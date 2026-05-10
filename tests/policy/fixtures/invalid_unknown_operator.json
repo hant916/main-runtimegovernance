@@ -1,0 +1,11 @@
+{
+  "policy_id": "bad.operator",
+  "version": "1.0.0",
+  "decision": "require_review",
+  "severity": "high",
+  "match": {
+    "arguments.amount_eur": {
+      "above": 500
+    }
+  }
+}

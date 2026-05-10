@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ailuros"
+version = "0.0.0"
+description = "Ailuros Governance Runtime"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic>=2,<3",
+  "typer>=0.12,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.8",
+  "pytest>=8",
+  "ruff>=0.4",
+]
+
+[project.scripts]
+ailuros = "ailuros.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]

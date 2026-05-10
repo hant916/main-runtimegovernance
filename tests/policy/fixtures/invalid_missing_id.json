@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "decision": "require_review",
+  "severity": "high",
+  "match": {
+    "tool_name": "payment.issue_refund"
+  }
+}

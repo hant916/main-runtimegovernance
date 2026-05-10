@@ -1,0 +1,117 @@
+from datetime import UTC, datetime
+
+import pytest
+
+from ailuros.errors import AilurosDataCorruptionError
+from ailuros.models import (
+    AuditReport,
+    Environment,
+    EvaluationResult,
+    GovernanceDecision,
+    GovernanceDecisionType,
+    ReplayResult,
+    Run,
+    RunStatus,
+    RuntimeEvent,
+    RuntimeEventType,
+    Severity,
+    Step,
+    StepStatus,
+    StepType,
+)
+from ailuros.storage import SQLiteStorage
+
+
+def test_storage_round_trips_records(tmp_path):
+    storage = SQLiteStorage(tmp_path / "runtime.sqlite")
+    storage.init()
+    now = datetime.now(UTC)
+    run = Run(
+        run_id="run_1",
+        agent_id="agent",
+        environment=Environment.DEVELOPMENT,
+        status=RunStatus.RUNNING,
+        input={"prompt": "hi"},
+        created_at=now,
+        updated_at=now,
+    )
+    storage.create_run(run)
+    step = Step(
+        step_id="step_1",
+        run_id=run.run_id,
+        step_type=StepType.TOOL,
+        status=StepStatus.STARTED,
+        created_at=now,
+        updated_at=now,
+    )
+    storage.create_step(step)
+    first = storage.append_event(
+        RuntimeEvent(
+            event_id="evt_1",
+            run_id=run.run_id,
+            event_type=RuntimeEventType.RUN_STARTED,
+            timestamp=now,
+            payload={"a": 1},
+        )
+    )
+    second = storage.append_event(
+        RuntimeEvent(
+            event_id="evt_2",
+            run_id=run.run_id,
+            event_type=RuntimeEventType.RUN_COMPLETED,
+            timestamp=now,
+            payload={"b": 2},
+        )
+    )
+    storage.save_governance_decision(
+        GovernanceDecision(
+            decision_id="dec_1",
+            run_id=run.run_id,
+            decision=GovernanceDecisionType.ALLOW,
+            allowed=True,
+            reason="ok",
+            severity=Severity.LOW,
+            created_at=now,
+        )
+    )
+    storage.save_evaluation(
+        EvaluationResult(
+            evaluation_id="eval_1",
+            run_id=run.run_id,
+            evaluator="test",
+            passed=True,
+            created_at=now,
+        )
+    )
+    storage.save_audit_report(AuditReport(audit_id="audit_1", run_id=run.run_id, created_at=now))
+    storage.save_replay_result(
+        ReplayResult(replay_id="replay_1", run_id=run.run_id, status="completed", created_at=now)
+    )
+
+    assert first.sequence == 1
+    assert second.sequence == 2
+    assert storage.get_run(run.run_id).input == {"prompt": "hi"}
+    assert storage.get_step(step.step_id).step_type is StepType.TOOL
+    assert [event.sequence for event in storage.list_events(run.run_id)] == [1, 2]
+
+
+def test_corrupt_json_raises_explicit_error(tmp_path):
+    storage = SQLiteStorage(tmp_path / "runtime.sqlite")
+    storage.init()
+    storage._connect().execute(  # noqa: SLF001
+        "INSERT INTO runs VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            "run_bad",
+            "agent",
+            "development",
+            "running",
+            None,
+            None,
+            "{bad",
+            datetime.now(UTC).isoformat(),
+            datetime.now(UTC).isoformat(),
+        ),
+    )
+
+    with pytest.raises(AilurosDataCorruptionError):
+        storage.get_run("run_bad")
