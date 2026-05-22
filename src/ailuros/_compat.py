@@ -1,5 +1,1 @@
-from enum import Enum
-
-
-class StrEnum(str, Enum):
-    pass
+from enum import StrEnum as StrEnum
