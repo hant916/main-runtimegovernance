@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from ailuros import AilurosRuntime, Environment, RunStatus
+from ailuros.path import ExpectedPath
 
 REFUND_WAS_CALLED = False
 
@@ -37,6 +38,13 @@ def run_demo(storage_path: str | Path = "ailuros.sqlite") -> tuple[str, bool]:
         order_id="ORD-9231",
         amount_eur=order["amount_eur"],
         reason="customer_request",
+    )
+    runtime.validate_path(
+        run.run_id,
+        ExpectedPath(
+            path_id="refund_review",
+            required_tool_calls=["payment.issue_refund"],
+        ),
     )
     if result.blocked:
         runtime.complete_run(
