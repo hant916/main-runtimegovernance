@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,7 +31,7 @@ class SQLiteStorage:
             conn.executescript(sql)
             conn.execute(
                 "INSERT OR IGNORE INTO migrations(version, applied_at) VALUES (?, ?)",
-                ("001_initial", datetime.now(timezone.utc).isoformat()),
+                ("001_initial", datetime.now(UTC).isoformat()),
             )
 
     def create_run(self, run: Run) -> None:
@@ -69,7 +69,7 @@ class SQLiteStorage:
         with self._connect() as conn:
             cur = conn.execute(
                 "UPDATE runs SET status = ?, updated_at = ? WHERE run_id = ?",
-                (status.value, datetime.now(timezone.utc).isoformat(), run_id),
+                (status.value, datetime.now(UTC).isoformat(), run_id),
             )
         if cur.rowcount == 0:
             raise AilurosNotFoundError(f"run not found: {run_id}")
@@ -110,7 +110,7 @@ class SQLiteStorage:
         with self._connect() as conn:
             cur = conn.execute(
                 "UPDATE steps SET status = ?, updated_at = ? WHERE step_id = ?",
-                (status.value, datetime.now(timezone.utc).isoformat(), step_id),
+                (status.value, datetime.now(UTC).isoformat(), step_id),
             )
         if cur.rowcount == 0:
             raise AilurosNotFoundError(f"step not found: {step_id}")
@@ -118,7 +118,8 @@ class SQLiteStorage:
     def append_event(self, event: RuntimeEvent) -> RuntimeEvent:
         with self._connect() as conn:
             row = conn.execute(
-                "SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence FROM events WHERE run_id = ?",
+                "SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence "
+                "FROM events WHERE run_id = ?",
                 (event.run_id,),
             ).fetchone()
             sequence = int(row["next_sequence"])

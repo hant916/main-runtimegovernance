@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from ailuros._compat import StrEnum
 
+
 class RuntimeEventType(StrEnum):
     RUN_STARTED = "run_started"
     USER_INPUT_RECEIVED = "user_input_received"

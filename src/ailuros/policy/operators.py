@@ -16,7 +16,9 @@ class OperatorResult:
     reason: str = ""
 
 
-def evaluate_operator(operator: PolicyOperator, actual: Any, expected: Any = None) -> OperatorResult:
+def evaluate_operator(
+    operator: PolicyOperator, actual: Any, expected: Any = None
+) -> OperatorResult:
     if operator is PolicyOperator.EXISTS:
         return OperatorResult(actual is not MISSING)
     if operator is PolicyOperator.NOT_EXISTS:

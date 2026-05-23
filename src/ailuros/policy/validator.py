@@ -15,7 +15,9 @@ class PolicyValidator:
     def validate(self, data: dict[str, Any], source: Path | None = None) -> Policy:
         missing = self.required_fields - data.keys()
         if missing:
-            raise PolicyValidationError(self._message(source, f"missing required field: {sorted(missing)[0]}"))
+            raise PolicyValidationError(
+                self._message(source, f"missing required field: {sorted(missing)[0]}")
+            )
         self._validate_conditions(data.get("match", {}), source)
         self._validate_conditions(data.get("scope", {}), source)
         self._validate_conditions(data.get("requires_previous_steps", {}), source)

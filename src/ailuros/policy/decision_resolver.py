@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
 import uuid
+from datetime import UTC, datetime
 
 from ailuros.models import GovernanceDecision, GovernanceDecisionType, Policy, Severity
 
@@ -28,7 +28,7 @@ class DecisionResolver:
                 allowed=True,
                 reason="No matching policy.",
                 severity=Severity.LOW,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.now(UTC),
             )
         winner = sorted(
             policies,
@@ -47,7 +47,7 @@ class DecisionResolver:
             reason=winner.reason or f"Matched policy {winner.policy_id}.",
             severity=winner.severity,
             matched_policy_ids=sorted(policy.policy_id for policy in policies),
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
 

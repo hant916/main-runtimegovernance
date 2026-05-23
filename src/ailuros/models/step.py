@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 from ailuros._compat import StrEnum
 
+
 class StepType(StrEnum):
     USER_INPUT = "user_input"
     AGENT = "agent"
