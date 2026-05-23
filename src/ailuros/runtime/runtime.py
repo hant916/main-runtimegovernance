@@ -15,6 +15,7 @@ from ailuros.models import (
     RuntimeEventType,
     Severity,
 )
+from ailuros.path import ExpectedPath, PathValidationResult, PathValidator
 from ailuros.policy import DecisionResolver, PolicyEngine, PolicyLoader, ToolCallContext
 from ailuros.runtime.clock import now_utc
 from ailuros.runtime.ids import new_decision_id, new_event_id, new_run_id
@@ -134,6 +135,18 @@ class AilurosRuntime:
     def list_events(self, run_id: str) -> list[RuntimeEvent]:
         return self.storage.list_events(run_id)
 
+    def validate_path(
+        self, run_id: str, expected_path: ExpectedPath
+    ) -> PathValidationResult:
+        self._require_run(run_id)
+        result = PathValidator.validate(expected_path, self.list_events(run_id))
+        self.record_event(
+            run_id,
+            RuntimeEventType.PATH_VALIDATION_RESULT,
+            result.model_dump(mode="json"),
+        )
+        return result
+
     def before_tool_call(
         self,
         run_id: str,
@@ -149,7 +162,10 @@ class AilurosRuntime:
             {"tool_name": tool_name, "arguments": args, "metadata": metadata or {}},
         )
         context = ToolCallContext(
-            environment=self.environment, tool_name=tool_name, arguments=args, metadata=metadata or {}
+            environment=self.environment,
+            tool_name=tool_name,
+            arguments=args,
+            metadata=metadata or {},
         )
         evaluation = self.policy_engine.evaluate_tool_call(context)
         self.record_event(
@@ -163,12 +179,20 @@ class AilurosRuntime:
         )
         decision = self.decision_resolver.resolve(run_id, evaluation.matched_policies)
         self.storage.save_governance_decision(decision)
-        self.record_event(run_id, RuntimeEventType.GOVERNANCE_DECISION, decision.model_dump(mode="json"))
+        self.record_event(
+            run_id,
+            RuntimeEventType.GOVERNANCE_DECISION,
+            decision.model_dump(mode="json"),
+        )
         if not decision.allowed:
             self.record_event(
                 run_id,
                 RuntimeEventType.TOOL_CALL_BLOCKED,
-                {"tool_name": tool_name, "decision": decision.decision.value, "reason": decision.reason},
+                {
+                    "tool_name": tool_name,
+                    "decision": decision.decision.value,
+                    "reason": decision.reason,
+                },
             )
         return decision
 
