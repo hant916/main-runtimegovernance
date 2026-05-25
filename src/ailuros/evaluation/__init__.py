@@ -1,3 +1,4 @@
+from ailuros.evaluation.cases import EvaluationCaseLoadError, load_evaluation_cases
 from ailuros.evaluation.models import (
     AllowedToolExpectation,
     BlockedToolExpectation,
@@ -17,6 +18,7 @@ __all__ = [
     "AllowedToolExpectation",
     "BlockedToolExpectation",
     "EvaluationCase",
+    "EvaluationCaseLoadError",
     "EvaluationEvidence",
     "EvaluationExpectation",
     "EvaluationFailure",
@@ -26,4 +28,5 @@ __all__ = [
     "GovernanceDecisionExpectation",
     "PathValidationExpectation",
     "ToolNotExecutedExpectation",
+    "load_evaluation_cases",
 ]

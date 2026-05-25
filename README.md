@@ -14,6 +14,7 @@ The primary example is the refund demo in `examples/refund_agent`, where a high-
 - Inspect stored runs and timelines from the CLI.
 - Replay a stored timeline by printing its events; replay does not invoke tools.
 - Build a compact audit summary from stored events; audit does not recompute policy.
+- Evaluate stored timelines against JSON golden cases; eval does not recompute policy or invoke tools.
 - Validate JSON policy files from the CLI.
 
 ## Governance flow
@@ -28,12 +29,12 @@ agent code
   -> blocked calls record the block and do not call the wrapped function
   -> validate_path compares an ExpectedPath with recorded tool-call events
   -> complete_run records the final run status and output
-  -> run show, replay, and audit read the stored timeline
+  -> run show, replay, audit, and eval read the stored timeline
 ```
 
 Path validation is a recorded check over observed events. It reports missing required calls, forbidden observed calls, unexpected calls, and malformed tool-call events. It is not documented here as an execution blocker; in the refund demo, the refund is blocked by policy before the refund function can run.
 
-Audit and replay are read-only CLI views over stored timeline data. `replay` prints the stored event sequence. `audit` summarizes the stored decision, reason, tool, and path-validation status.
+Audit, replay, and eval are read-only CLI views over stored timeline data. `replay` prints the stored event sequence. `audit` summarizes the stored decision, reason, tool, and path-validation status. `eval` loads JSON `EvaluationCase` files and prints PASS/FAIL with evidence sequence references.
 
 ## Quickstart
 
@@ -69,6 +70,7 @@ python -m ailuros run list
 python -m ailuros run show <run_id>
 python -m ailuros replay <run_id>
 python -m ailuros audit <run_id>
+python -m ailuros eval <run_id> --case examples/refund_agent/evaluation/high_refund_requires_review.json
 ```
 
 If the database is somewhere else, pass it before the command:
@@ -95,4 +97,4 @@ python -m mypy src
 
 ## Not implemented in v0.1
 
-The current repository does not implement a server, external runtime adapters, an evaluation harness, regression comparison workflows, or a full documentation site. Some model names may exist as public data types, but this README only treats the runtime kernel, policy gate, path validation, stored timelines, audit/replay CLI, and refund demo as implemented behavior.
+The current repository does not implement a server, external runtime adapters, regression comparison workflows, or a full documentation site. Some model names may exist as public data types, but this README only treats the runtime kernel, policy gate, path validation, stored timelines, audit/replay/eval CLI, and refund demo as implemented behavior.

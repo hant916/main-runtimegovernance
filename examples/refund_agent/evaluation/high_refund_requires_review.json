@@ -1,0 +1,36 @@
+{
+  "id": "refund.high_value_requires_review.golden",
+  "name": "High-value refund requires review and does not execute refund tool",
+  "expectations": [
+    {
+      "type": "governance_decision",
+      "decision": "require_review",
+      "allowed": false,
+      "severity": "high"
+    },
+    {
+      "type": "blocked_tool",
+      "tool_name": "payment.issue_refund",
+      "decision": "require_review"
+    },
+    {
+      "type": "tool_not_executed",
+      "tool_name": "payment.issue_refund"
+    },
+    {
+      "type": "path_validation",
+      "path_id": "refund_review",
+      "valid": true
+    },
+    {
+      "type": "event_sequence_contains",
+      "event_types": [
+        "tool_call_requested",
+        "policy_evaluation_result",
+        "governance_decision",
+        "tool_call_blocked",
+        "path_validation_result"
+      ]
+    }
+  ]
+}
