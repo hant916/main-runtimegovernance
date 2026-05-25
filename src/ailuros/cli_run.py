@@ -14,7 +14,7 @@ app = typer.Typer(help="Inspect runs and timelines.")
 _db_override: Path | None = None
 
 
-def set_db_override(path: Path) -> None:
+def set_db_override(path: Path | None) -> None:
     global _db_override
     _db_override = path
 
