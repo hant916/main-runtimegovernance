@@ -5,6 +5,7 @@ import typer
 
 from ailuros.audit import build_audit_summary
 from ailuros.cli_policy import app as policy_app
+from ailuros.cli_regression import app as regression_app
 from ailuros.cli_run import app as run_app
 from ailuros.cli_run import format_event, open_storage
 from ailuros.errors import AilurosDataCorruptionError, AilurosNotFoundError
@@ -15,6 +16,7 @@ from ailuros.runtime import AilurosRuntime
 app = typer.Typer(help="Ailuros Governance Runtime")
 app.add_typer(run_app, name="run")
 app.add_typer(policy_app, name="policy")
+app.add_typer(regression_app, name="regression")
 
 
 @app.callback()
