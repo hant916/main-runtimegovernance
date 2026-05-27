@@ -97,4 +97,4 @@ python -m mypy src
 
 ## Not implemented in v0.1
 
-The current repository does not implement a server, external runtime adapters, regression comparison workflows, or a full documentation site. Some model names may exist as public data types, but this README only treats the runtime kernel, policy gate, path validation, stored timelines, audit/replay/eval CLI, and refund demo as implemented behavior.
+The current repository does not implement a server, framework-specific adapters (LangChain, LlamaIndex, etc.), regression comparison workflows, or a full documentation site. A framework-neutral adapter contract skeleton (`src/ailuros/adapters/`) is in place with a reference `LocalCallableAdapter` that validates blocked calls never reach underlying tools. Some model names may exist as public data types, but this README only treats the runtime kernel, policy gate, path validation, stored timelines, audit/replay/eval CLI, refund demo, and adapter contract boundary as implemented behavior.
