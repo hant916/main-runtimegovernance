@@ -116,3 +116,32 @@ def eval_run(
     typer.echo(f"Summary: {len(results) - len(failed)} passed, {len(failed)} failed")
     if failed:
         raise typer.Exit(1)
+
+
+@app.command()
+def server(
+    host: Annotated[
+        str,
+        typer.Option("--host", help="Bind address. Default 127.0.0.1 (localhost only)."),
+    ] = "127.0.0.1",
+    port: Annotated[
+        int,
+        typer.Option("--port", help="Listen port."),
+    ] = 8000,
+    db: Annotated[
+        Path | None,
+        typer.Option("--db", help="SQLite database path."),
+    ] = None,
+) -> None:
+    from ailuros.server import run_server
+
+    try:
+        storage = open_storage(db)
+    except typer.BadParameter as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    try:
+        run_server(storage=storage, host=host, port=port)
+    except OSError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
