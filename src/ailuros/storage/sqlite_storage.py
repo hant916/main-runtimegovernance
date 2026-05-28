@@ -9,6 +9,7 @@ from typing import Any
 from ailuros.errors import AilurosDataCorruptionError, AilurosNotFoundError, AilurosStorageError
 from ailuros.models import (
     AuditReport,
+    EvaluationFinding,
     EvaluationResult,
     GovernanceDecision,
     ReplayResult,
@@ -190,6 +191,23 @@ class SQLiteStorage:
                 ),
             )
 
+    def list_evaluations(self) -> list[EvaluationResult]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM evaluations ORDER BY created_at DESC"
+            ).fetchall()
+        return [self._row_to_evaluation(row) for row in rows]
+
+    def get_evaluation(self, run_id: str) -> EvaluationResult:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM evaluations WHERE run_id = ? ORDER BY created_at DESC LIMIT 1",
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            raise AilurosNotFoundError(f"evaluation not found for run: {run_id}")
+        return self._row_to_evaluation(row)
+
     def save_audit_report(self, report: AuditReport) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -224,6 +242,17 @@ class SQLiteStorage:
             return conn
         except sqlite3.Error as exc:
             raise AilurosStorageError(str(exc)) from exc
+
+    def _row_to_evaluation(self, row: sqlite3.Row) -> EvaluationResult:
+        return EvaluationResult(
+            evaluation_id=row["evaluation_id"],
+            run_id=row["run_id"],
+            evaluator=row["evaluator"],
+            passed=bool(row["passed"]),
+            findings=[EvaluationFinding(**f) for f in self._loads(row["findings_json"])],
+            metadata=self._loads(row["metadata_json"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
 
     def _row_to_run(self, row: sqlite3.Row) -> Run:
         return Run(

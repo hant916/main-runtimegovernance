@@ -15,6 +15,20 @@ from ailuros.storage import SQLiteStorage
 logger = logging.getLogger(__name__)
 
 
+def _build_evaluation_summary(ev: Any) -> dict[str, Any]:
+    total = len(ev.findings) or 1
+    passed = ev.passed
+    return {
+        "run_id": ev.run_id,
+        "evaluator": ev.evaluator,
+        "status": "passed" if passed else "failed",
+        "total_cases": total,
+        "passed_cases": total if passed else 0,
+        "failed_cases": 0 if passed else total,
+        "created_at": ev.created_at.isoformat(),
+    }
+
+
 class _Handler(BaseHTTPRequestHandler):
     storage: SQLiteStorage | None = None
 
@@ -49,6 +63,12 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json(data)
                 return
 
+            if path == "/evaluations":
+                evaluations = storage.list_evaluations()
+                data = [_build_evaluation_summary(ev) for ev in evaluations]
+                self._send_json(data)
+                return
+
             parts = path.split("/")
             if len(parts) == 4 and parts[1] == "runs":
                 run_id = parts[2]
@@ -58,6 +78,11 @@ class _Handler(BaseHTTPRequestHandler):
                 if parts[3] == "audit":
                     self._handle_audit(storage, run_id)
                     return
+
+            if len(parts) == 3 and parts[1] == "evaluations":
+                run_id = parts[2]
+                self._handle_evaluation_detail(storage, run_id)
+                return
 
             self._send_error(404, "Not found")
         except Exception:
@@ -90,6 +115,14 @@ class _Handler(BaseHTTPRequestHandler):
             "tool": summary.tool,
             "path_validation": summary.path_validation,
         })
+
+    def _handle_evaluation_detail(self, storage: SQLiteStorage, run_id: str) -> None:
+        try:
+            ev = storage.get_evaluation(run_id)
+        except AilurosNotFoundError:
+            self._send_error(404, f"Evaluation not found for run: {run_id}")
+            return
+        self._send_json(ev.model_dump(mode="json"))
 
     def log_message(self, format: str, *args: Any) -> None:
         logger.info("access: %s", format % args)
