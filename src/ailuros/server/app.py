@@ -111,6 +111,17 @@ class _Handler(BaseHTTPRequestHandler):
                 if parts[3] == "audit":
                     self._handle_audit(storage, run_id)
                     return
+                if parts[3] == "events":
+                    limit, offset, err = self._parse_pagination()
+                    if err:
+                        self._send_error(400, err)
+                        return
+                    self._handle_run_events(storage, run_id, limit=limit, offset=offset)
+                    return
+
+            if len(parts) == 3 and parts[1] == "runs" and parts[2]:
+                self._handle_run_detail(storage, parts[2])
+                return
 
             if len(parts) == 3 and parts[1] == "evaluations":
                 run_id = parts[2]
@@ -153,6 +164,31 @@ class _Handler(BaseHTTPRequestHandler):
             "reason": summary.reason,
             "tool": summary.tool,
             "path_validation": summary.path_validation,
+        })
+
+    def _handle_run_detail(self, storage: SQLiteStorage, run_id: str) -> None:
+        try:
+            run = storage.get_run(run_id)
+        except AilurosNotFoundError:
+            self._send_error(404, f"Run not found: {run_id}")
+            return
+        self._send_json({
+            "run": run.model_dump(mode="json"),
+            "metadata_version": 1,
+        })
+
+    def _handle_run_events(
+        self, storage: SQLiteStorage, run_id: str,
+        limit: int | None = None, offset: int | None = None,
+    ) -> None:
+        try:
+            events = storage.list_events(run_id, limit=limit, offset=offset)
+        except AilurosNotFoundError:
+            self._send_error(404, f"Run not found: {run_id}")
+            return
+        self._send_json({
+            "events": [e.model_dump(mode="json") for e in events],
+            "metadata_version": 1,
         })
 
     def _handle_evaluation_detail(self, storage: SQLiteStorage, run_id: str) -> None:
