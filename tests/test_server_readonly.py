@@ -4,7 +4,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import HTTPServer
 from pathlib import Path
 from typing import Any
@@ -19,7 +19,7 @@ from ailuros.storage import SQLiteStorage
 
 
 def _make_run(run_id: str, agent_id: str = "test-agent") -> Run:
-    now = datetime.now(timezone.utc)  # noqa: UP017
+    now = datetime.now(UTC)
     return Run(
         run_id=run_id,
         agent_id=agent_id,
@@ -42,7 +42,7 @@ def _make_event(
         event_id=event_id,
         run_id=run_id,
         event_type=event_type,
-        timestamp=datetime.now(timezone.utc),  # noqa: UP017
+        timestamp=datetime.now(UTC),
         payload=payload or {},
         sequence=sequence,
     )

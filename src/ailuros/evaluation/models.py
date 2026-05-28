@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -51,7 +51,7 @@ class EventSequenceContainsExpectation(BaseModel):
     event_types: list[RuntimeEventType]
 
 
-EvaluationExpectation: TypeAlias = Annotated[
+type EvaluationExpectation = Annotated[
     GovernanceDecisionExpectation
     | BlockedToolExpectation
     | AllowedToolExpectation

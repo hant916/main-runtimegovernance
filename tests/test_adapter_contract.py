@@ -1,6 +1,6 @@
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -24,7 +24,7 @@ def _make_decision(
         decision=decision_type,
         allowed=decision_type == GovernanceDecisionType.ALLOW,
         reason=reason,
-        created_at=datetime.now(tz=timezone.utc),  # noqa: UP017
+        created_at=datetime.now(tz=UTC),
     )
 
 

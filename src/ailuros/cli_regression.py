@@ -6,10 +6,10 @@ from pathlib import Path
 import typer
 
 from ailuros.evaluation.models import EvaluationResult
-from ailuros.regression import RegressionService
+from ailuros.regression import RegressionService, replay_timeline
 from ailuros.regression.models import RegressionBaseline
 
-app = typer.Typer(help="Compare evaluation results against a saved baseline.")
+app = typer.Typer(help="Regression commands: compare baselines and replay timelines.")
 
 
 @app.command("compare")
@@ -52,3 +52,30 @@ def compare(
         raise typer.Exit(1)
     else:
         typer.echo(f"All clear -- {len(result.warnings)} informational warning(s)")
+
+
+@app.command("replay")
+def replay(
+    timeline_path: Path = typer.Argument(  # noqa: B008
+        ..., help="Path to a stored timeline JSON file (list of RuntimeEvent objects)."
+    ),
+) -> None:
+    try:
+        result = replay_timeline(timeline_path)
+    except Exception as exc:
+        typer.echo(f"unexpected error during replay: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    if result.failures:
+        typer.echo("Timeline replay regressions:", err=True)
+        for failure in result.failures:
+            typer.echo(f"  FAIL {failure}", err=True)
+
+    typer.echo(
+        f"Summary: {result.total_cases} case(s), "
+        f"{result.passed_cases} passed, "
+        f"{result.failed_cases} failed"
+    )
+
+    if not result.passed:
+        raise typer.Exit(1)

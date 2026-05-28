@@ -4,7 +4,7 @@ import json
 import threading
 import urllib.error
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import HTTPServer
 from pathlib import Path
 from typing import Any
@@ -18,7 +18,7 @@ from ailuros.storage import SQLiteStorage
 
 
 def _make_run(run_id: str) -> Run:
-    now = datetime.now(timezone.utc)  # noqa: UP017
+    now = datetime.now(UTC)
     return Run(
         run_id=run_id,
         agent_id="test-agent",
@@ -40,7 +40,7 @@ def _make_evaluation(
         run_id=run_id,
         evaluator="test-evaluator",
         passed=passed,
-        created_at=datetime.now(timezone.utc),  # noqa: UP017
+        created_at=datetime.now(UTC),
     )
 
 
