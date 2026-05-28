@@ -1,13 +1,24 @@
 from __future__ import annotations
 
 import json
+from enum import StrEnum
 from pathlib import Path
+from typing import Annotated, Any
 
 import typer
 
 from ailuros.evaluation.models import EvaluationResult
 from ailuros.regression import RegressionService, replay_timeline
 from ailuros.regression.models import RegressionBaseline
+
+
+class OutputFormat(StrEnum):
+    text = "text"
+    json = "json"
+
+
+def _print_json(data: Any) -> None:
+    typer.echo(json.dumps(data, indent=2, default=str))
 
 app = typer.Typer(help="Regression commands: compare baselines and replay timelines.")
 
@@ -16,6 +27,10 @@ app = typer.Typer(help="Regression commands: compare baselines and replay timeli
 def compare(
     current_results: Path,
     baseline: Path,
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format."),
+    ] = OutputFormat.text,
 ) -> None:
     try:
         with open(current_results, encoding="utf-8") as f:
@@ -37,6 +52,12 @@ def compare(
         raise typer.Exit(1) from exc
 
     result = RegressionService().compare(results, baseline_obj)
+
+    if output == OutputFormat.json:
+        _print_json(result.model_dump(mode="json"))
+        if result.regressions:
+            raise typer.Exit(1)
+        return
 
     typer.echo(f"Compared {len(result.case_ids_compared)} case(s)")
     for diff in result.regressions:

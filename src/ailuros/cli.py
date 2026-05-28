@@ -1,5 +1,9 @@
+from __future__ import annotations
+
+import json
+from enum import StrEnum
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -12,6 +16,15 @@ from ailuros.errors import AilurosDataCorruptionError, AilurosNotFoundError
 from ailuros.evaluation import EvaluationCaseLoadError, EvaluationService, load_evaluation_cases
 from ailuros.replay import ReplayService
 from ailuros.runtime import AilurosRuntime
+
+
+class OutputFormat(StrEnum):
+    text = "text"
+    json = "json"
+
+
+def _print_json(data: Any) -> None:
+    typer.echo(json.dumps(data, indent=2, default=str))
 
 app = typer.Typer(help="Ailuros Governance Runtime")
 app.add_typer(run_app, name="run")
@@ -32,17 +45,39 @@ def main(
 
 
 @app.command()
-def version() -> None:
-    typer.echo(AilurosRuntime().get_version())
+def version(
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format."),
+    ] = OutputFormat.text,
+) -> None:
+    ver = AilurosRuntime().get_version()
+    if output == OutputFormat.json:
+        _print_json({"name": "ailuros", "version": ver})
+    else:
+        typer.echo(ver)
 
 
 @app.command()
-def replay(run_id: str) -> None:
+def replay(
+    run_id: str,
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format."),
+    ] = OutputFormat.text,
+) -> None:
     try:
         events = ReplayService(open_storage()).load_run(run_id)
     except (AilurosNotFoundError, AilurosDataCorruptionError, typer.BadParameter) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
+
+    if output == OutputFormat.json:
+        _print_json({
+            "run_id": run_id,
+            "events": [e.model_dump(mode="json") for e in events],
+        })
+        return
 
     typer.echo(f"Run: {run_id}")
     typer.echo("Timeline:")
@@ -51,13 +86,29 @@ def replay(run_id: str) -> None:
 
 
 @app.command()
-def audit(run_id: str) -> None:
+def audit(
+    run_id: str,
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format."),
+    ] = OutputFormat.text,
+) -> None:
     try:
         events = ReplayService(open_storage()).load_run(run_id)
         summary = build_audit_summary(events)
     except (AilurosNotFoundError, AilurosDataCorruptionError, typer.BadParameter) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
+
+    if output == OutputFormat.json:
+        _print_json({
+            "run_id": run_id,
+            "decision": summary.decision,
+            "reason": summary.reason,
+            "tool": summary.tool,
+            "path_validation": summary.path_validation,
+        })
+        return
 
     typer.echo(f"Run: {run_id}")
     typer.echo("Audit:")
@@ -77,6 +128,10 @@ def eval_run(
             help="EvaluationCase JSON file. May be provided more than once.",
         ),
     ] = None,
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format."),
+    ] = OutputFormat.text,
 ) -> None:
     if not case_files:
         typer.echo("at least one --case file is required", err=True)
@@ -100,6 +155,17 @@ def eval_run(
         raise typer.Exit(1) from exc
 
     failed = [result for result in results if not result.passed]
+
+    if output == OutputFormat.json:
+        _print_json({
+            "run_id": run_id,
+            "results": [r.model_dump(mode="json") for r in results],
+            "summary": {"passed": len(results) - len(failed), "failed": len(failed)},
+        })
+        if failed:
+            raise typer.Exit(1)
+        return
+
     typer.echo(f"Evaluation: {run_id}")
     for result in results:
         status = "PASS" if result.passed else "FAIL"

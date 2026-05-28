@@ -2,13 +2,24 @@ from __future__ import annotations
 
 import json
 import os
+from enum import StrEnum
 from pathlib import Path
+from typing import Annotated, Any
 
 import typer
 
 from ailuros.errors import AilurosDataCorruptionError, AilurosNotFoundError
 from ailuros.models import RuntimeEvent
 from ailuros.storage import SQLiteStorage
+
+
+class OutputFormat(StrEnum):
+    text = "text"
+    json = "json"
+
+
+def _print_json(data: Any) -> None:
+    typer.echo(json.dumps(data, indent=2, default=str))
 
 app = typer.Typer(help="Inspect runs and timelines.")
 _db_override: Path | None = None
@@ -46,7 +57,13 @@ def list_runs() -> None:
 
 
 @app.command("show")
-def show_run(run_id: str) -> None:
+def show_run(
+    run_id: str,
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format."),
+    ] = OutputFormat.text,
+) -> None:
     try:
         storage = open_storage()
         run = storage.get_run(run_id)
@@ -54,6 +71,15 @@ def show_run(run_id: str) -> None:
     except (AilurosNotFoundError, AilurosDataCorruptionError, typer.BadParameter) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
+
+    if output == OutputFormat.json:
+        _print_json({
+            "run_id": run.run_id,
+            "status": run.status.value,
+            "agent_id": run.agent_id,
+            "events": [e.model_dump(mode="json") for e in events],
+        })
+        return
 
     typer.echo(f"Run: {run.run_id}")
     typer.echo(f"Status: {run.status.value}")
