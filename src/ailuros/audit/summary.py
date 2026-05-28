@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ailuros.models import RuntimeEvent, RuntimeEventType
+from ailuros.storage.sqlite_storage import SQLiteStorage
 
 UNKNOWN = "unknown"
 ABSENT = "absent"
@@ -57,3 +58,46 @@ def _path_validation(payload: dict[str, Any]) -> str:
     if isinstance(value, bool):
         return "valid" if value else "invalid"
     return UNKNOWN
+
+
+@dataclass(frozen=True)
+class RunSummary:
+    run_id: str
+    status: str
+    event_count: int
+    decision_counts: dict[str, int]
+    blocked_count: int
+    review_count: int
+    started_at: str | None = None
+    completed_at: str | None = None
+    metadata_version: str = "1"
+
+
+def build_run_summary(storage: SQLiteStorage, run_id: str) -> RunSummary:
+    run = storage.get_run(run_id)
+    events = storage.list_events(run_id)
+
+    decision_counts: dict[str, int] = {}
+    started_at: str | None = None
+    completed_at: str | None = None
+
+    for event in events:
+        if event.event_type is RuntimeEventType.GOVERNANCE_DECISION:
+            decision = event.payload.get("decision")
+            if isinstance(decision, str):
+                decision_counts[decision] = decision_counts.get(decision, 0) + 1
+        elif event.event_type is RuntimeEventType.RUN_STARTED:
+            started_at = event.timestamp.isoformat()
+        elif event.event_type is RuntimeEventType.RUN_COMPLETED:
+            completed_at = event.timestamp.isoformat()
+
+    return RunSummary(
+        run_id=run.run_id,
+        status=run.status.value,
+        event_count=len(events),
+        decision_counts=decision_counts,
+        blocked_count=decision_counts.get("block", 0),
+        review_count=decision_counts.get("require_review", 0),
+        started_at=started_at,
+        completed_at=completed_at,
+    )

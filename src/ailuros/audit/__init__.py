@@ -1,3 +1,3 @@
-from ailuros.audit.summary import AuditSummary, build_audit_summary
+from ailuros.audit.summary import AuditSummary, RunSummary, build_audit_summary, build_run_summary
 
-__all__ = ["AuditSummary", "build_audit_summary"]
+__all__ = ["AuditSummary", "RunSummary", "build_audit_summary", "build_run_summary"]
