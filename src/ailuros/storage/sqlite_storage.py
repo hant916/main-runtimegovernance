@@ -118,25 +118,34 @@ class SQLiteStorage:
 
     def append_event(self, event: RuntimeEvent) -> RuntimeEvent:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence "
-                "FROM events WHERE run_id = ?",
-                (event.run_id,),
-            ).fetchone()
-            sequence = int(row["next_sequence"])
-            stored = event.model_copy(update={"sequence": sequence})
-            conn.execute(
-                "INSERT INTO events VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    stored.event_id,
-                    stored.run_id,
-                    stored.step_id,
-                    stored.event_type.value,
-                    stored.timestamp.isoformat(),
-                    self._dumps(stored.payload),
-                    stored.sequence,
-                ),
-            )
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+            except sqlite3.Error as exc:
+                raise AilurosStorageError(str(exc)) from exc
+            try:
+                row = conn.execute(
+                    "SELECT COALESCE(MAX(sequence), 0) + 1 AS next_sequence "
+                    "FROM events WHERE run_id = ?",
+                    (event.run_id,),
+                ).fetchone()
+                sequence = int(row["next_sequence"])
+                stored = event.model_copy(update={"sequence": sequence})
+                conn.execute(
+                    "INSERT INTO events VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        stored.event_id,
+                        stored.run_id,
+                        stored.step_id,
+                        stored.event_type.value,
+                        stored.timestamp.isoformat(),
+                        self._dumps(stored.payload),
+                        stored.sequence,
+                    ),
+                )
+                conn.execute("COMMIT")
+            except sqlite3.Error as exc:
+                conn.execute("ROLLBACK")
+                raise AilurosStorageError(str(exc)) from exc
         return stored
 
     def list_events(self, run_id: str) -> list[RuntimeEvent]:
@@ -239,6 +248,7 @@ class SQLiteStorage:
         try:
             conn = sqlite3.connect(self.path, isolation_level=None)
             conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA busy_timeout = 5000")
             return conn
         except sqlite3.Error as exc:
             raise AilurosStorageError(str(exc)) from exc

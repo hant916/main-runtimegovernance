@@ -1,3 +1,4 @@
+import concurrent.futures
 from datetime import UTC, datetime
 
 import pytest
@@ -93,6 +94,45 @@ def test_storage_round_trips_records(tmp_path):
     assert storage.get_run(run.run_id).input == {"prompt": "hi"}
     assert storage.get_step(step.step_id).step_type is StepType.TOOL
     assert [event.sequence for event in storage.list_events(run.run_id)] == [1, 2]
+
+
+def test_concurrent_event_append_same_run_produces_unique_sequences(tmp_path):
+    storage = SQLiteStorage(tmp_path / "concurrent.sqlite")
+    storage.init()
+    now = datetime.now(UTC)
+    run = Run(
+        run_id="concurrent_run",
+        agent_id="agent",
+        environment=Environment.DEVELOPMENT,
+        status=RunStatus.RUNNING,
+        created_at=now,
+        updated_at=now,
+    )
+    storage.create_run(run)
+
+    n = 20
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n) as executor:
+        futures = [
+            executor.submit(
+                storage.append_event,
+                RuntimeEvent(
+                    event_id=f"concurrent_evt_{i}",
+                    run_id=run.run_id,
+                    event_type=RuntimeEventType.RUN_STARTED,
+                    timestamp=now,
+                    payload={"i": i},
+                ),
+            )
+            for i in range(n)
+        ]
+        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+
+    sequences = [r.sequence for r in results]
+    assert len(sequences) == n
+    assert len(set(sequences)) == n, f"Duplicate sequences: {sequences}"
+
+    evts = storage.list_events(run.run_id)
+    assert [e.sequence for e in evts] == sorted(sequences)
 
 
 def test_corrupt_json_raises_explicit_error(tmp_path):
