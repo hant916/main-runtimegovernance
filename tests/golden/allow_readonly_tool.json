@@ -1,0 +1,12 @@
+{
+  "name": "allow_readonly_tool",
+  "description": "A read-only tool call is allowed when no policy restricts it.",
+  "input": {
+    "tool_name": "payment.get_status",
+    "arguments": {
+      "order_id": "ORD-123"
+    }
+  },
+  "expected_decision": "allow",
+  "policies": []
+}

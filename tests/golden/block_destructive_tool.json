@@ -1,0 +1,27 @@
+{
+  "name": "block_destructive_tool",
+  "description": "A high-value refund tool call is blocked by a matching policy.",
+  "input": {
+    "tool_name": "payment.issue_refund",
+    "arguments": {
+      "amount_eur": 999
+    }
+  },
+  "expected_decision": "block",
+  "policies": [
+    {
+      "policy_id": "refund.block_high_value",
+      "version": "1.0.0",
+      "decision": "block",
+      "severity": "high",
+      "enabled": true,
+      "match": {
+        "tool_name": "payment.issue_refund",
+        "arguments.amount_eur": {
+          "gt": 500
+        }
+      },
+      "reason": "High-value refunds are blocked."
+    }
+  ]
+}

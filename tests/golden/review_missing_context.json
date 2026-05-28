@@ -1,0 +1,24 @@
+{
+  "name": "review_missing_context",
+  "description": "A refund tool call that matches a require_review policy is flagged for review.",
+  "input": {
+    "tool_name": "payment.issue_refund",
+    "arguments": {
+      "amount_eur": 100
+    }
+  },
+  "expected_decision": "require_review",
+  "policies": [
+    {
+      "policy_id": "refund.require_manual_review",
+      "version": "1.0.0",
+      "decision": "require_review",
+      "severity": "high",
+      "enabled": true,
+      "match": {
+        "tool_name": "payment.issue_refund"
+      },
+      "reason": "All refunds require manual review."
+    }
+  ]
+}
