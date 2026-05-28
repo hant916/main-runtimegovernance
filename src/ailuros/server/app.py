@@ -189,6 +189,10 @@ class _Handler(BaseHTTPRequestHandler):
         self._send_json({
             "events": [e.model_dump(mode="json") for e in events],
             "metadata_version": 1,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+            },
         })
 
     def _handle_evaluation_detail(self, storage: SQLiteStorage, run_id: str) -> None:

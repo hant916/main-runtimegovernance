@@ -20,6 +20,8 @@ from ailuros.models import (
     StepStatus,
 )
 
+MAX_EVENT_LIMIT = 1000
+
 
 class SQLiteStorage:
     def __init__(self, path: str | Path) -> None:
@@ -180,6 +182,8 @@ class SQLiteStorage:
         limit: int | None = None, offset: int | None = None,
     ) -> list[RuntimeEvent]:
         self.get_run(run_id)
+        if limit is not None:
+            limit = min(limit, MAX_EVENT_LIMIT)
         with self._connect() as conn:
             sql = "SELECT * FROM events WHERE run_id = ? ORDER BY sequence ASC"
             params: list[Any] = [run_id]
