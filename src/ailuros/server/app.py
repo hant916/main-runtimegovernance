@@ -5,7 +5,7 @@ import logging
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from ailuros.audit import build_audit_summary
 from ailuros.errors import AilurosNotFoundError
@@ -43,6 +43,27 @@ class _Handler(BaseHTTPRequestHandler):
     def _send_error(self, status: int, message: str) -> None:
         self._send_json({"error": message}, status)
 
+    def _parse_pagination(self) -> tuple[int | None, int | None, str | None]:
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        limit: int | None = None
+        offset: int | None = None
+        if "limit" in params:
+            try:
+                limit = int(params["limit"][0])
+            except (ValueError, IndexError):
+                return None, None, "limit must be a non-negative integer"
+            if limit < 0:
+                return None, None, "limit must be a non-negative integer"
+        if "offset" in params:
+            try:
+                offset = int(params["offset"][0])
+            except (ValueError, IndexError):
+                return None, None, "offset must be a non-negative integer"
+            if offset < 0:
+                return None, None, "offset must be a non-negative integer"
+        return limit, offset, None
+
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
@@ -58,13 +79,21 @@ class _Handler(BaseHTTPRequestHandler):
                 return
 
             if path == "/runs":
-                runs = storage.list_runs()
+                limit, offset, err = self._parse_pagination()
+                if err:
+                    self._send_error(400, err)
+                    return
+                runs = storage.list_runs(limit=limit, offset=offset)
                 data = [run.model_dump(mode="json") for run in runs]
                 self._send_json(data)
                 return
 
             if path == "/evaluations":
-                evaluations = storage.list_evaluations()
+                limit, offset, err = self._parse_pagination()
+                if err:
+                    self._send_error(400, err)
+                    return
+                evaluations = storage.list_evaluations(limit=limit, offset=offset)
                 data = [_build_evaluation_summary(ev) for ev in evaluations]
                 self._send_json(data)
                 return
@@ -73,7 +102,11 @@ class _Handler(BaseHTTPRequestHandler):
             if len(parts) == 4 and parts[1] == "runs":
                 run_id = parts[2]
                 if parts[3] == "replay":
-                    self._handle_replay(storage, run_id)
+                    limit, offset, err = self._parse_pagination()
+                    if err:
+                        self._send_error(400, err)
+                        return
+                    self._handle_replay(storage, run_id, limit=limit, offset=offset)
                     return
                 if parts[3] == "audit":
                     self._handle_audit(storage, run_id)
@@ -93,9 +126,15 @@ class _Handler(BaseHTTPRequestHandler):
         cls = self.__class__
         return getattr(cls, "storage", None)
 
-    def _handle_replay(self, storage: SQLiteStorage, run_id: str) -> None:
+    def _handle_replay(
+        self, storage: SQLiteStorage, run_id: str,
+        limit: int | None = None, offset: int | None = None,
+    ) -> None:
         try:
-            events = ReplayService(storage).load_run(run_id)
+            if limit is not None or offset is not None:
+                events = storage.list_events(run_id, limit=limit, offset=offset)
+            else:
+                events = ReplayService(storage).load_run(run_id)
         except AilurosNotFoundError:
             self._send_error(404, f"Run not found: {run_id}")
             return

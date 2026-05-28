@@ -110,6 +110,32 @@ class TestEvaluationsList:
         assert statuses["run-pass"] == "passed"
         assert statuses["run-fail"] == "failed"
 
+    def test_limit(self, storage, server):
+        storage.create_run(_make_run("run-extra-1"))
+        storage.save_evaluation(_make_evaluation("eval-3", "run-extra-1", passed=True))
+        status, data = _get(server.server_address[1], "/evaluations?limit=1")
+        assert status == 200
+        assert len(data) == 1
+
+    def test_offset(self, storage, server):
+        storage.create_run(_make_run("run-extra-1"))
+        storage.save_evaluation(_make_evaluation("eval-3", "run-extra-1", passed=True))
+        status, data = _get(server.server_address[1], "/evaluations?offset=1")
+        assert status == 200
+        assert len(data) == 2
+
+    def test_invalid_limit_returns_400(self, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/evaluations?limit=abc")
+        assert exc.value.code == 400
+
+    def test_negative_offset_returns_400(self, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/evaluations?offset=-5")
+        assert exc.value.code == 400
+
 
 class TestEvaluationDetail:
     def test_returns_evaluation_for_known_run(self, server):

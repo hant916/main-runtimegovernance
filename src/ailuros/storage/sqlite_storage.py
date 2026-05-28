@@ -34,6 +34,23 @@ class SQLiteStorage:
                 "INSERT OR IGNORE INTO migrations(version, applied_at) VALUES (?, ?)",
                 ("001_initial", datetime.now(UTC).isoformat()),
             )
+            self._apply_pending_migrations(conn)
+
+    def _apply_pending_migrations(self, conn: sqlite3.Connection) -> None:
+        migrations_dir = Path(__file__).with_name("migrations")
+        applied = {
+            row["version"]
+            for row in conn.execute("SELECT version FROM migrations").fetchall()
+        }
+        for path in sorted(migrations_dir.glob("*.sql")):
+            version = path.stem
+            if version in applied:
+                continue
+            conn.executescript(path.read_text())
+            conn.execute(
+                "INSERT INTO migrations(version, applied_at) VALUES (?, ?)",
+                (version, datetime.now(UTC).isoformat()),
+            )
 
     def create_run(self, run: Run) -> None:
         with self._connect() as conn:
@@ -61,9 +78,19 @@ class SQLiteStorage:
             raise AilurosNotFoundError(f"run not found: {run_id}")
         return self._row_to_run(row)
 
-    def list_runs(self) -> list[Run]:
+    def list_runs(self, limit: int | None = None, offset: int | None = None) -> list[Run]:
         with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM runs ORDER BY created_at DESC").fetchall()
+            sql = "SELECT * FROM runs ORDER BY created_at DESC"
+            params: list[Any] = []
+            if limit is not None:
+                sql += " LIMIT ?"
+                params.append(limit)
+            if offset is not None:
+                if limit is None:
+                    sql += " LIMIT -1"
+                sql += " OFFSET ?"
+                params.append(offset)
+            rows = conn.execute(sql, params).fetchall()
         return [self._row_to_run(row) for row in rows]
 
     def update_run_status(self, run_id: str, status: RunStatus) -> None:
@@ -148,12 +175,23 @@ class SQLiteStorage:
                 raise AilurosStorageError(str(exc)) from exc
         return stored
 
-    def list_events(self, run_id: str) -> list[RuntimeEvent]:
+    def list_events(
+        self, run_id: str,
+        limit: int | None = None, offset: int | None = None,
+    ) -> list[RuntimeEvent]:
         self.get_run(run_id)
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM events WHERE run_id = ? ORDER BY sequence ASC", (run_id,)
-            ).fetchall()
+            sql = "SELECT * FROM events WHERE run_id = ? ORDER BY sequence ASC"
+            params: list[Any] = [run_id]
+            if limit is not None:
+                sql += " LIMIT ?"
+                params.append(limit)
+            if offset is not None:
+                if limit is None:
+                    sql += " LIMIT -1"
+                sql += " OFFSET ?"
+                params.append(offset)
+            rows = conn.execute(sql, params).fetchall()
         return [
             RuntimeEvent(
                 event_id=row["event_id"],
@@ -200,11 +238,21 @@ class SQLiteStorage:
                 ),
             )
 
-    def list_evaluations(self) -> list[EvaluationResult]:
+    def list_evaluations(
+        self, limit: int | None = None, offset: int | None = None,
+    ) -> list[EvaluationResult]:
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM evaluations ORDER BY created_at DESC"
-            ).fetchall()
+            sql = "SELECT * FROM evaluations ORDER BY created_at DESC"
+            params: list[Any] = []
+            if limit is not None:
+                sql += " LIMIT ?"
+                params.append(limit)
+            if offset is not None:
+                if limit is None:
+                    sql += " LIMIT -1"
+                sql += " OFFSET ?"
+                params.append(offset)
+            rows = conn.execute(sql, params).fetchall()
         return [self._row_to_evaluation(row) for row in rows]
 
     def get_evaluation(self, run_id: str) -> EvaluationResult:

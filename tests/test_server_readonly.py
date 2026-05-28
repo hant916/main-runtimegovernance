@@ -120,6 +120,61 @@ class TestListRuns:
         run_ids = [r["run_id"] for r in data]
         assert run_ids == ["run-b", "run-a"]
 
+    def test_limit(self, storage, server):
+        _populate_storage(storage, "run-a")
+        _populate_storage(storage, "run-b")
+        status, data = _get(server.server_address[1], "/runs?limit=1")
+        assert status == 200
+        assert len(data) == 1
+
+    def test_offset(self, storage, server):
+        _populate_storage(storage, "run-a")
+        _populate_storage(storage, "run-b")
+        status, data = _get(server.server_address[1], "/runs?offset=1")
+        assert status == 200
+        assert len(data) == 1
+        assert data[0]["run_id"] == "run-a"
+
+    def test_limit_with_offset(self, storage, server):
+        _populate_storage(storage, "run-a")
+        _populate_storage(storage, "run-b")
+        _populate_storage(storage, "run-c")
+        status, data = _get(server.server_address[1], "/runs?limit=1&offset=1")
+        assert status == 200
+        assert len(data) == 1
+        assert data[0]["run_id"] == "run-b"
+
+    def test_invalid_limit_returns_400(self, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/runs?limit=abc")
+        assert exc.value.code == 400
+
+    def test_negative_limit_returns_400(self, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/runs?limit=-1")
+        assert exc.value.code == 400
+
+    def test_invalid_offset_returns_400(self, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/runs?offset=abc")
+        assert exc.value.code == 400
+
+    def test_negative_offset_returns_400(self, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/runs?offset=-1")
+        assert exc.value.code == 400
+
+    def test_pagination_errors_contain_message(self, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            urllib.request.urlopen(_url(port, "/runs?limit=-5"))
+        body = json.loads(exc.value.read())
+        assert "error" in body
+
 
 class TestReplay:
     def test_not_found_returns_404(self, server):
@@ -147,6 +202,38 @@ class TestReplay:
             "tool_call_executed",
             "run_completed",
         ]
+
+    def test_limit(self, storage, server):
+        _populate_storage(storage, "run-1")
+        status, data = _get(server.server_address[1], "/runs/run-1/replay?limit=2")
+        assert status == 200
+        assert len(data) == 2
+
+    def test_offset(self, storage, server):
+        _populate_storage(storage, "run-1")
+        status, data = _get(server.server_address[1], "/runs/run-1/replay?offset=3")
+        assert status == 200
+        assert len(data) == 3
+        assert data[0]["sequence"] == 4
+
+    def test_limit_with_offset(self, storage, server):
+        _populate_storage(storage, "run-1")
+        status, data = _get(server.server_address[1], "/runs/run-1/replay?limit=2&offset=2")
+        assert status == 200
+        assert len(data) == 2
+        assert data[0]["sequence"] == 3
+
+    def test_replay_invalid_limit_returns_400(self, storage, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/runs/run-1/replay?limit=abc")
+        assert exc.value.code == 400
+
+    def test_replay_negative_offset_returns_400(self, storage, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/runs/run-1/replay?offset=-1")
+        assert exc.value.code == 400
 
 
 class TestAudit:

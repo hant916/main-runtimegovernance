@@ -135,6 +135,163 @@ def test_concurrent_event_append_same_run_produces_unique_sequences(tmp_path):
     assert [e.sequence for e in evts] == sorted(sequences)
 
 
+def _make_run_for_storage(storage, run_id: str):
+    run = Run(
+        run_id=run_id,
+        agent_id="agent",
+        environment=Environment.DEVELOPMENT,
+        status=RunStatus.COMPLETED,
+        input={"prompt": run_id},
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    storage.create_run(run)
+
+
+class TestListRunsPagination:
+    def test_default_returns_all(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        for i in range(5):
+            _make_run_for_storage(storage, f"run_{i}")
+        result = storage.list_runs()
+        assert len(result) == 5
+
+    def test_limit(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        for i in range(5):
+            _make_run_for_storage(storage, f"run_{i}")
+        result = storage.list_runs(limit=2)
+        assert len(result) == 2
+
+    def test_offset(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        for i in range(5):
+            _make_run_for_storage(storage, f"run_{i}")
+        result = storage.list_runs(offset=3)
+        assert len(result) == 2
+
+    def test_limit_with_offset(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        for i in range(5):
+            _make_run_for_storage(storage, f"run_{i}")
+        result = storage.list_runs(limit=2, offset=2)
+        assert len(result) == 2
+
+
+class TestListEventsPagination:
+    def test_default_returns_all(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        _make_run_for_storage(storage, "run_1")
+        now = datetime.now(UTC)
+        for i in range(5):
+            storage.append_event(
+                RuntimeEvent(
+                    event_id=f"evt_{i}", run_id="run_1",
+                    event_type=RuntimeEventType.RUN_STARTED,
+                    timestamp=now, payload={"i": i},
+                )
+            )
+        result = storage.list_events("run_1")
+        assert len(result) == 5
+
+    def test_limit(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        _make_run_for_storage(storage, "run_1")
+        now = datetime.now(UTC)
+        for i in range(5):
+            storage.append_event(
+                RuntimeEvent(
+                    event_id=f"evt_{i}", run_id="run_1",
+                    event_type=RuntimeEventType.RUN_STARTED,
+                    timestamp=now, payload={"i": i},
+                )
+            )
+        result = storage.list_events("run_1", limit=2)
+        assert len(result) == 2
+
+    def test_offset(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        _make_run_for_storage(storage, "run_1")
+        now = datetime.now(UTC)
+        for i in range(5):
+            storage.append_event(
+                RuntimeEvent(
+                    event_id=f"evt_{i}", run_id="run_1",
+                    event_type=RuntimeEventType.RUN_STARTED,
+                    timestamp=now, payload={"i": i},
+                )
+            )
+        result = storage.list_events("run_1", offset=3)
+        assert len(result) == 2
+        assert result[0].sequence == 4
+
+    def test_limit_with_offset(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        _make_run_for_storage(storage, "run_1")
+        now = datetime.now(UTC)
+        for i in range(5):
+            storage.append_event(
+                RuntimeEvent(
+                    event_id=f"evt_{i}", run_id="run_1",
+                    event_type=RuntimeEventType.RUN_STARTED,
+                    timestamp=now, payload={"i": i},
+                )
+            )
+        result = storage.list_events("run_1", limit=2, offset=2)
+        assert len(result) == 2
+        assert result[0].sequence == 3
+
+
+class TestListEvaluationsPagination:
+    def test_default_returns_all(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        _make_run_for_storage(storage, "run_1")
+        now = datetime.now(UTC)
+        for i in range(5):
+            storage.save_evaluation(
+                EvaluationResult(
+                    evaluation_id=f"eval_{i}", run_id="run_1",
+                    evaluator="test", passed=True,
+                    created_at=now,
+                )
+            )
+        result = storage.list_evaluations()
+        assert len(result) == 5
+
+    def test_limit(self, tmp_path):
+        storage = SQLiteStorage(tmp_path / "test.sqlite")
+        storage.init()
+        _make_run_for_storage(storage, "run_1")
+        now = datetime.now(UTC)
+        for i in range(5):
+            storage.save_evaluation(
+                EvaluationResult(
+                    evaluation_id=f"eval_{i}", run_id="run_1",
+                    evaluator="test", passed=True,
+                    created_at=now,
+                )
+            )
+        result = storage.list_evaluations(limit=2)
+        assert len(result) == 2
+
+
+def test_init_is_idempotent(tmp_path):
+    storage = SQLiteStorage(tmp_path / "idempotent.sqlite")
+    storage.init()
+    storage.init()
+    _make_run_for_storage(storage, "run_idem")
+    assert storage.get_run("run_idem").run_id == "run_idem"
+
+
 def test_corrupt_json_raises_explicit_error(tmp_path):
     storage = SQLiteStorage(tmp_path / "runtime.sqlite")
     storage.init()
