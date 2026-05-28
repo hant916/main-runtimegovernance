@@ -17,6 +17,7 @@ class ToolCallContext(BaseModel):
     tool_name: str
     arguments: dict[str, Any] = {}
     metadata: dict[str, Any] = {}
+    prior_events: list[dict[str, Any]] = []
 
 
 @dataclass(frozen=True)
@@ -38,6 +39,14 @@ class PolicyMatcher:
                 result = self._evaluate_condition(actual, condition)
                 if not result.matched:
                     failed.append(f"{field}: {result.reason or 'condition failed'}")
+        if policy.requires_previous_steps:
+            for field, condition in policy.requires_previous_steps.items():
+                actual = get_by_path(context_data, field)
+                result = self._evaluate_condition(actual, condition)
+                if not result.matched:
+                    failed.append(
+                        f"requires_previous_steps.{field}: {result.reason or 'condition failed'}"
+                    )
         return MatchDetails(matched=not failed, failed_conditions=failed)
 
     def _evaluate_condition(self, actual: Any, condition: Any) -> OperatorResult:

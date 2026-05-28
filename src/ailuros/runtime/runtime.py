@@ -161,11 +161,13 @@ class AilurosRuntime:
             RuntimeEventType.TOOL_CALL_REQUESTED,
             {"tool_name": tool_name, "arguments": args, "metadata": metadata or {}},
         )
+        prior_events_raw = self.storage.list_events(run_id)
         context = ToolCallContext(
             environment=self.environment,
             tool_name=tool_name,
             arguments=args,
             metadata=metadata or {},
+            prior_events=[event.model_dump(mode="json") for event in prior_events_raw],
         )
         evaluation = self.policy_engine.evaluate_tool_call(context)
         self.record_event(
