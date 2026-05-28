@@ -98,3 +98,17 @@ python -m mypy src
 ## Not implemented in v0.1
 
 The current repository does not implement a server, framework-specific adapters (LangChain, LlamaIndex, etc.), regression comparison workflows, or a full documentation site. A framework-neutral adapter contract skeleton (`src/ailuros/adapters/`) is in place with a reference `LocalCallableAdapter` that validates blocked calls never reach underlying tools. Some model names may exist as public data types, but this README only treats the runtime kernel, policy gate, path validation, stored timelines, audit/replay/eval CLI, refund demo, and adapter contract boundary as implemented behavior.
+
+## Product Line &amp; Strategy
+
+Ailuros is the canonical governance runtime. See the canonical docs for strategy,
+architecture, and decisions:
+
+- **Strategy:** [Product Line Thesis](docs/strategy/product-line-thesis.md) ·
+  [Reference Apps](docs/strategy/reference-apps.md) ·
+  [Roadmap](docs/strategy/roadmap.md)
+- **Architecture:** [Governance Boundary](docs/architecture/governance-boundary.md) ·
+  [Clarify Reference Architecture](docs/architecture/clarify-reference-architecture.md)
+- **Decisions:** [ADR-0001](docs/decisions/ADR-0001-ailuros-as-governance-runtime.md) ·
+  [ADR-0002](docs/decisions/ADR-0002-clarify-as-reference-app.md) ·
+  [ADR-0003](docs/decisions/ADR-0003-evidence-first-integration.md)
