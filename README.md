@@ -108,7 +108,7 @@ architecture, and decisions:
   [Reference Apps](docs/strategy/reference-apps.md) ·
   [Roadmap](docs/strategy/roadmap.md)
 - **Architecture:** [Governance Boundary](docs/architecture/governance-boundary.md) ·
-  [Clarify Reference Architecture](docs/architecture/clarify-reference-architecture.md)
+  [Clarify Reference Application](docs/architecture/clarify-reference-app.md)
 - **Decisions:** [ADR-0001](docs/decisions/ADR-0001-ailuros-as-governance-runtime.md) ·
   [ADR-0002](docs/decisions/ADR-0002-clarify-as-reference-app.md) ·
   [ADR-0003](docs/decisions/ADR-0003-evidence-first-integration.md)
