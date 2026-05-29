@@ -12,6 +12,8 @@ def _load_fixtures():
     fixtures = []
     for f in sorted(GOLDEN_DIR.glob("*.json")):
         data = json.loads(f.read_text())
+        if not isinstance(data, dict):
+            continue
         fixtures.append(pytest.param(data, id=data["name"]))
     return fixtures
 
