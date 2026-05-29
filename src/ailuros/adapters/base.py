@@ -16,6 +16,15 @@ class _RuntimeProtocol(Protocol):
         metadata: dict[str, Any] | None = None,
     ) -> Any: ...
 
+    def record_tool_result(
+        self,
+        run_id: str,
+        tool_name: str,
+        result: Any,
+        arguments: dict[str, Any] | None = None,
+        step_id: str | None = None,
+    ) -> Any: ...
+
 
 @runtime_checkable
 class ToolAdapter(Protocol):
@@ -55,6 +64,12 @@ class LocalCallableAdapter:
                 reason=decision.reason,
             )
         result = fn(**context.arguments)
+        self._runtime.record_tool_result(
+            run_id=context.run_id,
+            tool_name=context.tool_name,
+            result=result,
+            arguments=context.arguments,
+        )
         return AdapterResult(
             status=AdapterDecisionStatus.ALLOWED,
             decision=decision,
