@@ -73,6 +73,32 @@ class RunSummary:
     metadata_version: str = "1"
 
 
+def build_audit_report(summary: RunSummary, events: list[RuntimeEvent]) -> dict[str, Any]:
+    timeline = []
+    for event in events:
+        entry: dict[str, Any] = {
+            "event_id": event.event_id,
+            "event_type": event.event_type.value,
+            "timestamp": event.timestamp.isoformat(),
+        }
+        if event.sequence is not None:
+            entry["sequence"] = event.sequence
+        timeline.append(entry)
+
+    return {
+        "metadata_version": summary.metadata_version,
+        "run_id": summary.run_id,
+        "status": summary.status,
+        "counts": {
+            "event_count": summary.event_count,
+            "decision_counts": dict(summary.decision_counts),
+            "blocked_count": summary.blocked_count,
+            "review_count": summary.review_count,
+        },
+        "timeline": timeline,
+    }
+
+
 def build_run_summary(storage: SQLiteStorage, run_id: str) -> RunSummary:
     run = storage.get_run(run_id)
     events = storage.list_events(run_id)
