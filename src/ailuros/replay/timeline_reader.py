@@ -7,7 +7,10 @@ from ailuros.errors import AilurosDataCorruptionError, AilurosNotFoundError
 from ailuros.models import RuntimeEvent, RuntimeEventType
 from ailuros.storage import SQLiteStorage
 
-DECISION_FIELDS = {"decision", "allowed", "reason", "severity", "matched_policy_ids"}
+DECISION_FIELDS = {
+    "decision", "allowed", "reason", "severity", "matched_policy_ids",
+    "risk_level", "evidence_refs", "input_hash", "tool_name",
+}
 TOOL_FIELDS = {"tool_name", "arguments", "result"}
 
 

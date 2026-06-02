@@ -212,7 +212,11 @@ class SQLiteStorage:
     def save_governance_decision(self, decision: GovernanceDecision) -> None:
         with self._connect() as conn:
             conn.execute(
-                "INSERT INTO governance_decisions VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO governance_decisions "
+                "(decision_id, run_id, decision, allowed, reason, severity, "
+                " matched_policy_ids_json, metadata_json, created_at, "
+                " risk_level, evidence_refs_json, input_hash, tool_name) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     decision.decision_id,
                     decision.run_id,
@@ -223,6 +227,10 @@ class SQLiteStorage:
                     self._dumps(decision.matched_policy_ids),
                     self._dumps(decision.metadata),
                     decision.created_at.isoformat(),
+                    decision.risk_level.value,
+                    self._dumps(decision.evidence_refs),
+                    decision.input_hash,
+                    decision.tool_name,
                 ),
             )
 

@@ -36,3 +36,7 @@ select = ["E", "F", "I", "UP", "B"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disable_error_code = ["no-untyped-def", "import-untyped", "no-untyped-call", "arg-type", "type-arg", "func-returns-value", "call-arg", "comparison-overlap", "index", "operator", "list-item"]

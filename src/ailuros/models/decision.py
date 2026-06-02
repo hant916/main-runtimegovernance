@@ -25,6 +25,10 @@ class GovernanceDecision(BaseModel):
     reason: str
     severity: Severity = Severity.LOW
     matched_policy_ids: list[str] = []
+    risk_level: Severity = Severity.LOW
+    evidence_refs: list[str] = []
+    input_hash: str | None = None
+    tool_name: str | None = None
     metadata: dict[str, Any] = {}
     created_at: datetime
 

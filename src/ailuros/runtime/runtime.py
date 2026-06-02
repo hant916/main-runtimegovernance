@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -184,7 +186,14 @@ class AilurosRuntime:
                 "matched_policy_count": evaluation.matched_policy_count,
             },
         )
-        decision = self.decision_resolver.resolve(run_id, evaluation.matched_policies)
+        decision = self.decision_resolver.resolve(run_id, evaluation.matched_policies).model_copy(
+            update={
+                "tool_name": tool_name,
+                "input_hash": hashlib.sha256(
+                    json.dumps(args, sort_keys=True).encode()
+                ).hexdigest(),
+            }
+        )
         self.storage.save_governance_decision(decision)
         self.record_event(
             run_id,
