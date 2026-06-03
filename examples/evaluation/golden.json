@@ -1,0 +1,75 @@
+[
+  {
+    "id": "allow.refund_status_check",
+    "name": "Safe allow: read-only refund status lookup",
+    "expectations": [
+      { "type": "governance_decision", "decision": "allow", "allowed": true },
+      { "type": "allowed_tool", "tool_name": "payment.get_status" }
+    ]
+  },
+  {
+    "id": "allow.document_summary",
+    "name": "Safe allow: document summarization",
+    "expectations": [
+      { "type": "governance_decision", "decision": "allow", "allowed": true },
+      { "type": "allowed_tool", "tool_name": "document.summarize" }
+    ]
+  },
+  {
+    "id": "block.payment_cancellation",
+    "name": "Risky block: payment cancellation",
+    "expectations": [
+      { "type": "governance_decision", "decision": "block", "allowed": false, "severity": "high" },
+      { "type": "blocked_tool", "tool_name": "payment.cancel", "decision": "block" },
+      { "type": "tool_not_executed", "tool_name": "payment.cancel" }
+    ]
+  },
+  {
+    "id": "block.refund_over_threshold",
+    "name": "Risky block: high-value refund",
+    "expectations": [
+      { "type": "governance_decision", "decision": "block", "allowed": false, "severity": "high" },
+      { "type": "blocked_tool", "tool_name": "payment.issue_refund", "decision": "block" },
+      { "type": "tool_not_executed", "tool_name": "payment.issue_refund" }
+    ]
+  },
+  {
+    "id": "block.external_api_write",
+    "name": "Risky block: external API write",
+    "expectations": [
+      { "type": "governance_decision", "decision": "block", "allowed": false },
+      { "type": "blocked_tool", "tool_name": "api.external.write", "decision": "block" },
+      { "type": "tool_not_executed", "tool_name": "api.external.write" }
+    ]
+  },
+  {
+    "id": "review.customer_data_lookup",
+    "name": "Ambiguous review: PII customer data lookup",
+    "expectations": [
+      { "type": "governance_decision", "decision": "require_review", "allowed": false, "severity": "medium" },
+      { "type": "blocked_tool", "tool_name": "customer.get_full_profile", "decision": "require_review" },
+      { "type": "tool_not_executed", "tool_name": "customer.get_full_profile" },
+      { "type": "path_validation", "path_id": "pii_review", "valid": true }
+    ]
+  },
+  {
+    "id": "review.refund_email",
+    "name": "Ambiguous review: email-triggered refund",
+    "expectations": [
+      { "type": "governance_decision", "decision": "require_review", "allowed": false, "severity": "medium" },
+      { "type": "blocked_tool", "tool_name": "payment.issue_refund", "decision": "require_review" },
+      { "type": "tool_not_executed", "tool_name": "payment.issue_refund" },
+      { "type": "path_validation", "path_id": "email_refund_review", "valid": true }
+    ]
+  },
+  {
+    "id": "review.external_api_call",
+    "name": "Ambiguous review: external API integration call",
+    "expectations": [
+      { "type": "governance_decision", "decision": "require_review", "allowed": false, "severity": "low" },
+      { "type": "blocked_tool", "tool_name": "api.integration.call", "decision": "require_review" },
+      { "type": "tool_not_executed", "tool_name": "api.integration.call" },
+      { "type": "path_validation", "path_id": "integration_review", "valid": true }
+    ]
+  }
+]
