@@ -47,12 +47,9 @@ class AilurosRuntime:
         self.decision_resolver = DecisionResolver()
 
     def get_version(self) -> str:
-        try:
-            from importlib.metadata import version
+        from ailuros import __version__
 
-            return version("ailuros")
-        except (ImportError, Exception):
-            return "0.0.0"
+        return __version__
 
     def start_run(
         self, input: Any, user_id: str | None = None, metadata: dict[str, Any] | None = None

@@ -209,6 +209,16 @@ class SQLiteStorage:
             for row in rows
         ]
 
+    def get_decision(self, decision_id: str) -> GovernanceDecision:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM governance_decisions WHERE decision_id = ?",
+                (decision_id,),
+            ).fetchone()
+        if row is None:
+            raise AilurosNotFoundError(f"decision not found: {decision_id}")
+        return self._row_to_decision(row)
+
     def save_governance_decision(self, decision: GovernanceDecision) -> None:
         with self._connect() as conn:
             conn.execute(
@@ -312,6 +322,23 @@ class SQLiteStorage:
             return conn
         except sqlite3.Error as exc:
             raise AilurosStorageError(str(exc)) from exc
+
+    def _row_to_decision(self, row: sqlite3.Row) -> GovernanceDecision:
+        return GovernanceDecision(
+            decision_id=row["decision_id"],
+            run_id=row["run_id"],
+            decision=row["decision"],
+            allowed=bool(row["allowed"]),
+            reason=row["reason"],
+            severity=row["severity"],
+            matched_policy_ids=self._loads(row["matched_policy_ids_json"]),
+            metadata=self._loads(row["metadata_json"]),
+            created_at=datetime.fromisoformat(row["created_at"]),
+            risk_level=row["risk_level"],
+            evidence_refs=self._loads(row["evidence_refs_json"]),
+            input_hash=row["input_hash"],
+            tool_name=row["tool_name"],
+        )
 
     def _row_to_evaluation(self, row: sqlite3.Row) -> EvaluationResult:
         return EvaluationResult(

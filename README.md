@@ -1,5 +1,7 @@
 # ailuros
 
+[Read the changelog](CHANGELOG.md) for the full v0.1.0 release summary.
+
 ailuros is a Python governance runtime kernel for local agent runs. In v0.1 it provides an in-process runtime, policy-gated tool calls, SQLite-backed run timelines, explicit path validation, and read-only audit/replay CLI commands.
 
 The primary example is the refund demo in `examples/refund_agent`, where a high-value refund request is blocked by policy before `payment.issue_refund` is invoked.
@@ -78,6 +80,14 @@ If the database is somewhere else, pass it before the command:
 ```bash
 python -m ailuros --db path/to/ailuros.sqlite run show <run_id>
 ```
+
+Run the minimal hello governance demo:
+
+```bash
+python examples/hello.py
+```
+
+The hello demo uses an in-memory database and prints the five governance artifacts directly: decision, ordered events, run summary, replay timeline, and audit summary. No external files, network, or API keys required.
 
 ## Refund demo behavior
 

@@ -12,7 +12,16 @@ from typing import Any
 import pytest
 
 from ailuros.audit import build_audit_summary
-from ailuros.models import Environment, Run, RunStatus, RuntimeEvent, RuntimeEventType
+from ailuros.models import (
+    Environment,
+    GovernanceDecision,
+    GovernanceDecisionType,
+    Run,
+    RunStatus,
+    RuntimeEvent,
+    RuntimeEventType,
+    Severity,
+)
 from ailuros.server import create_app
 from ailuros.server.app import _Server
 from ailuros.storage import SQLiteStorage
@@ -270,6 +279,37 @@ class TestUnknownPath:
         port = server.server_address[1]
         with pytest.raises(urllib.error.HTTPError) as exc:
             _get(port, "/unknown")
+        assert exc.value.code == 404
+
+
+class TestDecisions:
+    def _populate_decision(self, storage, decision_id: str, run_id: str = "run-d"):
+        run = _make_run(run_id)
+        storage.create_run(run)
+        decision = GovernanceDecision(
+            decision_id=decision_id,
+            run_id=run_id,
+            decision=GovernanceDecisionType.ALLOW,
+            allowed=True,
+            reason="all checks passed",
+            severity=Severity.LOW,
+            created_at=datetime.now(UTC),
+        )
+        storage.save_governance_decision(decision)
+        return decision
+
+    def test_returns_decision(self, storage, server):
+        self._populate_decision(storage, "dec-1")
+        status, data = _get(server.server_address[1], "/decisions/dec-1")
+        assert status == 200
+        assert data["decision_id"] == "dec-1"
+        assert data["decision"] == "allow"
+        assert data["allowed"] is True
+
+    def test_not_found_returns_404(self, server):
+        port = server.server_address[1]
+        with pytest.raises(urllib.error.HTTPError) as exc:
+            _get(port, "/decisions/nonexistent")
         assert exc.value.code == 404
 
 

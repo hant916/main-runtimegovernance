@@ -128,6 +128,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._handle_evaluation_detail(storage, run_id)
                 return
 
+            if len(parts) == 3 and parts[1] == "decisions" and parts[2]:
+                self._handle_decision_detail(storage, parts[2])
+                return
+
             self._send_error(404, "Not found")
         except Exception:
             logger.exception("unhandled error")
@@ -202,6 +206,14 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_error(404, f"Evaluation not found for run: {run_id}")
             return
         self._send_json(ev.model_dump(mode="json"))
+
+    def _handle_decision_detail(self, storage: SQLiteStorage, decision_id: str) -> None:
+        try:
+            decision = storage.get_decision(decision_id)
+        except AilurosNotFoundError:
+            self._send_error(404, f"Decision not found: {decision_id}")
+            return
+        self._send_json(decision.model_dump(mode="json"))
 
     def log_message(self, format: str, *args: Any) -> None:
         logger.info("access: %s", format % args)
