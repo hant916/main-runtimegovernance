@@ -21,6 +21,26 @@ platform, or generic workflow engine. Phase 1 does not change this identity.
 - Ailuros remains in-process; no server or platform API is introduced.
 - No Clarify Python module is imported by `src/ailuros/`.
 
+### Core Boundary Guard
+
+A static boundary guard (`tests/test_core_boundary.py`) enforces that
+reference-app vocabulary does not leak into `src/ailuros/` core modules
+(excluding the `adapters/` boundary directory, where reference-app adapter
+contracts are intentionally defined).
+
+**Forbidden core vocabulary (case-insensitive, whole-word match):**
+
+| Term | Reason |
+|---|---|
+| `clarify` | Reference application name |
+| `browser` | UI platform concept |
+| `sidepanel` | UI component |
+| `cta` | Call-to-action (marketing/UI term) |
+
+**Server write methods forbidden:** The HTTP server (`src/ailuros/server/`)
+must expose only `do_GET`. `do_POST`, `do_PUT`, `do_PATCH`, and `do_DELETE`
+are forbidden by the guard.
+
 ## EvidenceRecord Model
 
 The canonical evidence contract is `EvidenceRecord`, defined in
