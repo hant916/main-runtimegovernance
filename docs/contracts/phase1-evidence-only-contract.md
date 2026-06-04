@@ -69,11 +69,15 @@ The `event_type` field is a free-form string, not restricted to
 
 ## Explicit Deferrals
 
-The following are **out of scope** for Phase 1:
+The following are **out of scope** for Phase 1 and are **later packs only**:
 
 | Feature | Rationale |
 |---|---|
-| HTTP write API | Ailuros remains an in-process library; Phase 1 uses local ingestion |
+| Evidence ingestion implementation | Later pack; contract-only scope for Phase 1 |
+| Evidence export implementation | Later pack; contract-only scope for Phase 1 |
+| Evidence evaluation | Later pack; contract-only scope for Phase 1 |
+| Evidence regression | Later pack; contract-only scope for Phase 1 |
+| HTTP write API | No HTTP write endpoints are introduced; server remains read-only |
 | Auth / session management | Out of scope for local runtime kernel |
 | Dashboard or UI | Not a platformization goal |
 | Realtime browser blocking | No runtime control from browser into Ailuros |
