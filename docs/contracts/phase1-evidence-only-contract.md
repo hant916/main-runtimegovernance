@@ -21,22 +21,31 @@ platform, or generic workflow engine. Phase 1 does not change this identity.
 - Ailuros remains in-process; no server or platform API is introduced.
 - No Clarify Python module is imported by `src/ailuros/`.
 
-## Versioned Evidence Payloads
+## EvidenceRecord Model
 
-Evidence entering Ailuros from Clarify is a structured JSON event with an
-explicit version field. The high-level payload expectations are:
+The canonical evidence contract is `EvidenceRecord`, defined in
+`src/ailuros/models/evidence.py` and exported from `ailuros.models`.
+
+Evidence entering Ailuros is a structured record with an explicit version field:
 
 | Field | Type | Purpose |
 |---|---|---|
-| `version` | string (semver) | Schema version for forward compatibility |
-| `run_id` | string | Target run identifier in the Ailuros timeline |
-| `event_type` | string | Categorizes the evidence (e.g. `navigation`, `interaction`) |
-| `payload` | object | Event-specific structured data |
-| `timestamp` | string (ISO-8601) | When the evidence was captured |
+| `version` | str | Schema version for forward compatibility |
+| `run_id` | str | Target run identifier in the Ailuros timeline |
+| `event_type` | str | Categorizes the evidence (application-neutral, e.g. `navigation`, `interaction`) |
+| `payload` | dict[str, Any] | Opaque event-specific structured data (default `{}`) |
+| `timestamp` | datetime | Timezone-aware datetime of evidence capture |
 
-The event schema beyond these top-level fields is defined in the Clarify
-repository. Ailuros stores and retrieves evidence as timeline events but does
-not define or validate Clarify-specific payload shapes.
+The `EvidenceRecord` is a Pydantic `BaseModel` with `ConfigDict(extra="forbid")`
+and follows the same timezone-validation convention as all other Ailuros models.
+
+The payload is opaque to core. Ailuros stores and retrieves evidence records
+without validating or interpreting payload contents. Domain-specific payload
+shapes are defined by applications (e.g., Clarify) and never appear in
+`src/ailuros/`.
+
+The `event_type` field is a free-form string, not restricted to
+`RuntimeEventType`. This keeps the contract application-neutral.
 
 ## Explicit Deferrals
 

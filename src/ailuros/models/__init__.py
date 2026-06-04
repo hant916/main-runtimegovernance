@@ -3,6 +3,7 @@ from ailuros.models.common import Environment, Severity
 from ailuros.models.decision import GovernanceDecision, GovernanceDecisionType
 from ailuros.models.evaluation import EvaluationFinding, EvaluationResult
 from ailuros.models.event import RuntimeEvent, RuntimeEventType
+from ailuros.models.evidence import EvidenceRecord
 from ailuros.models.policy import Policy, PolicyOperator
 from ailuros.models.regression import RegressionComparisonResult
 from ailuros.models.replay import ReplayResult
@@ -14,6 +15,7 @@ __all__ = [
     "Environment",
     "EvaluationFinding",
     "EvaluationResult",
+    "EvidenceRecord",
     "GovernanceDecision",
     "GovernanceDecisionType",
     "Policy",
