@@ -1,5 +1,15 @@
+from __future__ import annotations
+
+from typing import Any
+
 from ailuros.evaluation.models import EvaluationResult
-from ailuros.regression.models import RegressionBaseline, RegressionComparisonResult, RegressionDiff
+from ailuros.regression.models import (
+    EvidenceTimelineDiff,
+    EvidenceTimelineRegressionResult,
+    RegressionBaseline,
+    RegressionComparisonResult,
+    RegressionDiff,
+)
 
 
 class RegressionService:
@@ -74,4 +84,87 @@ class RegressionService:
             case_ids_compared=all_ids,
             regressions=regressions,
             warnings=warnings,
+        )
+
+    @staticmethod
+    def _extract_evidence_signature(record: dict[str, Any]) -> dict[str, Any]:
+        evidence = record.get("evidence") or {}
+        if not isinstance(evidence, dict):
+            evidence = {}
+        return {
+            "sequence": record.get("sequence"),
+            "event_type": record.get("event_type"),
+            "evidence_version": evidence.get("version"),
+            "evidence_event_type": evidence.get("event_type"),
+        }
+
+    def compare_evidence_timeline(
+        self,
+        baseline: list[dict[str, Any]],
+        current: list[dict[str, Any]],
+    ) -> EvidenceTimelineRegressionResult:
+        diffs: list[EvidenceTimelineDiff] = []
+        max_len = max(len(baseline), len(current))
+
+        for i in range(max_len):
+            base_rec = baseline[i] if i < len(baseline) else None
+            curr_rec = current[i] if i < len(current) else None
+
+            if base_rec is None:
+                diffs.append(
+                    EvidenceTimelineDiff(
+                        index=i,
+                        kind="added_evidence",
+                        message=(
+                            f"Additional evidence event at position {i} "
+                            f"not present in baseline"
+                        ),
+                        current_record=curr_rec,
+                    )
+                )
+                continue
+
+            if curr_rec is None:
+                diffs.append(
+                    EvidenceTimelineDiff(
+                        index=i,
+                        kind="missing_evidence",
+                        message=(
+                            f"Baseline evidence event at position {i} "
+                            f"missing from current"
+                        ),
+                        baseline_record=base_rec,
+                    )
+                )
+                continue
+
+            base_sig = self._extract_evidence_signature(base_rec)
+            curr_sig = self._extract_evidence_signature(curr_rec)
+
+            if base_sig != curr_sig:
+                field_diffs: list[str] = []
+                for key in base_sig:
+                    if base_sig[key] != curr_sig[key]:
+                        field_diffs.append(
+                            f"{key}: {base_sig[key]!r} -> {curr_sig[key]!r}"
+                        )
+
+                diffs.append(
+                    EvidenceTimelineDiff(
+                        index=i,
+                        kind="changed_evidence",
+                        message=(
+                            f"Evidence changed at position {i}: "
+                            + "; ".join(field_diffs)
+                        ),
+                        baseline_record=base_rec,
+                        current_record=curr_rec,
+                    )
+                )
+
+        return EvidenceTimelineRegressionResult(
+            passed=not diffs,
+            baseline_count=len(baseline),
+            current_count=len(current),
+            diffs=diffs,
         )

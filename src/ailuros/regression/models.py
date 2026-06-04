@@ -32,3 +32,22 @@ class RegressionComparisonResult(BaseModel):
     case_ids_compared: list[str]
     regressions: list[RegressionDiff]
     warnings: list[RegressionDiff]
+
+
+class EvidenceTimelineDiff(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    index: int | None
+    kind: str
+    message: str
+    baseline_record: dict | None = None
+    current_record: dict | None = None
+
+
+class EvidenceTimelineRegressionResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    passed: bool
+    baseline_count: int
+    current_count: int
+    diffs: list[EvidenceTimelineDiff]
