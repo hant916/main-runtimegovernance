@@ -23,7 +23,7 @@ def test_runtime_event_type_contains_canonical_events() -> None:
 
     assert "run_started" in values
     assert "payload_redacted" in values
-    assert len(values) == 24
+    assert len(values) == 26
 
 
 def test_models_serialize_to_json() -> None:

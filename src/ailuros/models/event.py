@@ -31,6 +31,8 @@ class RuntimeEventType(StrEnum):
     REPLAY_COMPLETED = "replay_completed"
     REGRESSION_COMPARISON_RESULT = "regression_comparison_result"
     PAYLOAD_REDACTED = "payload_redacted"
+    EVIDENCE = "evidence"
+    EXTERNAL_EVIDENCE = "external_evidence"
 
 
 class RuntimeEvent(BaseModel):
