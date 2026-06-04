@@ -21,6 +21,7 @@ from ailuros.runtime import AilurosRuntime
 class OutputFormat(StrEnum):
     text = "text"
     json = "json"
+    jsonl = "jsonl"
 
 
 def _print_json(data: Any) -> None:
@@ -182,6 +183,35 @@ def eval_run(
     typer.echo(f"Summary: {len(results) - len(failed)} passed, {len(failed)} failed")
     if failed:
         raise typer.Exit(1)
+
+
+@app.command()
+def evidence(
+    run_id: str,
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format: json or jsonl."),
+    ] = OutputFormat.json,
+) -> None:
+    from ailuros.cli_run import open_storage
+    from ailuros.evidence.export import export_evidence_json, export_evidence_jsonl
+
+    try:
+        storage = open_storage()
+    except typer.BadParameter as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    try:
+        if output == OutputFormat.jsonl:
+            result = export_evidence_jsonl(storage, run_id)
+        else:
+            result = export_evidence_json(storage, run_id)
+    except (AilurosNotFoundError, AilurosDataCorruptionError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    typer.echo(result)
 
 
 @app.command()
