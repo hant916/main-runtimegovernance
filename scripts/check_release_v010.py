@@ -1,6 +1,5 @@
 """v0.1.0 release smoke check. Exit 0 if all checks pass."""
 
-import re
 import subprocess
 import sys
 from pathlib import Path

@@ -14,7 +14,9 @@ def main() -> None:
     runtime = AilurosRuntime(storage_path=tmp_dir / "hello.sqlite")
     run = runtime.start_run({"task": "hello governance"})
     decision = runtime.before_tool_call(run.run_id, "demo.greet", {"name": "world"})
-    runtime.after_tool_call(run.run_id, "demo.greet", {"name": "world"}, result={"greeting": "hello world"})
+    runtime.after_tool_call(
+        run.run_id, "demo.greet", {"name": "world"}, result={"greeting": "hello world"}
+    )
     runtime.validate_path(
         run.run_id,
         ExpectedPath(path_id="greet", required_tool_calls=["demo.greet"]),

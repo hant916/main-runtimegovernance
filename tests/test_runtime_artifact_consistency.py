@@ -123,7 +123,7 @@ def test_replay_timeline_ordering_is_sequence_based(storage):
     timeline = ReplayService(storage).build_timeline(run_id)
 
     assert len(timeline) == len(events)
-    for event, entry in zip(events, timeline):
+    for event, entry in zip(events, timeline, strict=True):
         assert entry["sequence_number"] == event.sequence
         assert entry["event_id"] == event.event_id
         assert entry["event_type"] == event.event_type.value
@@ -157,7 +157,7 @@ def test_audit_report_timeline_matches_events(storage):
     report_timeline = report["timeline"]
     assert len(report_timeline) == len(events)
 
-    for event, entry in zip(events, report_timeline):
+    for event, entry in zip(events, report_timeline, strict=True):
         assert entry["event_id"] == event.event_id
         assert entry["event_type"] == event.event_type.value
         if event.sequence is not None:

@@ -7,7 +7,7 @@ EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 if str(EXAMPLES) not in sys.path:
     sys.path.insert(0, str(EXAMPLES))
 
-from hello import main
+from hello import main  # noqa: E402  (path must be patched before import)
 
 
 def test_hello_demo_output(capsys):
