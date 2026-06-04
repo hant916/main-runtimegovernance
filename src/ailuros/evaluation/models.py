@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -51,13 +51,23 @@ class EventSequenceContainsExpectation(BaseModel):
     event_types: list[RuntimeEventType]
 
 
+class EvidenceEventExpectation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["evidence_event"] = "evidence_event"
+    evidence_event_type: str | None = None
+    version: str | None = None
+    payload_contains: dict[str, Any] | None = None
+
+
 type EvaluationExpectation = Annotated[
     GovernanceDecisionExpectation
     | BlockedToolExpectation
     | AllowedToolExpectation
     | ToolNotExecutedExpectation
     | PathValidationExpectation
-    | EventSequenceContainsExpectation,
+    | EventSequenceContainsExpectation
+    | EvidenceEventExpectation,
     Field(discriminator="type"),
 ]
 

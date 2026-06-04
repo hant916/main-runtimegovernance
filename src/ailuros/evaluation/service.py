@@ -7,6 +7,7 @@ from ailuros.evaluation.models import (
     EvaluationFailure,
     EvaluationResult,
     EventSequenceContainsExpectation,
+    EvidenceEventExpectation,
     GovernanceDecisionExpectation,
     PathValidationExpectation,
     ToolNotExecutedExpectation,
@@ -61,6 +62,10 @@ class EvaluationService:
             )
         if isinstance(expectation, EventSequenceContainsExpectation):
             return self._event_sequence_contains(events, expectation)
+        if isinstance(expectation, EvidenceEventExpectation):
+            return self._evidence_event(events, expectation), self._evidence_event_evidence(
+                events, expectation
+            )
         raise TypeError(f"Unsupported evaluation expectation type: {type(expectation).__name__}")
 
     def _governance_decision(
@@ -330,6 +335,63 @@ class EvaluationService:
 
     def _matches_optional(self, actual: object, expected: object | None) -> bool:
         return expected is None or actual == expected
+
+    def _evidence_event(
+        self, events: list[RuntimeEvent], expectation: EvidenceEventExpectation
+    ) -> list[EvaluationFailure]:
+        if self._matching_evidence_events(events, expectation):
+            return []
+        actual = [
+            {
+                "event_type": event.payload.get("event_type"),
+                "version": event.payload.get("version"),
+            }
+            for event in events
+            if event.event_type in {RuntimeEventType.EVIDENCE, RuntimeEventType.EXTERNAL_EVIDENCE}
+        ]
+        return [
+            EvaluationFailure(
+                expectation_type=expectation.type,
+                message=(
+                    "Expected evidence event "
+                    f"evidence_event_type={expectation.evidence_event_type!r}, "
+                    f"version={expectation.version!r}, "
+                    f"payload_contains={expectation.payload_contains!r}; "
+                    f"actual={actual or 'missing'}"
+                ),
+            )
+        ]
+
+    def _evidence_event_evidence(
+        self, events: list[RuntimeEvent], expectation: EvidenceEventExpectation
+    ) -> list[EvaluationEvidence]:
+        match = self._first(self._matching_evidence_events(events, expectation))
+        if not match:
+            return []
+        return [self._evidence(expectation.type, match, "Matched evidence event.")]
+
+    def _matching_evidence_events(
+        self, events: list[RuntimeEvent], expectation: EvidenceEventExpectation
+    ) -> list[RuntimeEvent]:
+        return [
+            event
+            for event in events
+            if event.event_type in {RuntimeEventType.EVIDENCE, RuntimeEventType.EXTERNAL_EVIDENCE}
+            and self._matches_optional(
+                event.payload.get("event_type"), expectation.evidence_event_type
+            )
+            and self._matches_optional(event.payload.get("version"), expectation.version)
+            and self._matches_payload_contains(event.payload, expectation.payload_contains)
+        ]
+
+    def _matches_payload_contains(
+        self, actual: dict[str, object], expected: dict[str, object] | None
+    ) -> bool:
+        if expected is None:
+            return True
+        return all(
+            key in actual and actual[key] == value for key, value in expected.items()
+        )
 
     def _first(self, events: list[RuntimeEvent]) -> RuntimeEvent | None:
         return events[0] if events else None

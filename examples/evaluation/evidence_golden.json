@@ -1,0 +1,45 @@
+[
+  {
+    "id": "evidence.pass.event_found",
+    "name": "Evidence golden case: evidence event matches expected fields",
+    "expectations": [
+      { "type": "evidence_event", "evidence_event_type": "example.event", "version": "1.0.0" }
+    ]
+  },
+  {
+    "id": "evidence.pass.payload_contains",
+    "name": "Evidence golden case: evidence event with payload_contains check",
+    "expectations": [
+      {
+        "type": "evidence_event",
+        "evidence_event_type": "example.event",
+        "payload_contains": { "action": "click" }
+      }
+    ]
+  },
+  {
+    "id": "evidence.fail.no_events",
+    "name": "Evidence golden case: no evidence events in timeline",
+    "expectations": [
+      { "type": "evidence_event", "evidence_event_type": "example.event" }
+    ]
+  },
+  {
+    "id": "evidence.fail.wrong_version",
+    "name": "Evidence golden case: evidence event present but version mismatch",
+    "expectations": [
+      { "type": "evidence_event", "evidence_event_type": "example.event", "version": "2.0.0" }
+    ]
+  },
+  {
+    "id": "evidence.fail.payload_contains_mismatch",
+    "name": "Evidence golden case: evidence event present but payload_contains mismatch",
+    "expectations": [
+      {
+        "type": "evidence_event",
+        "evidence_event_type": "example.event",
+        "payload_contains": { "action": "hover" }
+      }
+    ]
+  }
+]
