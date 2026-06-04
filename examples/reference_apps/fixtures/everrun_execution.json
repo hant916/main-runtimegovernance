@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "run_id": "everrun-dogfood-001",
+  "event_type": "everrun.execution.tool_call",
+  "payload": {
+    "tool": "bash",
+    "args": ["echo", "hello"],
+    "exit_code": 0,
+    "duration_ms": 42
+  },
+  "timestamp": "2026-06-04T12:01:00.000000+00:00"
+}

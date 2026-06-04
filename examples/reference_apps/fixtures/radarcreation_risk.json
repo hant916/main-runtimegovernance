@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "run_id": "radarcreation-dogfood-001",
+  "event_type": "radarCreation.risk.assessment",
+  "payload": {
+    "domain": "defense",
+    "risk_level": "low",
+    "assessment_id": "risk-001",
+    "scores": {
+      "confidentiality": 0.1,
+      "integrity": 0.2,
+      "availability": 0.15
+    }
+  },
+  "timestamp": "2026-06-04T12:02:00.000000+00:00"
+}

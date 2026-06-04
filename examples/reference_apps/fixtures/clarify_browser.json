@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "run_id": "clarify-dogfood-001",
+  "event_type": "clarify.browser.navigation",
+  "payload": {
+    "url": "https://example.com",
+    "title": "Example Domain",
+    "tab_id": "tab-42",
+    "action": "page_loaded"
+  },
+  "timestamp": "2026-06-04T12:00:00.000000+00:00"
+}
