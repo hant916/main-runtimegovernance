@@ -15,7 +15,7 @@ Validation commands were run directly against the working tree:
 
 | Check | Command | Result |
 |---|---|---|
-| Test suite | `python -m pytest tests -q` | 346 passed |
+| Test suite | `python -m pytest tests -q` | 523 passed |
 | Type check | `python -m mypy src` | no issues in 55 source files |
 | Lint (whole repo) | `python -m ruff check .` | 7 errors (all in `examples/` + `scripts/`; `src/` is clean) |
 
@@ -41,12 +41,25 @@ with `LocalCallableAdapter`, a read-only HTTP server (GET only), and the full CL
 
 Goal: make `ruff check .`, `pytest`, and `mypy` all green, and finalize v0.1.0.
 
+v0.1.0 documentation is complete and the release is documented as finalized
+(`docs/release/v0.1.0-finalization.md` status: finalized). The remaining P0 gap is
+the ruff lint cleanup.
+
 | Task | Action | Acceptance evidence |
 |---|---|---|
 | P0-1 Fix ruff | Wrap `examples/hello.py:17`; remove unused `import re` in `scripts/check_release_v010.py`; drop placeholder-less `f` in `scripts/check_repo_baseline.py:32`; replace unused `label` loop var | `ruff check .` → all checks passed |
-| P0-2 Regression test | Add `tests/test_lint_baseline.py` asserting `ruff check .` exit code 0 | `pytest tests/test_lint_baseline.py` |
-| P0-3 Repo hygiene | Verified `ailuros.sqlite` is already untracked (`.gitignore` `*.sqlite` in effect); no action needed | `git ls-files \| grep sqlite` lists only source files |
-| P0-4 Finalize | acceptance.md `release-candidate` → `released`; tag `v0.1.0` | `python scripts/check_release_v010.py` passes |
+| P0-2 Repo hygiene | Verified `ailuros.sqlite` is already untracked (`.gitignore` `*.sqlite` in effect); no action needed | `git ls-files \| grep sqlite` lists only source files |
+
+### Phase P0.5 — Backend-Health Assessment (before Phase 1)
+
+Before Phase 1 evidence-model work begins, an EverRun backend-health assessment is
+recommended. The most recent Ailuros run was accepted-with-warnings:
+`planner_unavailable`, `judge_not_invoked`, `deterministic_fallback_used`,
+`coder_backend_warning`, and `tool_schema_error` were reported. Code validation
+passed (523 tests) but governance participation was incomplete.
+
+See [ailuros-run-reconciliation.md](ailuros-run-reconciliation.md) for the full
+reconciliation report.
 
 ### Phase P1 — Clarify Evidence Integration (3–5 days)
 
@@ -71,5 +84,5 @@ new event type, so no new core architecture is introduced — within the
 ## Execution Order
 
 ```
-P0 (baseline green + finalize) ──► P1-1 ingest ──► P1-2 export ──► P1-3/4 eval+regression ──► P1-5/6 guard+docs
+P0 (ruff cleanup) ──► P0.5 (backend-health assessment) ──► P1-1 ingest ──► P1-2 export ──► P1-3/4 eval+regression ──► P1-5/6 guard+docs
 ```
