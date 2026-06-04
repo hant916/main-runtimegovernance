@@ -61,28 +61,30 @@ passed (523 tests) but governance participation was incomplete.
 See [ailuros-run-reconciliation.md](ailuros-run-reconciliation.md) for the full
 reconciliation report.
 
-### Phase P1 — Clarify Evidence Integration (3–5 days)
+### Phase P1 — Clarify Evidence Integration (pack-by-pack)
 
 Strictly evidence-only: unidirectional evidence in, no HTTP write API, no browser
 reverse control, no Clarify concept in `src/ailuros/`. The kernel recognizes only the
 generic five-field contract (`version`/`run_id`/`event_type`/`payload`/`timestamp`)
 from `docs/contracts/phase1-evidence-only-contract.md`.
 
-| Task | Module | Design | Acceptance evidence |
-|---|---|---|---|
-| P1-1 Ingest | `src/ailuros/evidence/ingest.py` | `ingest_evidence(run_id, record)` stores external JSON evidence as an `EVIDENCE` timeline event; validates only the generic five-field contract, never payload shape | `tests/test_evidence_ingest.py`; visible via `replay` |
-| P1-2 Export | `src/ailuros/evidence/export.py` + CLI `export <run_id>` | Export stored evidence timeline as JSON/JSONL for external analysis | `tests/test_evidence_export.py`; round-trip consistent |
-| P1-3 Eval | reuse `EvaluationService` | Run golden cases against evidence timelines (non-realtime) | new `examples/evaluation/evidence_*.json` |
-| P1-4 Regression | reuse `RegressionService` | Re-evaluate evidence sets as policy changes | `tests/test_evidence_regression.py` |
-| P1-5 Boundary guard | `tests/test_core_boundary.py` | Static assert `src/ailuros/` contains no `browser`/`clarify`/`cta`/`sidepanel`; no HTTP write method | guard test passes |
-| P1-6 Docs sync | flip `phase1-readiness.md` items to `[x]`; add dogfood doc | documentation-drift check passes |
+Phase 1 evidence implementation (0070-0072) is already complete — the code, tests,
+and exports exist in the repository. The remaining work is formal v0.2.0 release
+verification. The roadmap (`docs/strategy/evidence-roadmap-v0.2.md`) is the
+authoritative pack-by-pack plan; this section provides a summary.
 
-P1-3/P1-4 reuse the existing `EvaluationService`/`RegressionService`; evidence is just a
-new event type, so no new core architecture is introduced — within the
-`v0.1.0-acceptance.md` non-goal boundary.
+| Pack | Scope | Status |
+|---|---|---|
+| 0070 Contract verify | EvidenceRecord model contract (five fields, opaque payload, free-form event_type) | COMPLETE — `src/ailuros/models/evidence.py` + `tests/test_evidence_contract.py` (147 lines) |
+| 0071 Ingest | `ingest_evidence(run_id, record)` stores external JSON evidence as an `EVIDENCE` timeline event | COMPLETE — `src/ailuros/evidence/ingest.py` + `tests/test_evidence_ingest.py` (165 lines) |
+| 0072 Export | `export_evidence()` + CLI — export stored evidence as JSON/JSONL | COMPLETE — `src/ailuros/evidence/export.py` + `tests/test_evidence_export.py` (218 lines) |
+| 0073 Release verify | Run v0.2.0 smoke checks, create readiness doc, flip acceptance status | NEXT PACK — requires `scripts/check_release_v020.py` and `tests/test_release_v020.py` |
+
+No new core architecture is introduced — within the `v0.1.0-acceptance.md` non-goal
+boundary. Each pack depends on the prior pack passing.
 
 ## Execution Order
 
 ```
-P0 (ruff cleanup) ──► P0.5 (backend-health assessment) ──► P1-1 ingest ──► P1-2 export ──► P1-3/4 eval+regression ──► P1-5/6 guard+docs
+P0 (ruff cleanup) ──► 0070–0072 (already complete) ──► 0073 v0.2.0 release verify ──► later packs (Phase 2+)
 ```
