@@ -28,6 +28,17 @@ def test_release_acceptance_doc_exists() -> None:
     assert "does not introduce automatic evidence-only review mode" in content
 
 
+def test_release_finalization_doc_exists() -> None:
+    doc = ROOT / "docs" / "release" / "v0.1.0-finalization.md"
+    assert doc.exists(), "docs/release/v0.1.0-finalization.md not found"
+    content = doc.read_text(encoding="utf-8")
+    assert "finalized" in content
+    assert "Validation Boundary" in content
+    assert "Release Boundary" in content
+    assert "Phase 1 Non-Goals" in content
+    assert "evidence" in content
+
+
 def test_evidence_only_contract_boundary_is_explicit() -> None:
     boundary = (
         "does not introduce an automatic evidence-only review mode, "

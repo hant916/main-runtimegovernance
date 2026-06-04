@@ -59,6 +59,7 @@ def main() -> int:
     check_file_exists("examples/hello.py")
     check_file_exists("docs/release/v0.1.0-checklist.md")
     check_file_exists("docs/release/v0.1.0-acceptance.md")
+    check_file_exists("docs/release/v0.1.0-finalization.md")
     check_file_exists("docs/contracts/governance-decision-contract.md")
     check_file_exists("scripts/check_repo_baseline.py")
     check_file_exists("scripts/check_docs_baseline.py")
