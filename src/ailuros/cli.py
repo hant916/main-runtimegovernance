@@ -186,6 +186,32 @@ def eval_run(
 
 
 @app.command()
+def audit_package(
+    run_id: str,
+    output: Annotated[
+        OutputFormat,
+        typer.Option("--output", help="Output format."),
+    ] = OutputFormat.json,
+) -> None:
+    from ailuros.audit.package_export import export_audit_package_json
+    from ailuros.cli_run import open_storage
+
+    try:
+        storage = open_storage()
+    except typer.BadParameter as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    try:
+        result = export_audit_package_json(storage, run_id)
+    except (AilurosNotFoundError, AilurosDataCorruptionError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    typer.echo(result)
+
+
+@app.command()
 def evidence(
     run_id: str,
     output: Annotated[
