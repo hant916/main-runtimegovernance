@@ -63,7 +63,7 @@ Work started but not fully satisfied. Marked for completion, not regeneration.
 | Pack | Description | What remains | Evidence |
 |---|---|---|---|
 | P0-1 ruff cleanup | Make `ruff check .` green | 7 errors in `examples/hello.py:17` (E501), `scripts/check_release_v010.py:3` (F401), `scripts/check_repo_baseline.py:32,112` (F541/B007) | `next-steps.md` lines 32-33, 50; v0.1.0 finalized with cosmetic deferral |
-| v0.2.0 formal verification | Run v0.2.0 acceptance checks and flip status from "acceptance-defined" to verified | v0.2.0-acceptance.md status is still "acceptance-defined"; v0.2.0-readiness.md does not exist | `docs/release/v0.2.0-acceptance.md` line 5; repo inspection |
+| 0084 v0.2.0 acceptance gate | Define and verify v0.2 acceptance gate: smoke check passes (31/31), release tests pass (7/7), full suite 557 passed. Status remains acceptance-defined until formal release. | v0.2.0-acceptance.md status updated; check_release_v020.py passes; 557 tests pass | `docs/release/v0.2.0-acceptance.md`; `scripts/check_release_v020.py`; `tests/test_release_v020.py` |
 
 The ruff errors are cosmetic (not in `src/` core) and do not block evidence work.
 The v0.2.0 implementation is already present in source; only formal verification and
@@ -83,54 +83,52 @@ These were considered but are no longer needed.
 
 These are the ordered, narrow, validation-gated packs for the remaining Phase 1 evidence work.
 
-### 0073 — v0.2.0 Release Verification
+### 0084 — v0.2.0 Evidence Pipeline Acceptance (completed)
 
-**Goal:** Formally verify that the v0.2.0 acceptance criteria are satisfied, run the v0.2.0
-release smoke script, and produce a readiness document. No new implementation; this is a
-verification-and-documentation pack.
+**Goal:** Define the final v0.2 evidence pipeline acceptance gate: record exactly what
+the MVP evidence pipeline supports and what it does not support. No source feature work.
 
-**Scope:**
-- Run `scripts/check_release_v020.py` and confirm all checks pass
-- Run `tests/test_release_v020.py` and confirm all tests pass
-- Run full test suite to confirm no regression
-- Create `docs/release/v0.2.0-readiness.md` capturing verification evidence
-- Update `docs/release/v0.2.0-acceptance.md` status from "acceptance-defined" to "acceptance-passed"
-- Verify that evidence model, ingest, export, evaluation, and regression all pass
-- Verify no server write API (`do_POST`/`do_PUT`/`do_PATCH`/`do_DELETE`) is present
-- Verify no domain-specific vocabulary leaked into `src/ailuros/` core
+**Scope (completed):**
+- Inspect evidence model, ingest, export, CLI, evaluation, regression, boundary guard,
+  audit section, and demo files against actual repository state
+- Run `scripts/check_release_v020.py` — 31/31 checks pass
+- Run `tests/test_release_v020.py` — 7/7 tests pass
+- Run full test suite — 557 tests pass
+- Update `docs/release/v0.2.0-acceptance.md` with pack ID, date, and verification evidence
+- Update `docs/strategy/evidence-roadmap-v0.2.md` and `docs/strategy/next-steps.md`
+- No source implementation files modified
+- No server write API claimed
+- No real Clarify/browser/radarCreation integration claimed
 
-**Non-scope (explicitly NOT in 0073):**
+**Non-scope:**
 - No new evidence implementation
 - No new core abstractions
 - No server write API introduction
 - No domain-specific evidence examples in core
 - No backend-health repair (separate concern)
+- No readiness doc created (scope is acceptance gate definition, not release)
 
 **Dependencies:**
 - `docs/release/v0.2.0-acceptance.md` (exists, status: acceptance-defined)
 - `scripts/check_release_v020.py` (exists)
 - `tests/test_release_v020.py` (exists)
+- 0083.evidence-demo-local-fixture (prior pack, completed)
 - 0070/0071/0072 implementation (completed — code already in repo)
 
-**Validation:**
-- `scripts/check_release_v020.py` — all checks pass
-- `tests/test_release_v020.py` — all tests pass
-- `python -m pytest tests -q` — all pass
-- `python -m mypy src` — no issues
-- Core boundary guard test (`tests/test_core_boundary.py`) — passes
-
-**Risk:** Backend-health warnings (planner_unavailable, judge_not_invoked,
-deterministic_fallback_used) persist from the accepted-with-warnings run. If these
-persist through 0073 execution, accept_with_warnings is possible but the pack should
-be reviewed more carefully than a clean run.
+**Validation (verified):**
+- `scripts/check_release_v020.py` — 31/31 checks pass
+- `tests/test_release_v020.py` — 7/7 tests pass
+- `python -m pytest tests -q` — 557 pass
+- Core boundary guard enforces no server write API (`do_POST`/`do_PUT`/`do_PATCH`/`do_DELETE`)
+- No domain-specific vocabulary leaked into `src/ailuros/` core
 
 ### Later Phase 1 Work (after v0.2.0 verification)
 
 | Pack | Description | Depends on |
 |---|---|---|
-| Phase 1 docs finalization | Flip remaining `[ ]` items in `phase1-readiness.md` to `[x]` for evidence items | 0073 |
-| Phase 1 boundary guard audit | Verify core boundary test still passes and no domain terms leaked | 0073 |
-| v0.2.0 git tag | Create and push git tag `v0.2.0` (human decision) | 0073 |
+| Phase 1 docs finalization | Flip remaining `[ ]` items in `phase1-readiness.md` to `[x]` for evidence items | 0084 |
+| Phase 1 boundary guard audit | Verify core boundary test still passes and no domain terms leaked | 0084 |
+| v0.2.0 git tag | Create and push git tag `v0.2.0` (human decision) | 0084 |
 
 ## Later Packs
 
@@ -178,8 +176,8 @@ Each next pack must pass these gates before marking complete:
 | Type check | `python -m mypy src` | No issues |
 | Lint | `python -m ruff check .` | Accept `examples/` and `scripts/` errors as known cosmetic gap; `src/` must be clean |
 | Contract check | Manual review against `phase1-evidence-only-contract.md` | No server write APIs, no domain-specific core leak |
-| v0.2.0 smoke | `scripts/check_release_v020.py` | All checks pass (for 0073 only) |
-| v0.2.0 release tests | `tests/test_release_v020.py` | All pass (for 0073 only) |
+| v0.2.0 smoke | `scripts/check_release_v020.py` | All checks pass (for 0084 only) |
+| v0.2.0 release tests | `tests/test_release_v020.py` | All pass (for 0084 only) |
 
 ## Risks
 

@@ -27,6 +27,12 @@ def test_release_acceptance_doc_exists() -> None:
     assert "evidence-only" in content
     assert "HTTP write API" in content
     assert "Non-goals" in content
+    assert "Acceptance Matrix" in content
+    assert "IMPLEMENTED" in content
+    assert "NON-GOAL" in content
+    assert "Pipeline boundary" in content
+    assert "Audit package" in content
+    assert "Evidence demo" in content
 
 
 def test_evidence_only_contract_boundary_is_explicit() -> None:

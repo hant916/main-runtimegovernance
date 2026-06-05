@@ -30,7 +30,7 @@ with `LocalCallableAdapter`, a read-only HTTP server (GET only), and the full CL
 | # | Finding | Severity | Evidence |
 |---|---|---|---|
 | G1 | `ruff check .` fails with 7 errors | High — README and acceptance list `ruff check .` as a validation command, but it does not pass | `examples/hello.py:17` E501; `scripts/check_release_v010.py:3` F401; `scripts/check_repo_baseline.py:32,112` F541/B007 |
-| G2 | Phase 1 (Clarify evidence ingestion) has zero code | Medium — next mainline; documented only | `phase1-readiness.md` three `[ ]` deferred items |
+| G2 | Phase 1 (Clarify evidence ingestion) code exists (0070-0072) | Low — code implemented; docs not synced | `src/ailuros/models/evidence.py`, `src/ailuros/evidence/ingest.py`, `src/ailuros/evidence/export.py` |
 | G3 | `ailuros.sqlite` (348 KB demo artifact) sits at repo root in the working tree | Low — already untracked; `.gitignore` `*.sqlite` covers it. Verified not in `git ls-files`. | `git ls-files \| grep sqlite` lists only source files |
 | G4 | Release status is still `release-candidate` | Low — kernel is stable, can be finalized | `docs/release/v0.1.0-acceptance.md` |
 | G5 | EverRun planner/coder backends fall back | None for product — tooling issue, not product truth | execution-report `planner_unavailable` |
@@ -69,8 +69,8 @@ generic five-field contract (`version`/`run_id`/`event_type`/`payload`/`timestam
 from `docs/contracts/phase1-evidence-only-contract.md`.
 
 Phase 1 evidence implementation (0070-0072) is already complete — the code, tests,
-and exports exist in the repository. The remaining work is formal v0.2.0 release
-verification. The roadmap (`docs/strategy/evidence-roadmap-v0.2.md`) is the
+and exports exist in the repository. Pack 0084 defined and verified the v0.2
+acceptance gate. The roadmap (`docs/strategy/evidence-roadmap-v0.2.md`) is the
 authoritative pack-by-pack plan; this section provides a summary.
 
 | Pack | Scope | Status |
@@ -78,7 +78,7 @@ authoritative pack-by-pack plan; this section provides a summary.
 | 0070 Contract verify | EvidenceRecord model contract (five fields, opaque payload, free-form event_type) | COMPLETE — `src/ailuros/models/evidence.py` + `tests/test_evidence_contract.py` (147 lines) |
 | 0071 Ingest | `ingest_evidence(run_id, record)` stores external JSON evidence as an `EVIDENCE` timeline event | COMPLETE — `src/ailuros/evidence/ingest.py` + `tests/test_evidence_ingest.py` (165 lines) |
 | 0072 Export | `export_evidence()` + CLI — export stored evidence as JSON/JSONL | COMPLETE — `src/ailuros/evidence/export.py` + `tests/test_evidence_export.py` (218 lines) |
-| 0073 Release verify | Run v0.2.0 smoke checks, create readiness doc, flip acceptance status | NEXT PACK — requires `scripts/check_release_v020.py` and `tests/test_release_v020.py` |
+| 0084 Acceptance gate | Define v0.2 acceptance gate: smoke check (31/31), release tests (7/7), suite (557 pass) | COMPLETE — `scripts/check_release_v020.py`, `tests/test_release_v020.py`, acceptance doc updated |
 
 No new core architecture is introduced — within the `v0.1.0-acceptance.md` non-goal
 boundary. Each pack depends on the prior pack passing.
@@ -86,5 +86,5 @@ boundary. Each pack depends on the prior pack passing.
 ## Execution Order
 
 ```
-P0 (ruff cleanup) ──► 0070–0072 (already complete) ──► 0073 v0.2.0 release verify ──► later packs (Phase 2+)
+P0 (ruff cleanup) ──► 0070–0072 (complete) ──► 0084 v0.2 acceptance gate (complete) ──► later packs (Phase 2+)
 ```

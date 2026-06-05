@@ -83,6 +83,13 @@ def main() -> int:
     check_file_exists("tests/test_evidence_export.py")
     check_file_exists("tests/test_evidence_evaluation.py")
     check_file_exists("tests/test_evidence_regression.py")
+    check_file_exists("tests/test_evidence_demo.py")
+    check_file_exists("tests/test_evidence_audit_package.py")
+    check_file_exists("tests/test_evidence_pipeline_boundary.py")
+    check_file_exists("tests/test_evidence_record_contract.py")
+    check_file_exists("tests/test_evidence_export_cli.py")
+    check_file_exists("tests/test_evidence_storage_gap.py")
+    check_file_exists("tests/test_core_boundary.py")
     check_file_exists("tests/test_reference_app_fixtures.py")
     check_file_exists("tests/test_release_v020.py")
 
