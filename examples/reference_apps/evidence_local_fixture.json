@@ -1,0 +1,50 @@
+[
+  {
+    "event_id": "demo-evt-001",
+    "run_id": "demo-evidence-run",
+    "event_type": "evidence",
+    "timestamp": "2026-06-05T00:00:00+00:00",
+    "sequence": 1,
+    "evidence": {
+      "version": "1.0.0",
+      "event_type": "scan_result",
+      "payload": {
+        "target": "readme.md",
+        "lines_scanned": 42,
+        "findings": 0
+      }
+    }
+  },
+  {
+    "event_id": "demo-evt-002",
+    "run_id": "demo-evidence-run",
+    "event_type": "evidence",
+    "timestamp": "2026-06-05T00:00:01+00:00",
+    "sequence": 2,
+    "evidence": {
+      "version": "1.0.0",
+      "event_type": "transform_result",
+      "payload": {
+        "source": "input.csv",
+        "rows_transformed": 150,
+        "target_format": "json"
+      }
+    }
+  },
+  {
+    "event_id": "demo-evt-003",
+    "run_id": "demo-evidence-run",
+    "event_type": "evidence",
+    "timestamp": "2026-06-05T00:00:02+00:00",
+    "sequence": 3,
+    "evidence": {
+      "version": "1.0.0",
+      "event_type": "quality_report",
+      "payload": {
+        "check": "schema_validation",
+        "passed": true,
+        "errors": []
+      }
+    }
+  }
+]
