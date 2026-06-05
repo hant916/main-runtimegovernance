@@ -188,12 +188,20 @@ def eval_run(
 @app.command()
 def audit_package(
     run_id: str,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-dir",
+            help="Write audit package files to this directory instead of stdout.",
+        ),
+    ] = None,
     output: Annotated[
         OutputFormat,
-        typer.Option("--output", help="Output format."),
+        typer.Option("--output", help="Output format (stdout only)."),
     ] = OutputFormat.json,
 ) -> None:
     from ailuros.audit.package_export import export_audit_package_json
+    from ailuros.audit_package import export_audit_package_to_dir
     from ailuros.cli_run import open_storage
 
     try:
@@ -201,6 +209,15 @@ def audit_package(
     except typer.BadParameter as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
+
+    if output_dir is not None:
+        try:
+            pkg_path = export_audit_package_to_dir(storage, run_id, output_dir.resolve())
+        except (AilurosNotFoundError, AilurosDataCorruptionError) as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(1) from exc
+        typer.echo(str(pkg_path))
+        return
 
     try:
         result = export_audit_package_json(storage, run_id)
