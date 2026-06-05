@@ -1,0 +1,16 @@
+[
+  {
+    "id": "evidence-basic.pass.found",
+    "name": "Basic evidence golden: matching evidence event exists",
+    "expectations": [
+      { "type": "evidence_event", "evidence_event_type": "basic.event", "version": "1.0.0" }
+    ]
+  },
+  {
+    "id": "evidence-basic.fail.missing",
+    "name": "Basic evidence golden: no evidence events in timeline",
+    "expectations": [
+      { "type": "evidence_event", "evidence_event_type": "basic.event" }
+    ]
+  }
+]

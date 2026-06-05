@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from ailuros.evaluation import (
     EvaluationCase,
     EvaluationCaseLoadError,
+    EvaluationResult,
     EvaluationService,
     EvidenceEventExpectation,
     load_evaluation_cases,
@@ -335,6 +336,81 @@ class TestEvidenceGoldenCaseMatching:
         failure_messages = [f.message for f in result.failures]
         combined = " ".join(failure_messages)
         assert "expected evidence event" in combined.lower()
+
+
+BASIC_GOLDEN_FILE = (
+    Path(__file__).parent.parent / "examples" / "evaluation" / "evidence-basic.json"
+)
+
+
+class TestBasicEvidenceGoldenCase:
+    def test_loads_basic_cases(self):
+        cases = load_evaluation_cases(BASIC_GOLDEN_FILE)
+        assert len(cases) == 2
+
+    def test_basic_pass_case_passes(self):
+        cases = load_evaluation_cases(BASIC_GOLDEN_FILE)
+        case = next(c for c in cases if c.id == "evidence-basic.pass.found")
+        events = _matching_evidence_events(case.expectations)
+        result: EvaluationResult = EvaluationService().evaluate(events, [case])[0]
+        assert result.passed
+
+    def test_basic_fail_case_fails(self):
+        cases = load_evaluation_cases(BASIC_GOLDEN_FILE)
+        case = next(c for c in cases if c.id == "evidence-basic.fail.missing")
+        result: EvaluationResult = EvaluationService().evaluate([], [case])[0]
+        assert not result.passed
+        assert "Expected evidence event" in result.failures[0].message
+
+    def test_basic_cases_are_application_neutral(self):
+        cases = load_evaluation_cases(BASIC_GOLDEN_FILE)
+        for case in cases:
+            for expectation in case.expectations:
+                assert isinstance(expectation, EvidenceEventExpectation)
+                if expectation.evidence_event_type:
+                    domain = expectation.evidence_event_type.lower()
+                    assert "browser" not in domain
+                    assert "clarify" not in domain
+                    assert "dom" not in domain
+                    assert "sidepanel" not in domain
+                    assert "cta" not in domain
+
+    def test_basic_payload_is_opaque_by_default(self):
+        cases = load_evaluation_cases(BASIC_GOLDEN_FILE)
+        for case in cases:
+            for expectation in case.expectations:
+                assert isinstance(expectation, EvidenceEventExpectation)
+                assert expectation.payload_contains is None
+
+    def test_basic_case_fails_when_evidence_type_wrong(self):
+        cases = load_evaluation_cases(BASIC_GOLDEN_FILE)
+        case = next(c for c in cases if c.id == "evidence-basic.pass.found")
+        events = [
+            event(1, RuntimeEventType.EVIDENCE, {"version": "1.0.0", "event_type": "wrong.event"})
+        ]
+        result: EvaluationResult = EvaluationService().evaluate(events, [case])[0]
+        assert not result.passed
+
+    def test_basic_case_fails_when_version_wrong(self):
+        cases = load_evaluation_cases(BASIC_GOLDEN_FILE)
+        case = next(c for c in cases if c.id == "evidence-basic.pass.found")
+        events = [
+            event(1, RuntimeEventType.EVIDENCE, {"version": "9.9.9", "event_type": "basic.event"})
+        ]
+        result: EvaluationResult = EvaluationService().evaluate(events, [case])[0]
+        assert not result.passed
+
+    def test_basic_unknown_payload_does_not_silently_pass(self):
+        case = EvaluationCase(
+            id="unknown_payload",
+            name="unknown_payload",
+            expectations=[
+                EvidenceEventExpectation(evidence_event_type="nonexistent.type")
+            ],
+        )
+        events = [event(1, RuntimeEventType.EVIDENCE, {"unknown": "data"})]
+        result: EvaluationResult = EvaluationService().evaluate(events, [case])[0]
+        assert not result.passed
 
 
 class TestEvidenceEventExpectationModel:
