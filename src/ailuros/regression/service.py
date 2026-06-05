@@ -11,6 +11,8 @@ from ailuros.regression.models import (
     RegressionDiff,
 )
 
+_SENTINEL = object()
+
 
 class RegressionService:
     def compare(
@@ -98,10 +100,29 @@ class RegressionService:
             "evidence_event_type": evidence.get("event_type"),
         }
 
+    @staticmethod
+    def _get_payload_at_path(
+        record: dict[str, Any],
+        path: str,
+    ) -> Any:
+        parts = path.split(".")
+        val: Any = record.get("evidence") or {}
+        if not isinstance(val, dict):
+            return _SENTINEL
+        for part in parts:
+            if isinstance(val, dict):
+                val = val.get(part, _SENTINEL)
+            else:
+                return _SENTINEL
+            if val is _SENTINEL:
+                break
+        return val
+
     def compare_evidence_timeline(
         self,
         baseline: list[dict[str, Any]],
         current: list[dict[str, Any]],
+        payload_paths: list[str] | None = None,
     ) -> EvidenceTimelineRegressionResult:
         diffs: list[EvidenceTimelineDiff] = []
         max_len = max(len(baseline), len(current))
@@ -161,6 +182,41 @@ class RegressionService:
                         current_record=curr_rec,
                     )
                 )
+                continue
+
+            if payload_paths:
+                payload_diffs: list[str] = []
+                for path in payload_paths:
+                    base_val = self._get_payload_at_path(base_rec, path)
+                    curr_val = self._get_payload_at_path(curr_rec, path)
+                    if base_val is _SENTINEL and curr_val is _SENTINEL:
+                        continue
+                    if base_val is _SENTINEL:
+                        payload_diffs.append(
+                            f"payload.{path}: MISSING_IN_BASELINE -> {curr_val!r}"
+                        )
+                    elif curr_val is _SENTINEL:
+                        payload_diffs.append(
+                            f"payload.{path}: {base_val!r} -> MISSING_IN_CURRENT"
+                        )
+                    elif base_val != curr_val:
+                        payload_diffs.append(
+                            f"payload.{path}: {base_val!r} -> {curr_val!r}"
+                        )
+
+                if payload_diffs:
+                    diffs.append(
+                        EvidenceTimelineDiff(
+                            index=i,
+                            kind="changed_evidence",
+                            message=(
+                                f"Evidence payload changed at position {i}: "
+                                + "; ".join(payload_diffs)
+                            ),
+                            baseline_record=base_rec,
+                            current_record=curr_rec,
+                        )
+                    )
 
         return EvidenceTimelineRegressionResult(
             passed=not diffs,

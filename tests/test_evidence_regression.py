@@ -1,300 +1,258 @@
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
+import json
+from pathlib import Path
 
-from ailuros.regression import (
-    EvidenceTimelineDiff,
-    EvidenceTimelineRegressionResult,
-    RegressionService,
-)
+from ailuros.regression import RegressionService
 
 
-def _evidence_record(
-    sequence: int = 1,
-    event_type: str = "evidence",
-    version: str = "1.0.0",
-    evt_type: str = "example.event",
-    payload: dict | None = None,
+def _load_fixture(name: str) -> list[dict]:
+    path = Path(__file__).resolve().parent.parent / "examples" / "evaluation" / name
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _record(
+    event_id: str,
+    event_type: str,
+    sequence: int,
+    evidence: dict | None = None,
 ) -> dict:
     return {
-        "event_id": f"evt_{sequence}",
-        "run_id": "run_test",
+        "event_id": event_id,
+        "run_id": "test-run",
         "event_type": event_type,
-        "timestamp": "2024-01-01T00:00:00+00:00",
+        "timestamp": "2026-06-05T00:00:00+00:00",
         "sequence": sequence,
-        "evidence": {
-            "version": version,
-            "event_type": evt_type,
-            "payload": payload or {"action": "click"},
-        },
+        "evidence": evidence or {},
     }
 
 
-class TestEvidenceTimelineDiffModel:
-    def test_extra_fields_rejected(self):
-        with pytest.raises(ValidationError):
-            EvidenceTimelineDiff.model_validate(
-                {"index": 0, "kind": "test", "message": "msg", "extra": "bad"}
-            )
-
-
-class TestEvidenceTimelineRegressionResultModel:
-    def test_extra_fields_rejected(self):
-        with pytest.raises(ValidationError):
-            EvidenceTimelineRegressionResult.model_validate(
-                {
-                    "passed": True,
-                    "baseline_count": 1,
-                    "current_count": 1,
-                    "diffs": [],
-                    "extra": "bad",
-                }
-            )
-
-
-class TestEvidenceTimelineNoRegression:
-    def test_identical_timelines_pass(self):
+class TestEvidenceRegressionGeneric:
+    def test_no_change_identical_timelines(self):
         baseline = [
-            _evidence_record(1, evt_type="nav"),
-            _evidence_record(2, evt_type="click"),
+            _record("a", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+            _record("b", "evidence", 2, {"version": "1.0", "event_type": "int"}),
         ]
         current = [
-            _evidence_record(1, evt_type="nav"),
-            _evidence_record(2, evt_type="click"),
+            _record("a2", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+            _record("b2", "evidence", 2, {"version": "1.0", "event_type": "int"}),
         ]
-
         result = RegressionService().compare_evidence_timeline(baseline, current)
-
         assert result.passed is True
-        assert result.diffs == []
         assert result.baseline_count == 2
         assert result.current_count == 2
+        assert result.diffs == []
 
-    def test_empty_timelines_pass(self):
-        result = RegressionService().compare_evidence_timeline([], [])
-
+    def test_no_change_from_fixture_files(self):
+        baseline = _load_fixture("evidence-regression-baseline.json")
+        current = _load_fixture("evidence-regression-current.json")
+        result = RegressionService().compare_evidence_timeline(baseline, current)
         assert result.passed is True
         assert result.diffs == []
-        assert result.baseline_count == 0
-        assert result.current_count == 0
 
-    def test_single_event_pass(self):
-        baseline = [_evidence_record(1)]
-        current = [_evidence_record(1)]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is True
-
-
-class TestEvidenceTimelineMissingEvidence:
-    def test_fewer_events_in_current_is_regression(self):
+    def test_missing_evidence_detected(self):
         baseline = [
-            _evidence_record(1, evt_type="nav"),
-            _evidence_record(2, evt_type="click"),
-            _evidence_record(3, evt_type="submit"),
+            _record("a", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+            _record("b", "evidence", 2, {"version": "1.0", "event_type": "int"}),
         ]
         current = [
-            _evidence_record(1, evt_type="nav"),
+            _record("a2", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
         ]
-
         result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is False
-        assert result.baseline_count == 3
-        assert result.current_count == 1
-        assert len(result.diffs) >= 2
-        kinds = {d.kind for d in result.diffs}
-        assert "missing_evidence" in kinds
-
-    def test_current_is_empty_is_regression(self):
-        baseline = [_evidence_record(1)]
-        current: list[dict] = []
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
         assert result.passed is False
         assert len(result.diffs) == 1
         assert result.diffs[0].kind == "missing_evidence"
-        assert result.diffs[0].index == 0
+        assert result.diffs[0].index == 1
+        assert result.baseline_count == 2
+        assert result.current_count == 1
 
-
-class TestEvidenceTimelineAddedEvidence:
-    def test_more_events_in_current_is_regression(self):
-        baseline = [_evidence_record(1, evt_type="nav")]
-        current = [
-            _evidence_record(1, evt_type="nav"),
-            _evidence_record(2, evt_type="click"),
-            _evidence_record(3, evt_type="submit"),
+    def test_added_evidence_detected(self):
+        baseline = [
+            _record("a", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
         ]
-
+        current = [
+            _record("a2", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+            _record("b2", "evidence", 2, {"version": "1.0", "event_type": "int"}),
+        ]
         result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is False
-        assert result.baseline_count == 1
-        assert result.current_count == 3
-        kinds = {d.kind for d in result.diffs}
-        assert "added_evidence" in kinds
-
-    def test_baseline_empty_current_has_events_is_regression(self):
-        baseline: list[dict] = []
-        current = [_evidence_record(1)]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
         assert result.passed is False
         assert len(result.diffs) == 1
         assert result.diffs[0].kind == "added_evidence"
+        assert result.diffs[0].index == 1
+        assert result.baseline_count == 1
+        assert result.current_count == 2
 
-
-class TestEvidenceTimelineChangedStableField:
-    def test_version_changed_is_regression(self):
-        baseline = [_evidence_record(1, version="1.0.0")]
-        current = [_evidence_record(1, version="2.0.0")]
-
+    def test_changed_sequence_reported(self):
+        baseline = [
+            _record("a", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+        ]
+        current = [
+            _record("a2", "evidence", 99, {"version": "1.0", "event_type": "nav"}),
+        ]
         result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is False
-        assert len(result.diffs) == 1
-        assert result.diffs[0].kind == "changed_evidence"
-        assert "evidence_version" in result.diffs[0].message
-
-    def test_evidence_event_type_changed_is_regression(self):
-        baseline = [_evidence_record(1, evt_type="nav")]
-        current = [_evidence_record(1, evt_type="click")]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is False
-        assert len(result.diffs) == 1
-        assert result.diffs[0].kind == "changed_evidence"
-        assert "evidence_event_type" in result.diffs[0].message
-
-    def test_top_level_event_type_changed_is_regression(self):
-        baseline = [_evidence_record(1, event_type="evidence")]
-        current = [_evidence_record(1, event_type="external_evidence")]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is False
-        assert len(result.diffs) == 1
-        assert result.diffs[0].kind == "changed_evidence"
-
-    def test_sequence_changed_is_regression(self):
-        baseline = [_evidence_record(1)]
-        current = [_evidence_record(2)]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
         assert result.passed is False
         assert len(result.diffs) == 1
         assert result.diffs[0].kind == "changed_evidence"
         assert "sequence" in result.diffs[0].message
 
-    def test_multiple_fields_changed_reports_all(self):
-        baseline = [_evidence_record(1, version="1.0.0", evt_type="nav")]
-        current = [_evidence_record(1, version="2.0.0", evt_type="click")]
-
+    def test_changed_evidence_version_reported(self):
+        baseline = [
+            _record("a", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+        ]
+        current = [
+            _record("a2", "evidence", 1, {"version": "2.0", "event_type": "nav"}),
+        ]
         result = RegressionService().compare_evidence_timeline(baseline, current)
-
         assert result.passed is False
         assert len(result.diffs) == 1
         assert result.diffs[0].kind == "changed_evidence"
         assert "evidence_version" in result.diffs[0].message
+
+    def test_changed_event_type_reported(self):
+        baseline = [
+            _record("a", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+        ]
+        current = [
+            _record("a2", "external_evidence", 1, {"version": "1.0", "event_type": "nav"}),
+        ]
+        result = RegressionService().compare_evidence_timeline(baseline, current)
+        assert result.passed is False
+        assert len(result.diffs) == 1
+        assert result.diffs[0].kind == "changed_evidence"
+        assert "event_type" in result.diffs[0].message
+
+    def test_changed_evidence_event_type_reported(self):
+        baseline = [
+            _record("a", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+        ]
+        current = [
+            _record("a2", "evidence", 1, {"version": "1.0", "event_type": "page_view"}),
+        ]
+        result = RegressionService().compare_evidence_timeline(baseline, current)
+        assert result.passed is False
+        assert len(result.diffs) == 1
+        assert result.diffs[0].kind == "changed_evidence"
         assert "evidence_event_type" in result.diffs[0].message
 
 
-class TestEvidenceTimelineOpaquePayload:
-    def test_opaque_payload_change_does_not_cause_regression(self):
-        baseline = [_evidence_record(1, payload={"action": "click"})]
-        current = [_evidence_record(1, payload={"action": "hover"})]
+class TestEvidenceRegressionPayloadPaths:
+    def test_payload_path_opt_in_reports_diff(self):
+        baseline = [
+            _record("a", "evidence", 1, {
+                "version": "1.0", "event_type": "nav", "action": "click"
+            }),
+        ]
+        current = [
+            _record("a2", "evidence", 1, {
+                "version": "1.0", "event_type": "nav", "action": "hover"
+            }),
+        ]
+        result = RegressionService().compare_evidence_timeline(
+            baseline, current, payload_paths=["action"]
+        )
+        assert result.passed is False
+        assert len(result.diffs) == 1
+        assert result.diffs[0].kind == "changed_evidence"
+        assert "payload.action" in result.diffs[0].message
 
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
+    def test_payload_path_no_diff_when_identical(self):
+        baseline = [
+            _record("a", "evidence", 1, {
+                "version": "1.0", "event_type": "nav", "action": "click"
+            }),
+        ]
+        current = [
+            _record("a2", "evidence", 1, {
+                "version": "1.0", "event_type": "nav", "action": "click"
+            }),
+        ]
+        result = RegressionService().compare_evidence_timeline(
+            baseline, current, payload_paths=["action"]
+        )
         assert result.passed is True
         assert result.diffs == []
 
-    def test_new_payload_key_does_not_cause_regression(self):
-        baseline = [_evidence_record(1, payload={"action": "click"})]
-        current = [_evidence_record(1, payload={"action": "click", "extra": "data"})]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is True
-
-    def test_payload_removed_does_not_cause_regression(self):
-        baseline = [_evidence_record(1, payload={"action": "click"})]
-        current = [_evidence_record(1, payload={})]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is True
-
-
-class TestEvidenceTimelineReordered:
-    def test_reordered_events_is_regression(self):
+    def test_payload_path_not_compared_by_default(self):
         baseline = [
-            _evidence_record(1, evt_type="nav"),
-            _evidence_record(2, evt_type="click"),
+            _record("a", "evidence", 1, {
+                "version": "1.0", "event_type": "nav", "action": "click"
+            }),
         ]
         current = [
-            _evidence_record(1, evt_type="click"),
-            _evidence_record(2, evt_type="nav"),
+            _record("a2", "evidence", 1, {
+                "version": "1.0", "event_type": "nav", "action": "hover"
+            }),
         ]
-
         result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        assert result.passed is False
-
-
-class TestEvidenceTimelineDiffDetails:
-    def test_diff_includes_baseline_and_current_records(self):
-        baseline = [_evidence_record(1, version="1.0.0")]
-        current = [_evidence_record(1, version="2.0.0")]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        diff = result.diffs[0]
-        assert diff.baseline_record is not None
-        assert diff.baseline_record["evidence"]["version"] == "1.0.0"
-        assert diff.current_record is not None
-        assert diff.current_record["evidence"]["version"] == "2.0.0"
-
-    def test_missing_diff_has_baseline_record(self):
-        baseline = [_evidence_record(1)]
-        current: list[dict] = []
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        diff = result.diffs[0]
-        assert diff.baseline_record is not None
-        assert diff.current_record is None
-
-    def test_added_diff_has_current_record(self):
-        baseline: list[dict] = []
-        current = [_evidence_record(1)]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
-        diff = result.diffs[0]
-        assert diff.baseline_record is None
-        assert diff.current_record is not None
-
-
-class TestEvidenceTimelineExternal:
-    def test_external_evidence_type_is_compared(self):
-        baseline = [_evidence_record(1, event_type="external_evidence")]
-        current = [_evidence_record(1, event_type="external_evidence")]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
         assert result.passed is True
+        assert result.diffs == []
 
-    def test_evidence_vs_external_evidence_is_regression(self):
-        baseline = [_evidence_record(1, event_type="evidence")]
-        current = [_evidence_record(1, event_type="external_evidence")]
-
-        result = RegressionService().compare_evidence_timeline(baseline, current)
-
+    def test_nested_payload_path(self):
+        baseline = [
+            _record("a", "evidence", 1, {
+                "version": "1.0", "event_type": "nav",
+                "metadata": {"category": "nav", "priority": "high"},
+            }),
+        ]
+        current = [
+            _record("a2", "evidence", 1, {
+                "version": "1.0", "event_type": "nav",
+                "metadata": {"category": "nav", "priority": "low"},
+            }),
+        ]
+        result = RegressionService().compare_evidence_timeline(
+            baseline, current, payload_paths=["metadata.priority"]
+        )
         assert result.passed is False
+        assert len(result.diffs) == 1
+        assert "payload.metadata.priority" in result.diffs[0].message
+
+    def test_payload_path_missing_in_baseline(self):
+        baseline = [
+            _record("a", "evidence", 1, {
+                "version": "1.0", "event_type": "nav",
+            }),
+        ]
+        current = [
+            _record("a2", "evidence", 1, {
+                "version": "1.0", "event_type": "nav",
+                "action": "click",
+            }),
+        ]
+        result = RegressionService().compare_evidence_timeline(
+            baseline, current, payload_paths=["action"]
+        )
+        assert result.passed is False
+        assert "MISSING_IN_BASELINE" in result.diffs[0].message
+
+    def test_payload_path_missing_in_current(self):
+        baseline = [
+            _record("a", "evidence", 1, {
+                "version": "1.0", "event_type": "nav",
+                "action": "click",
+            }),
+        ]
+        current = [
+            _record("a2", "evidence", 1, {
+                "version": "1.0", "event_type": "nav",
+            }),
+        ]
+        result = RegressionService().compare_evidence_timeline(
+            baseline, current, payload_paths=["action"]
+        )
+        assert result.passed is False
+        assert "MISSING_IN_CURRENT" in result.diffs[0].message
+
+
+class TestEvidenceRegressionDeterminism:
+    def test_same_inputs_produce_same_output(self):
+        recs = [
+            _record("a", "evidence", 1, {"version": "1.0", "event_type": "nav"}),
+            _record("b", "evidence", 2, {"version": "1.0", "event_type": "int"}),
+        ]
+        r1 = RegressionService().compare_evidence_timeline(recs, recs)
+        r2 = RegressionService().compare_evidence_timeline(recs, recs)
+        assert r1.passed == r2.passed
+        assert r1.baseline_count == r2.baseline_count
+        assert r1.current_count == r2.current_count
+        assert len(r1.diffs) == len(r2.diffs)

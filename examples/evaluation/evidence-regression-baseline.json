@@ -1,0 +1,28 @@
+[
+  {
+    "event_id": "evt-baseline-001",
+    "run_id": "regression-baseline",
+    "event_type": "evidence",
+    "timestamp": "2026-06-05T00:00:00+00:00",
+    "sequence": 1,
+    "evidence": {
+      "version": "1.0",
+      "event_type": "navigation",
+      "action": "click",
+      "metadata": {"category": "nav", "priority": "high"}
+    }
+  },
+  {
+    "event_id": "evt-baseline-002",
+    "run_id": "regression-baseline",
+    "event_type": "evidence",
+    "timestamp": "2026-06-05T00:00:01+00:00",
+    "sequence": 2,
+    "evidence": {
+      "version": "1.0",
+      "event_type": "interaction",
+      "action": "hover",
+      "metadata": {"category": "ui", "priority": "low"}
+    }
+  }
+]
