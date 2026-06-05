@@ -124,20 +124,34 @@ the MVP evidence pipeline supports and what it does not support. No source featu
 
 ### Later Phase 1 Work (after v0.2.0 verification)
 
-| Pack | Description | Depends on |
+| Pack | Description | Status |
 |---|---|---|
-| Phase 1 docs finalization | Flip remaining `[ ]` items in `phase1-readiness.md` to `[x]` for evidence items | 0084 |
-| Phase 1 boundary guard audit | Verify core boundary test still passes and no domain terms leaked | 0084 |
-| v0.2.0 git tag | Create and push git tag `v0.2.0` (human decision) | 0084 |
+| Phase 1 docs finalization | Flip remaining `[ ]` items in `phase1-readiness.md` to `[x]` for evidence items | DONE — resolved by pack 0085 (v0.3 readiness closeout) |
+| Phase 1 boundary guard audit | Verify core boundary test still passes and no domain terms leaked | PENDING (human review, not blocking) |
+| v0.2.0 git tag | Create and push git tag `v0.2.0` (human decision) | PENDING (human decision) |
+
+## v0.3 MVP Scope
+
+See `docs/release/v0.3.0-scope.md` (created by pack 0085).
+
+v0.3 MVP is the next implementation target:
+
+| Capability | Scope |
+|---|---|
+| Audit package exporter | Extend v0.2 audit section to produce full audit packages from evidence |
+| Refund governance demo | Single deterministic demo exercising evidence-to-audit-package flow |
+| v0.3 acceptance gate | Release smoke check, release tests, scope boundary guard |
+
+**Non-goals for v0.3:** Server write API, UI dashboard, agent orchestration, browser governance, Clarify integration, radarCreation integration, MCP Gateway integration, broad adapters.
 
 ## Later Packs
 
-Work deferred beyond the immediate next-pack sequence.
+Work deferred beyond v0.3 MVP.
 
 | Pack | Description | When |
 |---|---|---|
 | P0-1 ruff cleanup | Fix 7 ruff errors in examples/scripts/ | Anytime; cosmetic, not blocking |
-| Phase 2 Governed LLM Call | Policy evaluation over LLM content | After v0.2.0 released |
+| Phase 2 Governed LLM Call | Policy evaluation over LLM content | After v0.3.0 released |
 | Phase 3 EverRun Loop | Continuous-run governance | After Phase 2 |
 | Phase 4 radarCreation Vertical | Domain-specific governance rules | After Phase 3 |
 | Phase 5 Platformization | Multi-tenant server, REST API, dashboard, adapter ecosystem | Explicitly deferred |
@@ -195,11 +209,8 @@ Each next pack must pass these gates before marking complete:
 - Planner/judge ACCEPT: Cannot verify. Run evidence reports `planner_unavailable`
   and `judge_not_invoked`.
 - `docs/release/v0.2.0-readiness.md` does not exist (will be created by pack 0073).
-- **Contradiction:** `docs/strategy/phase1-readiness.md` lines 52-56 list evidence
-  ingestion, export, and evaluation as `[ ]` deferred items. However, source-code
-  inspection confirms `src/ailuros/models/evidence.py`,
-  `src/ailuros/evidence/ingest.py`, `src/ailuros/evidence/export.py`, and
-  corresponding tests already exist and implement these features. The doc has not
-  been updated to reflect the completed state. The roadmap marks these packs as
-  COMPLETE (source-truth) and defers the docs sync to "Phase 1 docs finalization"
-  (later packs). The contradiction is recorded, not overwritten.
+- **Resolved contradiction (pack 0085):** `docs/strategy/phase1-readiness.md` previously
+  listed evidence ingestion, export, and evaluation as `[ ]` deferred items while
+  source-code already implemented these features. Pack 0085 (v0.3 readiness closeout)
+  resolved this by flipping the three items to `[x]` with source-file evidence.
+  The doc is now in sync with the implemented state.

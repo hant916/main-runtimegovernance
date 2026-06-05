@@ -83,8 +83,19 @@ authoritative pack-by-pack plan; this section provides a summary.
 No new core architecture is introduced — within the `v0.1.0-acceptance.md` non-goal
 boundary. Each pack depends on the prior pack passing.
 
+### v0.3—Close v0.2 Readiness and Freeze MVP Scope
+
+Pack 0085 closes v0.2 readiness and freezes v0.3 MVP scope:
+
+| Pack | Scope | Status |
+|---|---|---|
+| 0085 Readiness closeout | Close v0.2 readiness items, freeze v0.3 scope to audit-package export, refund governance demo, and v0.3 acceptance gate | COMPLETE — `docs/strategy/phase1-readiness.md` closeout, `docs/release/v0.3.0-scope.md` created |
+
+v0.3 MVP is intentionally narrow: evidence-to-audit-package plus one demo flow. See
+`docs/release/v0.3.0-scope.md` for the full scope and non-goals.
+
 ## Execution Order
 
 ```
-P0 (ruff cleanup) ──► 0070–0072 (complete) ──► 0084 v0.2 acceptance gate (complete) ──► later packs (Phase 2+)
+P0 (ruff cleanup) ──► 0070–0072 (complete) ──► 0084 v0.2 acceptance gate (complete) ──► 0085 v0.3 readiness closeout (complete) ──► v0.3 implementation packs
 ```

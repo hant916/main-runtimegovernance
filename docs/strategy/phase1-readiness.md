@@ -49,10 +49,19 @@ The following are explicitly deferred from Phase 1 and forbidden in this pack:
 - [x] Evidence payload expectations defined at the contract level
 - [x] Explicit deferrals documented for HTTP write API, auth, dashboard,
       browser blocking, and platformization
-- [ ] Evidence ingestion implementation (Phase 1 code) — deferred to future
-      integration pack
-- [ ] Timeline export from stored evidence — deferred
-- [ ] Evidence-based evaluation — deferred
+- [x] Evidence ingestion implementation (0070–0072 delivered code,
+      `src/ailuros/evidence/ingest.py` + tests)
+- [x] Timeline export from stored evidence (0072 delivered
+      `export_evidence()`/`export_evidence_json()`/`export_evidence_jsonl()`)
+- [x] Evidence-based evaluation (0070–0072 delivered evaluation and regression
+      services + tests)
+
+## v0.2 Readiness Closeout
+
+v0.2 evidence pipeline readiness items are **all completed**. Existing v0.2
+acceptance doc at `docs/release/v0.2.0-acceptance.md` records the formal
+acceptance-defined status. See `docs/release/v0.3.0-scope.md` for the frozen
+v0.3 MVP scope.
 
 ## Dependencies
 
