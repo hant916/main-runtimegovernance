@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.3.0 (2026-06-05)
+
+### Audit Package MVP
+
+- Added v0.3 audit-package export for stored governance runs.
+- Added `ailuros audit-package <run_id>` CLI output as structured JSON or a 7-file package directory.
+- Added audit package manifest contract with `schema_version: ailuros.audit-package.v1`.
+- Added low-level audit package export with timeline, decisions, evidence, validation, and replay metadata.
+
+### Refund Governance Demo
+
+- Added deterministic `examples/refund_governance_demo.py`.
+- Demo covers low-value allow, high-value require-review, and invalid-PNR block scenarios.
+- Demo exercises policy decisions, evidence ingestion, evaluation, and audit-package export without network or secrets.
+
+### Release Gate
+
+- Added v0.3 scope and acceptance documentation.
+- Added `scripts/check_release_v030.py` and release acceptance tests.
+- Accepted v0.3 MVP scope: audit-package exporter, refund-governance demo, and release gate.
+
+## v0.2.0 (2026-06-05)
+
+### Evidence Pipeline
+
+- Added `EvidenceRecord` contract for application-neutral external evidence.
+- Added evidence ingestion into the runtime timeline.
+- Added evidence export as JSON and JSONL.
+- Added evidence evaluation and evidence regression workflows.
+- Added reference application evidence fixtures for Clarify, EverRun, and radarCreation boundaries.
+
+### Release Gate
+
+- Added v0.2 evidence-only release acceptance documentation and smoke check.
+- Kept Phase 1 explicitly evidence-only: no HTTP write API, no browser reverse-control flow, and no domain-specific dependency inside `src/ailuros/`.
+
 ## v0.1.0 (2026-06-04)
 
 ### Governance Core

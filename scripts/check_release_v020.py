@@ -46,8 +46,8 @@ def main() -> int:
     check_file_exists("docs/release/v0.2.0-acceptance.md")
     check_file_contains(
         "docs/release/v0.2.0-acceptance.md",
-        "acceptance-defined",
-        "acceptance-defined status",
+        "Status: accepted",
+        "accepted status",
     )
     check_file_contains(
         "docs/release/v0.2.0-acceptance.md",

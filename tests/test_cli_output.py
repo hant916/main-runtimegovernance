@@ -10,7 +10,7 @@ from ailuros.cli import app
 def test_version_default_text():
     result = CliRunner().invoke(app, ["version"])
     assert result.exit_code == 0
-    assert "0.1.0" in result.output or result.output.strip()
+    assert "0.3.0" in result.output or result.output.strip()
 
 
 def test_version_json():

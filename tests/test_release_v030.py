@@ -24,7 +24,7 @@ def test_release_acceptance_doc_exists() -> None:
     assert doc.exists(), "docs/release/v0.3.0-acceptance.md not found"
     content = doc.read_text(encoding="utf-8")
 
-    assert "acceptance-defined" in content
+    assert "Status: accepted" in content
     assert "IMPLEMENTED" in content
     assert "NON-GOAL" in content
     assert "Acceptance Matrix" in content
@@ -82,6 +82,15 @@ def test_v020_prerequisite_files_exist() -> None:
 def test_v030_scope_doc_exists() -> None:
     scope = ROOT / "docs" / "release" / "v0.3.0-scope.md"
     assert scope.exists(), "docs/release/v0.3.0-scope.md not found"
+
+
+def test_v030_finalization_doc_exists() -> None:
+    doc = ROOT / "docs" / "release" / "v0.3.0-finalization.md"
+    assert doc.exists(), "docs/release/v0.3.0-finalization.md not found"
+    content = doc.read_text(encoding="utf-8")
+    assert "Status: finalized" in content
+    assert "Release Boundary" in content
+    assert "Validation Boundary" in content
 
 
 def test_release_doc_does_not_claim_production_integrations() -> None:

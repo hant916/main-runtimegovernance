@@ -55,8 +55,8 @@ def main() -> int:
     check_file_exists("docs/release/v0.3.0-acceptance.md")
     check_file_contains(
         "docs/release/v0.3.0-acceptance.md",
-        "acceptance-defined",
-        "acceptance-defined status",
+        "Status: accepted",
+        "accepted status",
     )
     check_file_contains(
         "docs/release/v0.3.0-acceptance.md",
@@ -100,6 +100,7 @@ def main() -> int:
         )
 
     check_file_exists("docs/release/v0.3.0-scope.md")
+    check_file_exists("docs/release/v0.3.0-finalization.md")
 
     check_file_exists("src/ailuros/audit_package.py")
     check_file_contains(

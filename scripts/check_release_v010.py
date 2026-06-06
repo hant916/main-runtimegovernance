@@ -44,12 +44,13 @@ def main() -> int:
     print("Ailuros v0.1.0 release smoke check")
     print("=" * 40)
 
-    # Version checks
-    check_file_contains("pyproject.toml", 'version = "0.1.0"', "version = 0.1.0")
+    # Current package version has moved on; this historical gate keeps v0.1 docs
+    # present while ensuring the active package version remains explicit.
+    check_file_contains("pyproject.toml", 'version = "0.3.0"', "current version = 0.3.0")
 
     init_path = ROOT / "src" / "ailuros" / "__init__.py"
     if init_path.exists():
-        check_file_contains("src/ailuros/__init__.py", "0.1.0", "0.1.0")
+        check_file_contains("src/ailuros/__init__.py", "0.3.0", "current version = 0.3.0")
 
     # Content checks
     check_file_contains("CHANGELOG.md", "0.1.0", "0.1.0")

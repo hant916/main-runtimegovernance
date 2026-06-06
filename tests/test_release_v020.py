@@ -23,7 +23,7 @@ def test_release_acceptance_doc_exists() -> None:
     doc = ROOT / "docs" / "release" / "v0.2.0-acceptance.md"
     assert doc.exists(), "docs/release/v0.2.0-acceptance.md not found"
     content = doc.read_text(encoding="utf-8")
-    assert "acceptance-defined" in content
+    assert "Status: accepted" in content
     assert "evidence-only" in content
     assert "HTTP write API" in content
     assert "Non-goals" in content

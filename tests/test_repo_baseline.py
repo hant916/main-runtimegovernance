@@ -30,7 +30,7 @@ def test_checker_output_contains_all_checks():
     )
     assert "[PASS]" in result.stdout
     assert "7/7 checks passed" in result.stdout
-    assert "version is 0.1.0" in result.stdout
+    assert "version is 0.3.0" in result.stdout
     assert "CHANGELOG.md" in result.stdout
     assert "hello.py exists" in result.stdout
     assert "ADR-0001" in result.stdout

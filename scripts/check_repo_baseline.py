@@ -28,8 +28,8 @@ def check_version() -> bool:
     m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
     if not m:
         return _check(False, "version in pyproject.toml", "version field missing")
-    ok = m.group(1) == "0.1.0"
-    return _check(ok, "version is 0.1.0", f"found {m.group(1)!r}" if not ok else "")
+    ok = m.group(1) == "0.3.0"
+    return _check(ok, "version is 0.3.0", f"found {m.group(1)!r}" if not ok else "")
 
 
 def check_changelog() -> bool:
@@ -95,7 +95,7 @@ def check_readme_refers_to_demo() -> bool:
 
 
 def main() -> int:
-    print(f"v0.1.0 release-baseline sanity check for {REPO.name}")
+    print(f"v0.3.0 release-baseline sanity check for {REPO.name}")
     print()
 
     checks = [
