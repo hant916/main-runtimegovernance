@@ -24,6 +24,11 @@ class OutputFormat(StrEnum):
     jsonl = "jsonl"
 
 
+class ReportFormat(StrEnum):
+    json = "json"
+    md = "md"
+
+
 def _print_json(data: Any) -> None:
     typer.echo(json.dumps(data, indent=2, default=str))
 
@@ -255,6 +260,48 @@ def evidence(
         raise typer.Exit(1) from exc
 
     typer.echo(result)
+
+
+@app.command("evidence-audit")
+def evidence_audit(
+    package_path: Path,
+    format: Annotated[
+        ReportFormat,
+        typer.Option("--format", help="Report format: json or md."),
+    ] = ReportFormat.json,
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Write the report to this file instead of stdout."),
+    ] = None,
+) -> None:
+    """Audit a canonical evidence package on disk and render a post-run report.
+
+    This is post-run validation, not runtime governance: it inspects a completed
+    run's evidence and reports a pass/warn/fail decision. No allow/review/block
+    control is performed.
+    """
+    from ailuros.adapters.evidence_package import (
+        audit_evidence_package,
+        audit_result_to_json,
+        audit_result_to_markdown,
+    )
+
+    if not package_path.is_dir():
+        typer.echo(f"evidence package directory not found: {package_path}", err=True)
+        raise typer.Exit(1)
+
+    result = audit_evidence_package(package_path)
+    if format == ReportFormat.md:
+        rendered = audit_result_to_markdown(result)
+    else:
+        rendered = audit_result_to_json(result)
+
+    if out is not None:
+        out.write_text(rendered, encoding="utf-8")
+        typer.echo(str(out))
+        return
+
+    typer.echo(rendered)
 
 
 @app.command()
