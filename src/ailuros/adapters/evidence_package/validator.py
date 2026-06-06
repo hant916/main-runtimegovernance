@@ -51,10 +51,12 @@ def _validate_files(
         return
 
     for entry in files:
+        name: str | None
         if isinstance(entry, str):
             name, required = entry, True
         elif isinstance(entry, dict):
-            name = entry.get("name")
+            raw_name = entry.get("name")
+            name = raw_name if isinstance(raw_name, str) else None
             required = bool(entry.get("required", True))
         else:
             errors.append("manifest 'files' entries must be strings or objects")
