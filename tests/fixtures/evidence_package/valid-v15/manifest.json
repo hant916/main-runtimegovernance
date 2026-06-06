@@ -1,7 +1,16 @@
 {
+  "package_version": "1",
   "source": "sample-agent",
+  "target": "ailuros",
+  "governance_mode": "observe",
   "schema_version": "ailuros.timeline.v0",
   "run_id": "run-sample-001",
+  "generated_at": "2025-01-15T10:01:30+00:00",
+  "files": [
+    {"name": "manifest.json", "required": true},
+    {"name": "timeline.json", "required": true},
+    {"name": "notes.md", "required": false}
+  ],
   "metadata": {
     "agent_name": "sample-agent",
     "description": "Sample evidence package for testing"
