@@ -6,12 +6,14 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from ailuros import AilurosRuntime, Environment, EvidenceRecord
 from ailuros.audit_package import export_audit_package_to_dir
 from ailuros.evaluation.models import EvaluationCase, GovernanceDecisionExpectation
 from ailuros.evaluation.service import EvaluationService
 from ailuros.evidence.ingest import ingest_evidence
+from ailuros.models import EvaluationFinding, EvaluationResult, Severity
 from ailuros.runtime.clock import now_utc
 
 HIGH_VALUE_POLICY = {
@@ -150,6 +152,33 @@ def run_demo(output_dir: Path) -> dict[str, Any]:
         ]
         eval_service = EvaluationService()
         eval_results = eval_service.evaluate(events, eval_cases)
+        runtime.storage.save_evaluation(
+            EvaluationResult(
+                evaluation_id=f"eval_{uuid4().hex}",
+                run_id=run.run_id,
+                evaluator="refund_governance_demo",
+                passed=all(r.passed for r in eval_results),
+                findings=[
+                    EvaluationFinding(
+                        finding_id=f"finding_{uuid4().hex}",
+                        severity=Severity.HIGH,
+                        message=f"{r.case_id}: {failure.message}",
+                        metadata={
+                            "case_id": r.case_id,
+                            "expectation_type": failure.expectation_type,
+                        },
+                    )
+                    for r in eval_results
+                    for failure in r.failures
+                ],
+                metadata={
+                    "case_results": [
+                        {"case_id": r.case_id, "passed": r.passed} for r in eval_results
+                    ],
+                },
+                created_at=now_utc(),
+            )
+        )
 
         runtime.complete_run(
             run.run_id,

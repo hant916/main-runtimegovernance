@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -82,3 +83,13 @@ def test_evaluation_results_present(tmp_path: Path) -> None:
     for ev in result["eval_results"]:
         assert "case_id" in ev
         assert "passed" in ev
+
+
+def test_audit_package_includes_demo_evaluation(tmp_path: Path) -> None:
+    result = run_demo(tmp_path / "output")
+    pkg_dir = Path(result["audit_package_dir"])
+    evaluations = json.loads((pkg_dir / "evaluations.json").read_text(encoding="utf-8"))
+    assert len(evaluations) == 1
+    assert evaluations[0]["evaluator"] == "refund_governance_demo"
+    assert evaluations[0]["passed"] is True
+    assert len(evaluations[0]["metadata"]["case_results"]) == len(FIXTURES)
