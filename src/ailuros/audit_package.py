@@ -176,7 +176,7 @@ def _build_summary_md(
         f"# Audit Summary: {run_id}\n\n"
         f"## Run Overview\n\n"
         f"- **Status**: {run_summary.status}\n"
-        f"- **Agent**: {run_summary.run_id}\n"
+        f"- **Run ID**: {run_summary.run_id}\n"
         f"- **Event count**: {run_summary.event_count}\n"
         f"- **Started**: {run_summary.started_at or 'not_available'}\n"
         f"- **Completed**: {run_summary.completed_at or 'not_available'}\n\n"

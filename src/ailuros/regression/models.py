@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -40,8 +42,8 @@ class EvidenceTimelineDiff(BaseModel):
     index: int | None
     kind: str
     message: str
-    baseline_record: dict | None = None
-    current_record: dict | None = None
+    baseline_record: dict[str, Any] | None = None
+    current_record: dict[str, Any] | None = None
 
 
 class EvidenceTimelineRegressionResult(BaseModel):
