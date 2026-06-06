@@ -1,0 +1,16 @@
+[
+  {
+    "event_id": "evt-001",
+    "event_type": "run_started",
+    "timestamp": "2025-01-15T10:00:00+00:00",
+    "payload": {"input": "test input"},
+    "metadata": {}
+  },
+  {
+    "event_id": "evt-002",
+    "event_type": "run_completed",
+    "timestamp": "2025-01-15T10:01:00+00:00",
+    "payload": {"result": "completed"},
+    "metadata": {}
+  }
+]

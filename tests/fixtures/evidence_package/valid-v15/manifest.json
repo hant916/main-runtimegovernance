@@ -1,0 +1,9 @@
+{
+  "source": "sample-agent",
+  "schema_version": "ailuros.timeline.v0",
+  "run_id": "run-sample-001",
+  "metadata": {
+    "agent_name": "sample-agent",
+    "description": "Sample evidence package for testing"
+  }
+}
