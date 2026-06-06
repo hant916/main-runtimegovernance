@@ -9,7 +9,8 @@ from ailuros.core.evidence import EvidenceEvent, EvidencePackage
 
 def _load_json(path: Path) -> dict[str, Any]:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+        return data
     except json.JSONDecodeError as e:
         msg = f"Invalid JSON in {path.name}: {e}"
         raise ValueError(msg) from e
