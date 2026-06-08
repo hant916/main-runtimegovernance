@@ -1,7 +1,7 @@
 # ailuros
 
 Ailuros is a Python governance runtime kernel for local agent runs. Current release:
-**v0.3.0**.
+**v0.3.0** (baseline). v1.5 post-run governance validation: **accepted**.
 
 It provides an in-process runtime, policy-gated tool calls, SQLite-backed timelines,
 evidence ingestion/export, replay/audit/evaluation CLI views, and v0.3 audit-package
@@ -128,6 +128,7 @@ Run the current repository checks with Python 3.12+:
 ```bash
 python scripts/check_release_v020.py
 python scripts/check_release_v030.py
+python scripts/check_release_v150.py
 python -m ruff check .
 python -m mypy src
 python -m pytest tests -q
@@ -138,6 +139,7 @@ python -m pytest tests -q
 - v0.1.0: finalized governance runtime baseline.
 - v0.2.0: accepted evidence-only pipeline.
 - v0.3.0: accepted audit-package and refund-governance MVP.
+- v1.5: accepted post-run governance validation (offline evidence-package audit).
 
 ## Explicit Non-Goals in v0.3
 

@@ -59,7 +59,7 @@ contract is stable.
 
 ### v1.5 - Post-run Governance Validator
 
-Current target:
+**Status:** Accepted (offline post-run governance validation, five execution packs).
 
 ```text
 Clarify evidence package
