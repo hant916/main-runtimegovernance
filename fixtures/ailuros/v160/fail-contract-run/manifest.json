@@ -1,0 +1,17 @@
+{
+  "package_version": "1",
+  "source": "v160-agent",
+  "target": "ailuros",
+  "governance_mode": "block",
+  "schema_version": "ailuros.timeline.v0",
+  "run_id": "run-v160-fail-001",
+  "generated_at": "2025-03-15T14:20:00+00:00",
+  "files": [
+    {"name": "manifest.json", "required": true},
+    {"name": "timeline.json", "required": true}
+  ],
+  "metadata": {
+    "agent_name": "v160-agent",
+    "description": "Golden fail fixture — contract violation triggers block signal"
+  }
+}

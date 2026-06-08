@@ -1,0 +1,27 @@
+{
+  "schema_version": "ailuros.timeline.v0",
+  "run_id": "run-v160-warn-001",
+  "events": [
+    {
+      "event_id": "evt-warn-001",
+      "event_type": "run_started",
+      "timestamp": "2025-03-15T14:10:00+00:00",
+      "payload": {"input": "governance warn scenario"},
+      "metadata": {}
+    },
+    {
+      "event_id": "evt-warn-002",
+      "event_type": "custom_governance_review",
+      "timestamp": "2025-03-15T14:10:05+00:00",
+      "payload": {"review": "requires human attention"},
+      "metadata": {}
+    },
+    {
+      "event_id": "evt-warn-003",
+      "event_type": "run_completed",
+      "timestamp": "2025-03-15T14:10:10+00:00",
+      "payload": {"result": "completed"},
+      "metadata": {}
+    }
+  ]
+}
