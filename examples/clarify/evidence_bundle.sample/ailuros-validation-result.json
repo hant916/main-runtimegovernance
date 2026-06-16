@@ -1,0 +1,158 @@
+{
+  "schema_version": "ailuros.validation_result.v0",
+  "source": "clarify",
+  "status": "PASS",
+  "checks": [
+    {
+      "check": "bundle_dir_exists",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "manifest_exists",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "manifest_valid_json",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "manifest_schema_version",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "manifest_producer",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "manifest_artifacts",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "manifest_artifacts_exist",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "timeline_exists",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "clarify_validation_result_exists",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "timeline_valid_json",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "timeline_schema_version",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "timeline_run_id",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "timeline_created_at",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "timeline_events_array",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "timeline_events_count",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "timeline_event_order",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "evaluation_result_quality_signals",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "quality_signals_fields",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "quality_signals_boolean",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "clarify_validation_result_valid_json",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "clarify_schema_version",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "clarify_status_valid",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "clarify_status_passed",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "clarify_commands_array",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "clarify_command_structure",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "forbidden_keys",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "suspicious_secret_keys",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "local_path_references",
+      "status": "PASS",
+      "message": ""
+    },
+    {
+      "check": "runtime_integration_present",
+      "status": "PASS",
+      "message": ""
+    }
+  ],
+  "summary": {
+    "total": 29,
+    "passed": 29,
+    "warnings": 0,
+    "blocking_issues": 0
+  }
+}
