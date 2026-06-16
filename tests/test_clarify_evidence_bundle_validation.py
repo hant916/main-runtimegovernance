@@ -4,12 +4,7 @@ import json
 import shutil
 from pathlib import Path
 
-import pytest
-
 from scripts.validate_clarify_evidence_bundle import (
-    CheckResult,
-    REQUIRED_EVENT_ORDER,
-    REQUIRED_QUALITY_SIGNALS,
     validate_bundle,
     write_results,
 )
@@ -43,7 +38,10 @@ def _read_json(path: Path) -> dict | None:
 def test_valid_pass(tmp_path: Path) -> None:
     bundle_dir = _copy_bundle(tmp_path)
     checks, status = validate_bundle(bundle_dir)
-    assert status == "PASS", f"Expected PASS, got {status}: {[c.message for c in checks if c.status != 'PASS']}"
+    assert status == "PASS", (
+        f"Expected PASS, got {status}: "
+        f"{[c.message for c in checks if c.status != 'PASS']}"
+    )
 
 
 def test_missing_manifest(tmp_path: Path) -> None:

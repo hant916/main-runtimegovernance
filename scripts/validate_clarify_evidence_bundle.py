@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
-
 
 EXIT_PASS = 0
 EXIT_WARN = 0
@@ -434,24 +432,24 @@ def write_results(
     )
 
     md_lines = [
-        f"# Clarify Evidence Bundle Validation Report",
-        f"",
+        "# Clarify Evidence Bundle Validation Report",
+        "",
         f"**Status:** {status}",
-        f"**Source:** clarify",
-        f"",
-        f"## Summary",
-        f"",
-        f"| Metric | Value |",
-        f"|---|---|",
+        "**Source:** clarify",
+        "",
+        "## Summary",
+        "",
+        "| Metric | Value |",
+        "|---|---|",
         f"| Total Checks | {len(checks)} |",
         f"| Passed | {result['summary']['passed']} |",
         f"| Warnings | {warnings} |",
         f"| Blocking Issues | {blocking} |",
-        f"",
-        f"## Checks",
-        f"",
-        f"| # | Check | Status | Message |",
-        f"|---|---|---|---|",
+        "",
+        "## Checks",
+        "",
+        "| # | Check | Status | Message |",
+        "|---|---|---|---|",
     ]
     for i, c in enumerate(checks, 1):
         md_lines.append(f"| {i} | {c.name} | {c.status} | {c.message} |")
