@@ -1,0 +1,66 @@
+{
+  "schema_version": "ailuros.timeline.v0",
+  "run_id": "evb-clarify-sample-run-001",
+  "created_at": "2026-06-15T00:00:00.000Z",
+  "events": [
+    {
+      "event": "INPUT_CLASSIFIED",
+      "run_id": "evb-clarify-sample-run-001",
+      "timestamp": "2026-06-15T00:00:00.000Z",
+      "metadata": {
+        "input_type": "text",
+        "doc_category": "general"
+      }
+    },
+    {
+      "event": "LLM_REQUEST",
+      "run_id": "evb-clarify-sample-run-001",
+      "timestamp": "2026-06-15T00:00:00.001Z",
+      "metadata": {
+        "model": "gpt-4",
+        "temperature": 0.1
+      }
+    },
+    {
+      "event": "LLM_RESPONSE",
+      "run_id": "evb-clarify-sample-run-001",
+      "timestamp": "2026-06-15T00:00:00.500Z",
+      "metadata": {
+        "model": "gpt-4",
+        "response_length": 1024
+      }
+    },
+    {
+      "event": "EVALUATION_RESULT",
+      "run_id": "evb-clarify-sample-run-001",
+      "timestamp": "2026-06-15T00:00:00.600Z",
+      "data": {
+        "quality_signals": {
+          "json_valid": true,
+          "sentence_too_long": false,
+          "contains_direct_advice": false,
+          "contains_decision_pressure": false,
+          "ambiguities_present": false
+        }
+      }
+    },
+    {
+      "event": "OUTPUT_GENERATED",
+      "run_id": "evb-clarify-sample-run-001",
+      "timestamp": "2026-06-15T00:00:00.700Z",
+      "metadata": {
+        "output_type": "text",
+        "word_count": 250
+      }
+    },
+    {
+      "event": "RUN_COMPLETED",
+      "run_id": "evb-clarify-sample-run-001",
+      "timestamp": "2026-06-15T00:00:01.000Z",
+      "data": {
+        "duration_ms": 1000,
+        "error_code": null
+      }
+    }
+  ]
+}

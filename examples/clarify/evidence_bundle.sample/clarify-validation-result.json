@@ -1,0 +1,20 @@
+{
+  "schema_version": "clarify.validation_result.v0",
+  "status": "passed",
+  "run_id": "evb-clarify-sample-run-001",
+  "summary": "All governance checks passed.",
+  "commands": [
+    {
+      "command": "check_quality_signals",
+      "exit_code": 0,
+      "status": "passed",
+      "duration_ms": 150
+    },
+    {
+      "command": "check_content_safety",
+      "exit_code": 0,
+      "status": "passed",
+      "duration_ms": 100
+    }
+  ]
+}
