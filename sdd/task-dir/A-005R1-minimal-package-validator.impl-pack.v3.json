@@ -1,0 +1,181 @@
+{
+  "schema": "impl-pack.v3.convergence",
+  "pack_id": "A-005R1-minimal-package-validator",
+  "title": "Minimal v0.3 Audit Package Validator",
+  "status": "ready",
+  "repo": {
+    "name": "hant916/main-runtimegovernance",
+    "default_branch": "master",
+    "source_of_truth": [
+      "README.md",
+      "docs/strategy/roadmap.md",
+      "docs/architecture/governance-boundary.md",
+      "docs/strategy/product-line-thesis.md",
+      "pyproject.toml"
+    ]
+  },
+  "context": {
+    "product": "Ailuros",
+    "current_version": "0.3.0",
+    "goal": "Complete a simplified core Ailuros function: given a v0.3 audit package directory, load it, validate its structure and run consistency, derive a deterministic post-run audit decision, and expose it through a CLI command.",
+    "why_now": "v0.3 already exports 7-file audit packages. The next useful core step is a deterministic v1.5-style post-run validator without moving into HTTP ingestion, runtime blocking, dashboard, auth, or reference-app coupling.",
+    "design_principles": [
+      "KISS / MVP first",
+      "Application-agnostic Ailuros core",
+      "Evidence before runtime control",
+      "Deterministic decisions over model judgment",
+      "No Clarify, EverRun, radarCreation, browser, UI, or domain-specific coupling in src/ailuros"
+    ]
+  },
+  "task": {
+    "summary": "Implement a minimal audit-package validation loop for Ailuros core.",
+    "user_story": "As an Ailuros user, I can pass a v0.3 audit-package directory to the CLI and receive a deterministic JSON result telling me whether the package is valid and whether the run passes, requires review, or fails governance audit.",
+    "non_goals": [
+      "Do not add HTTP API endpoints.",
+      "Do not add dashboard/UI work.",
+      "Do not add runtime blocking or live ingestion.",
+      "Do not add auth/session/user management.",
+      "Do not add a complex policy DSL.",
+      "Do not add Clarify/EverRun/radarCreation-specific models to src/ailuros.",
+      "Do not change existing v0.3 audit-package export behavior except where strictly necessary to keep tests passing."
+    ]
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/ailuros/**",
+      "tests/**",
+      "examples/**",
+      "scripts/check_release_v030.py",
+      "README.md"
+    ],
+    "preferred_new_paths": [
+      "src/ailuros/audit_package/__init__.py",
+      "src/ailuros/audit_package/models.py",
+      "src/ailuros/audit_package/loader.py",
+      "src/ailuros/audit_package/validator.py",
+      "src/ailuros/audit_package/decision.py",
+      "tests/test_audit_package_validator.py"
+    ],
+    "forbidden_paths": [
+      ".git/**",
+      ".venv/**",
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      ".tmp/**",
+      "docs/strategy/**",
+      "docs/architecture/**",
+      "docs/decisions/**"
+    ],
+    "forbidden_core_concepts": [
+      "browser",
+      "tab",
+      "window",
+      "DOM",
+      "content script",
+      "Clarify-specific models",
+      "EverRun-specific models",
+      "radarCreation-specific models",
+      "refund-specific core models",
+      "HTTP write API",
+      "auth/session"
+    ]
+  },
+  "implementation": {
+    "required_files_in_package": [
+      "manifest.json",
+      "run.json",
+      "timeline.jsonl",
+      "decisions.json",
+      "evaluations.json",
+      "regressions.json",
+      "summary.md"
+    ],
+    "required_behavior": [
+      "Add an application-agnostic package loader that accepts a filesystem directory path.",
+      "Validate that all 7 v0.3 audit-package files exist.",
+      "Parse JSON files with clear deterministic errors on malformed JSON.",
+      "Parse timeline.jsonl line by line with deterministic errors on malformed JSONL, including line number where practical.",
+      "Check run_id consistency across package records where run_id is present.",
+      "Return a structured validation result with valid:boolean, decision:string, and reasons:list[str].",
+      "Derive decision FAIL when package structure is invalid, JSON/JSONL is malformed, run_id consistency fails, or a blocking governance decision is present.",
+      "Derive decision REVIEW_REQUIRED when at least one require_review/review decision is present and there is no blocking/failing condition.",
+      "Derive decision PASS when the package is valid and no block/review condition exists.",
+      "Expose a CLI command that prints JSON to stdout: python -m ailuros validate-package <package_dir>.",
+      "The CLI must exit non-zero for FAIL caused by invalid package structure or parse/consistency errors. It may exit zero for PASS and REVIEW_REQUIRED."
+    ],
+    "decision_values": [
+      "PASS",
+      "REVIEW_REQUIRED",
+      "FAIL"
+    ],
+    "suggested_api": {
+      "load_function": "load_audit_package(path: Path) -> AuditPackage",
+      "validate_function": "validate_audit_package(package: AuditPackage) -> PackageValidationResult",
+      "decide_function": "decide_audit_package(validation: PackageValidationResult, package: AuditPackage) -> PackageValidationResult"
+    },
+    "error_handling": [
+      "Use typed exceptions or structured error records; avoid raw tracebacks in normal CLI output.",
+      "Do not silently ignore malformed files.",
+      "Do not guess missing run_id values; report them when needed for consistency checks."
+    ]
+  },
+  "acceptance_criteria": [
+    "A valid v0.3 audit package returns valid=true and decision=PASS when no block/review evidence exists.",
+    "A package missing any required file returns valid=false and decision=FAIL with a reason naming the missing file.",
+    "Malformed JSON in any JSON file returns valid=false and decision=FAIL.",
+    "Malformed JSONL in timeline.jsonl returns valid=false and decision=FAIL.",
+    "Mismatched run_id across package files/events returns valid=false and decision=FAIL.",
+    "A package containing a block/blocking decision returns decision=FAIL.",
+    "A package containing require_review/review and no block returns decision=REVIEW_REQUIRED.",
+    "The implementation does not introduce reference-app imports or domain-specific concepts into src/ailuros.",
+    "The new CLI command is covered by tests or existing CLI test style."
+  ],
+  "validation": {
+    "commands": [
+      "python scripts/check_release_v030.py",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q"
+    ],
+    "notes": [
+      "Use Python 3.12+ as required by pyproject.toml.",
+      "Do not weaken existing validation commands to pass the pack."
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "The implementation is application-agnostic and respects the src/ailuros core boundary.",
+      "The package validator requires exactly the documented v0.3 audit-package files unless README/repo code proves a different canonical set.",
+      "The CLI command emits deterministic JSON with valid, decision, and reasons fields.",
+      "Invalid structure, malformed JSON/JSONL, and run_id mismatch are rejected deterministically.",
+      "Decision precedence is correct: invalid/block -> FAIL, review -> REVIEW_REQUIRED, otherwise PASS.",
+      "Tests cover valid, missing file, malformed JSON, malformed JSONL, run_id mismatch, block decision, and review decision cases.",
+      "No forbidden paths or generated junk directories are modified.",
+      "All validation commands listed in this pack are run and reported honestly."
+    ],
+    "reject_if": [
+      "The change adds HTTP API, dashboard, auth/session, runtime blocking, live ingestion, or policy DSL work.",
+      "The change imports Clarify, EverRun, radarCreation, browser, UI, refund, or other domain-specific concepts into src/ailuros core.",
+      "The CLI prints human-only text instead of machine-readable JSON for normal results.",
+      "Malformed package files are ignored or downgraded to warnings.",
+      "Decision logic is model/LLM-dependent or non-deterministic.",
+      "Existing validation commands are removed, weakened, or skipped without explicit evidence.",
+      "The implementation changes unrelated release behavior or broad architecture documents to make the pack pass."
+    ]
+  },
+  "expected_output": {
+    "example_pass": {
+      "valid": true,
+      "decision": "PASS",
+      "reasons": []
+    },
+    "example_fail": {
+      "valid": false,
+      "decision": "FAIL",
+      "reasons": [
+        "missing required file: manifest.json"
+      ]
+    }
+  }
+}
