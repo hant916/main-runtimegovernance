@@ -32,6 +32,7 @@ class ReportFormat(StrEnum):
 def _print_json(data: Any) -> None:
     typer.echo(json.dumps(data, indent=2, default=str))
 
+
 app = typer.Typer(help="Ailuros Governance Runtime")
 app.add_typer(run_app, name="run")
 app.add_typer(policy_app, name="policy")
@@ -79,10 +80,12 @@ def replay(
         raise typer.Exit(1) from exc
 
     if output == OutputFormat.json:
-        _print_json({
-            "run_id": run_id,
-            "events": [e.model_dump(mode="json") for e in events],
-        })
+        _print_json(
+            {
+                "run_id": run_id,
+                "events": [e.model_dump(mode="json") for e in events],
+            }
+        )
         return
 
     typer.echo(f"Run: {run_id}")
@@ -107,13 +110,15 @@ def audit(
         raise typer.Exit(1) from exc
 
     if output == OutputFormat.json:
-        _print_json({
-            "run_id": run_id,
-            "decision": summary.decision,
-            "reason": summary.reason,
-            "tool": summary.tool,
-            "path_validation": summary.path_validation,
-        })
+        _print_json(
+            {
+                "run_id": run_id,
+                "decision": summary.decision,
+                "reason": summary.reason,
+                "tool": summary.tool,
+                "path_validation": summary.path_validation,
+            }
+        )
         return
 
     typer.echo(f"Run: {run_id}")
@@ -145,11 +150,7 @@ def eval_run(
 
     try:
         events = ReplayService(open_storage()).load_run(run_id)
-        cases = [
-            case
-            for case_file in case_files
-            for case in load_evaluation_cases(case_file)
-        ]
+        cases = [case for case_file in case_files for case in load_evaluation_cases(case_file)]
         results = EvaluationService().evaluate(events, cases)
     except (
         AilurosNotFoundError,
@@ -163,11 +164,13 @@ def eval_run(
     failed = [result for result in results if not result.passed]
 
     if output == OutputFormat.json:
-        _print_json({
-            "run_id": run_id,
-            "results": [r.model_dump(mode="json") for r in results],
-            "summary": {"passed": len(results) - len(failed), "failed": len(failed)},
-        })
+        _print_json(
+            {
+                "run_id": run_id,
+                "results": [r.model_dump(mode="json") for r in results],
+                "summary": {"passed": len(results) - len(failed), "failed": len(failed)},
+            }
+        )
         if failed:
             raise typer.Exit(1)
         return
@@ -302,6 +305,16 @@ def evidence_audit(
         return
 
     typer.echo(rendered)
+
+
+@app.command("validate-package")
+def validate_package(package_dir: Path) -> None:
+    from ailuros.audit_package import validate_audit_package_dir
+
+    result = validate_audit_package_dir(package_dir)
+    _print_json(result.to_dict())
+    if not result.valid:
+        raise typer.Exit(1)
 
 
 @app.command()
