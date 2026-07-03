@@ -2,157 +2,235 @@
   "schema_version": "ailuros.validation_result.v0",
   "source": "clarify",
   "status": "PASS",
+  "run_id": "clarify-run-sample-0005",
   "checks": [
     {
-      "check": "bundle_dir_exists",
+      "level": "P0",
+      "name": "bundle_dir_exists",
       "status": "PASS",
-      "message": ""
+      "message": "bundle directory exists"
     },
     {
-      "check": "manifest_exists",
+      "level": "P0",
+      "name": "manifest_exists",
       "status": "PASS",
-      "message": ""
+      "message": "manifest.json exists"
     },
     {
-      "check": "manifest_valid_json",
+      "level": "P0",
+      "name": "manifest_valid_json",
       "status": "PASS",
-      "message": ""
+      "message": "manifest.json is valid JSON"
     },
     {
-      "check": "manifest_schema_version",
+      "level": "P0",
+      "name": "manifest_schema_version",
       "status": "PASS",
-      "message": ""
+      "message": "manifest schema_version is valid"
     },
     {
-      "check": "manifest_producer",
+      "level": "P0",
+      "name": "manifest_producer",
       "status": "PASS",
-      "message": ""
+      "message": "manifest producer is clarify"
     },
     {
-      "check": "manifest_artifacts",
+      "level": "P0",
+      "name": "manifest_artifacts",
       "status": "PASS",
-      "message": ""
+      "message": "manifest.artifacts is present"
     },
     {
-      "check": "manifest_artifacts_exist",
+      "level": "P0",
+      "name": "manifest_artifacts_exist",
       "status": "PASS",
-      "message": ""
+      "message": "all manifest artifacts exist"
     },
     {
-      "check": "timeline_exists",
+      "level": "P0",
+      "name": "timeline_exists",
       "status": "PASS",
-      "message": ""
+      "message": "ailuros.timeline.v0.json exists"
     },
     {
-      "check": "clarify_validation_result_exists",
+      "level": "P0",
+      "name": "clarify_validation_result_exists",
       "status": "PASS",
-      "message": ""
+      "message": "clarify-validation-result.json exists"
     },
     {
-      "check": "timeline_valid_json",
+      "level": "P1",
+      "name": "manifest_bundle_type",
       "status": "PASS",
-      "message": ""
+      "message": "manifest bundle_type is valid"
     },
     {
-      "check": "timeline_schema_version",
+      "level": "P1",
+      "name": "manifest_runtime_integration",
       "status": "PASS",
-      "message": ""
+      "message": "manifest.runtime_integration is false"
     },
     {
-      "check": "timeline_run_id",
+      "level": "P1",
+      "name": "manifest_run_id",
       "status": "PASS",
-      "message": ""
+      "message": "manifest.run_id is present"
     },
     {
-      "check": "timeline_created_at",
+      "level": "P1",
+      "name": "manifest_created_at",
       "status": "PASS",
-      "message": ""
+      "message": "manifest.created_at is present"
     },
     {
-      "check": "timeline_events_array",
+      "level": "P1",
+      "name": "timeline_valid_json",
       "status": "PASS",
-      "message": ""
+      "message": "timeline JSON is valid"
     },
     {
-      "check": "timeline_events_count",
+      "level": "P1",
+      "name": "timeline_schema_version",
       "status": "PASS",
-      "message": ""
+      "message": "timeline schema_version is valid"
     },
     {
-      "check": "timeline_event_order",
+      "level": "P1",
+      "name": "timeline_run_id",
       "status": "PASS",
-      "message": ""
+      "message": "timeline.run_id is present"
     },
     {
-      "check": "evaluation_result_quality_signals",
+      "level": "P1",
+      "name": "timeline_created_at",
       "status": "PASS",
-      "message": ""
+      "message": "timeline.created_at is present"
     },
     {
-      "check": "quality_signals_fields",
+      "level": "P1",
+      "name": "timeline_events_array",
       "status": "PASS",
-      "message": ""
+      "message": "timeline.events is an array"
     },
     {
-      "check": "quality_signals_boolean",
+      "level": "P1",
+      "name": "timeline_events_count",
       "status": "PASS",
-      "message": ""
+      "message": "timeline has 6 events"
     },
     {
-      "check": "clarify_validation_result_valid_json",
+      "level": "P1",
+      "name": "timeline_event_order",
       "status": "PASS",
-      "message": ""
+      "message": "timeline event order is valid"
     },
     {
-      "check": "clarify_schema_version",
+      "level": "P1",
+      "name": "timeline_event_0_contract",
       "status": "PASS",
-      "message": ""
+      "message": "events[0] has required fields"
     },
     {
-      "check": "clarify_status_valid",
+      "level": "P1",
+      "name": "timeline_event_1_contract",
       "status": "PASS",
-      "message": ""
+      "message": "events[1] has required fields"
     },
     {
-      "check": "clarify_status_passed",
+      "level": "P1",
+      "name": "timeline_event_2_contract",
       "status": "PASS",
-      "message": ""
+      "message": "events[2] has required fields"
     },
     {
-      "check": "clarify_commands_array",
+      "level": "P1",
+      "name": "timeline_event_3_contract",
       "status": "PASS",
-      "message": ""
+      "message": "events[3] has required fields"
     },
     {
-      "check": "clarify_command_structure",
+      "level": "P1",
+      "name": "timeline_event_4_contract",
       "status": "PASS",
-      "message": ""
+      "message": "events[4] has required fields"
     },
     {
-      "check": "forbidden_keys",
+      "level": "P1",
+      "name": "timeline_event_5_contract",
       "status": "PASS",
-      "message": ""
+      "message": "events[5] has required fields"
     },
     {
-      "check": "suspicious_secret_keys",
+      "level": "P1",
+      "name": "quality_signals_present",
       "status": "PASS",
-      "message": ""
+      "message": "quality_signals is present"
     },
     {
-      "check": "local_path_references",
+      "level": "P1",
+      "name": "quality_signals_required_fields",
       "status": "PASS",
-      "message": ""
+      "message": "quality_signals has required fields"
     },
     {
-      "check": "runtime_integration_present",
+      "level": "P1",
+      "name": "quality_signals_boolean",
       "status": "PASS",
-      "message": ""
+      "message": "quality_signals are boolean"
+    },
+    {
+      "level": "P1",
+      "name": "clarify_validation_valid_json",
+      "status": "PASS",
+      "message": "clarify validation result JSON is valid"
+    },
+    {
+      "level": "P1",
+      "name": "clarify_validation_schema_version",
+      "status": "PASS",
+      "message": "clarify schema_version is valid"
+    },
+    {
+      "level": "P1",
+      "name": "clarify_validation_status",
+      "status": "PASS",
+      "message": "clarify validation passed"
+    },
+    {
+      "level": "P1",
+      "name": "clarify_validation_commands",
+      "status": "PASS",
+      "message": "clarify commands is an array"
+    },
+    {
+      "level": "P1",
+      "name": "clarify_validation_passed_commands",
+      "status": "PASS",
+      "message": "passed clarify validation commands passed"
+    },
+    {
+      "level": "P1",
+      "name": "evidence_only_forbidden_keys",
+      "status": "PASS",
+      "message": "no forbidden runtime or policy keys found"
+    },
+    {
+      "level": "P2",
+      "name": "secret_like_keys",
+      "status": "PASS",
+      "message": "no suspicious secret-like keys found"
+    },
+    {
+      "level": "P2",
+      "name": "local_path_references",
+      "status": "PASS",
+      "message": "no local machine path references found"
     }
   ],
   "summary": {
-    "total": 29,
-    "passed": 29,
-    "warnings": 0,
-    "blocking_issues": 0
+    "timeline_events": 6,
+    "clarify_validation_status": "passed",
+    "blocking_issues": 0,
+    "warnings": 0
   }
 }

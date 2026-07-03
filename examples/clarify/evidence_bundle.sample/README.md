@@ -1,18 +1,18 @@
 # Clarify Evidence Bundle Sample
 
-A minimal valid Clarify evidence bundle for offline validation testing.
+A minimal Clarify-produced evidence bundle for Ailuros offline validation.
 
 ## Contents
 
-- `manifest.json` — bundle manifest (schema_version: ailuros.evidence_bundle.v0, producer: clarify)
-- `ailuros.timeline.v0.json` — Ailuros timeline with 6 events and quality_signals
-- `clarify-validation-result.json` — Clarify's own validation result (status: passed)
-- `clarify-validation.log` — Clarify's validation log
+- `manifest.json`
+- `ailuros.timeline.v0.json`
+- `clarify-validation.log`
+- `clarify-validation-result.json`
 
 ## Usage
 
 ```bash
-python scripts/validate_clarify_evidence_bundle.py --bundle examples/clarify/evidence_bundle.sample
+python scripts/process_clarify_evidence_data.py --bundle examples/clarify/evidence_bundle.sample
 ```
 
-Expected result: PASS (exit code 0)
+Expected result: `PASS` with exit code `0`.

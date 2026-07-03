@@ -15,4 +15,5 @@ build/
 
 sdd/
 .ailuros/evidence/clarify/latest/
+.ailuros/evidence/clarify/runs/
 .ailuros/evidence/clarify/tmp/

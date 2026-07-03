@@ -1,12 +1,14 @@
 {
   "schema_version": "ailuros.evidence_bundle.v0",
   "producer": "clarify",
-  "runtime_integration": "ailuros",
-  "bundle_id": "evb-clarify-sample-001",
-  "created_at": "2026-06-15T00:00:00.000Z",
-  "artifacts": [
-    "ailuros.timeline.v0.json",
-    "clarify-validation-result.json",
-    "clarify-validation.log"
-  ]
+  "bundle_type": "governance-contract",
+  "runtime_integration": false,
+  "run_id": "clarify-run-sample-0005",
+  "created_at": "2026-06-16T21:16:41.000Z",
+  "artifacts": {
+    "timeline": "ailuros.timeline.v0.json",
+    "validation_log": "clarify-validation.log",
+    "validation_result": "clarify-validation-result.json",
+    "readme": "README.md"
+  }
 }

@@ -1,20 +1,14 @@
 {
   "schema_version": "clarify.validation_result.v0",
+  "runtime_integration": false,
   "status": "passed",
-  "run_id": "evb-clarify-sample-run-001",
-  "summary": "All governance checks passed.",
+  "run_id": "clarify-run-sample-0005",
   "commands": [
     {
-      "command": "check_quality_signals",
+      "command": "npm run ailuros:validate-data",
       "exit_code": 0,
       "status": "passed",
       "duration_ms": 150
-    },
-    {
-      "command": "check_content_safety",
-      "exit_code": 0,
-      "status": "passed",
-      "duration_ms": 100
     }
   ]
 }
