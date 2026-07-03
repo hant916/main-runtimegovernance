@@ -182,3 +182,14 @@ def test_invalid_json_root_types_are_reported(tmp_path: Path) -> None:
     assert result.decision == "FAIL"
     assert "manifest.json must contain a JSON object" in result.reasons
     assert "decisions.json must contain a JSON array" in result.reasons
+
+
+def test_invalid_utf8_in_json_file_returns_structured_error(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg")
+    (pkg / "run.json").write_bytes(b"\xff")
+
+    result = validate_audit_package_dir(pkg)
+
+    assert result.valid is False
+    assert result.decision == "FAIL"
+    assert result.reasons == ["invalid UTF-8 in run.json"]

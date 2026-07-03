@@ -71,11 +71,11 @@ def load_audit_package(path: Path) -> AuditPackage:
         path=package_dir,
         manifest=loaded["manifest.json"],
         run=loaded["run.json"],
-        timeline=_as_list(loaded["timeline.jsonl"]),
+        timeline=loaded["timeline.jsonl"],
         decisions=loaded["decisions.json"],
         evaluations=loaded["evaluations.json"],
         regressions=loaded["regressions.json"],
-        summary=(package_dir / "summary.md").read_text(encoding="utf-8"),
+        summary=_read_text_file(package_dir / "summary.md"),
     )
 
 
@@ -142,9 +142,19 @@ def _load_package_records(package_dir: Path) -> tuple[dict[str, Any], list[str]]
     return loaded, reasons
 
 
-def _read_json_file(path: Path) -> Any:
+def _read_text_file(path: Path) -> str:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise AuditPackageLoadError([f"invalid UTF-8 in {path.name}"]) from exc
+    except OSError as exc:
+        raise AuditPackageLoadError([f"unable to read {path.name}: {exc.strerror or exc}"]) from exc
+
+
+def _read_json_file(path: Path) -> Any:
+    text = _read_text_file(path)
+    try:
+        return json.loads(text)
     except json.JSONDecodeError as exc:
         raise AuditPackageLoadError(
             [f"malformed JSON in {path.name}: line {exc.lineno} column {exc.colno}"]
@@ -153,7 +163,7 @@ def _read_json_file(path: Path) -> Any:
 
 def _read_jsonl_file(path: Path) -> list[Any]:
     records: list[Any] = []
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for line_number, line in enumerate(_read_text_file(path).splitlines(), start=1):
         if not line.strip():
             continue
         try:
@@ -163,10 +173,6 @@ def _read_jsonl_file(path: Path) -> list[Any]:
                 [f"malformed JSONL in {path.name}: line {line_number} column {exc.colno}"]
             ) from exc
     return records
-
-
-def _as_list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
 
 
 def _structure_reasons(package: AuditPackage) -> list[str]:
@@ -278,13 +284,8 @@ def export_audit_package_to_dir(
     regressions = _get_regressions(events)
 
     summary_md = _build_summary_md(
-        run_id,
-        events,
-        run_summary,
-        audit_summary,
-        decisions,
-        evaluations,
-        regressions,
+        run_id, events, run_summary, audit_summary,
+        decisions, evaluations, regressions,
     )
 
     pkg_dir = output_dir / run_id
@@ -391,15 +392,16 @@ def _build_summary_md(
     evaluations: list[dict[str, Any]],
     regressions: list[dict[str, Any]],
 ) -> str:
-    tool_names = sorted(
-        {
-            event.payload.get("tool_name", "unknown")
-            for event in events
-            if event.payload and "tool_name" in event.payload
-        }
-    )
+    tool_names = sorted({
+        event.payload.get("tool_name", "unknown")
+        for event in events
+        if event.payload and "tool_name" in event.payload
+    })
 
-    decision_types = sorted({d.get("decision", "unknown") for d in decisions})
+    decision_types = sorted({
+        d.get("decision", "unknown")
+        for d in decisions
+    })
 
     eval_summary = "not_available"
     if evaluations:
@@ -412,7 +414,8 @@ def _build_summary_md(
         passed = sum(1 for r in regressions if r.get("passed"))
         failed = sum(1 for r in regressions if not r.get("passed"))
         reg_summary = (
-            f"{len(regressions)} regression comparison(s): {passed} passed, {failed} failed"
+            f"{len(regressions)} regression comparison(s): "
+            f"{passed} passed, {failed} failed"
         )
 
     review_required = "yes" if run_summary.review_count > 0 else "no"
