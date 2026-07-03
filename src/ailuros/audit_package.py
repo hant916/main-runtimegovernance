@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,246 @@ _AUDIT_PACKAGE_FILES = [
 ]
 
 
+@dataclass(frozen=True)
+class AuditPackage:
+    path: Path
+    manifest: Any
+    run: Any
+    timeline: list[Any]
+    decisions: Any
+    evaluations: Any
+    regressions: Any
+    summary: str
+
+
+@dataclass(frozen=True)
+class PackageValidationResult:
+    valid: bool
+    decision: str
+    reasons: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "valid": self.valid,
+            "decision": self.decision,
+            "reasons": self.reasons,
+        }
+
+
+class AuditPackageLoadError(ValueError):
+    def __init__(self, reasons: list[str]) -> None:
+        self.reasons = reasons
+        super().__init__("; ".join(reasons))
+
+
+def load_audit_package(path: Path) -> AuditPackage:
+    package_dir = path.resolve()
+    reasons = _missing_file_reasons(package_dir)
+    if not package_dir.is_dir():
+        raise AuditPackageLoadError([f"audit package directory not found: {path}"])
+    if reasons:
+        raise AuditPackageLoadError(reasons)
+
+    loaded, parse_reasons = _load_package_records(package_dir)
+    if parse_reasons:
+        raise AuditPackageLoadError(parse_reasons)
+
+    return AuditPackage(
+        path=package_dir,
+        manifest=loaded["manifest.json"],
+        run=loaded["run.json"],
+        timeline=_as_list(loaded["timeline.jsonl"]),
+        decisions=loaded["decisions.json"],
+        evaluations=loaded["evaluations.json"],
+        regressions=loaded["regressions.json"],
+        summary=(package_dir / "summary.md").read_text(encoding="utf-8"),
+    )
+
+
+def validate_audit_package(package: AuditPackage) -> PackageValidationResult:
+    reasons = _structure_reasons(package)
+    reasons.extend(_run_id_reasons(package))
+    if reasons:
+        return PackageValidationResult(valid=False, decision="FAIL", reasons=reasons)
+    return PackageValidationResult(valid=True, decision="PASS", reasons=[])
+
+
+def decide_audit_package(
+    validation: PackageValidationResult,
+    package: AuditPackage,
+) -> PackageValidationResult:
+    if not validation.valid:
+        return validation
+    decisions = list(_iter_dict_records(package.decisions))
+    if any(_is_block_decision(decision) for decision in decisions):
+        return PackageValidationResult(
+            valid=True,
+            decision="FAIL",
+            reasons=["blocking governance decision present"],
+        )
+    if any(_is_review_decision(decision) for decision in decisions):
+        return PackageValidationResult(
+            valid=True,
+            decision="REVIEW_REQUIRED",
+            reasons=["review governance decision present"],
+        )
+    return validation
+
+
+def validate_audit_package_dir(path: Path) -> PackageValidationResult:
+    try:
+        package = load_audit_package(path)
+    except AuditPackageLoadError as exc:
+        return PackageValidationResult(valid=False, decision="FAIL", reasons=exc.reasons)
+    validation = validate_audit_package(package)
+    return decide_audit_package(validation, package)
+
+
+def _missing_file_reasons(package_dir: Path) -> list[str]:
+    return [
+        f"missing required file: {file_name}"
+        for file_name in _AUDIT_PACKAGE_FILES
+        if not (package_dir / file_name).is_file()
+    ]
+
+
+def _load_package_records(package_dir: Path) -> tuple[dict[str, Any], list[str]]:
+    loaded: dict[str, Any] = {}
+    reasons: list[str] = []
+    for file_name in _AUDIT_PACKAGE_FILES:
+        if file_name == "summary.md":
+            continue
+        try:
+            if file_name == "timeline.jsonl":
+                loaded[file_name] = _read_jsonl_file(package_dir / file_name)
+            else:
+                loaded[file_name] = _read_json_file(package_dir / file_name)
+        except AuditPackageLoadError as exc:
+            reasons.extend(exc.reasons)
+    return loaded, reasons
+
+
+def _read_json_file(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise AuditPackageLoadError(
+            [f"malformed JSON in {path.name}: line {exc.lineno} column {exc.colno}"]
+        ) from exc
+
+
+def _read_jsonl_file(path: Path) -> list[Any]:
+    records: list[Any] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError as exc:
+            raise AuditPackageLoadError(
+                [f"malformed JSONL in {path.name}: line {line_number} column {exc.colno}"]
+            ) from exc
+    return records
+
+
+def _as_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
+def _structure_reasons(package: AuditPackage) -> list[str]:
+    reasons: list[str] = []
+    if not isinstance(package.manifest, dict):
+        reasons.append("manifest.json must contain a JSON object")
+    if not isinstance(package.run, dict):
+        reasons.append("run.json must contain a JSON object")
+    for file_name, value in (
+        ("timeline.jsonl", package.timeline),
+        ("decisions.json", package.decisions),
+        ("evaluations.json", package.evaluations),
+        ("regressions.json", package.regressions),
+    ):
+        if not isinstance(value, list):
+            reasons.append(f"{file_name} must contain a JSON array")
+    return reasons
+
+
+def _run_id_reasons(package: AuditPackage) -> list[str]:
+    reasons: list[str] = []
+    required_run_ids = {
+        "manifest.json": _top_level_run_id(package.manifest),
+        "run.json": _top_level_run_id(package.run),
+    }
+    for file_name, run_id in required_run_ids.items():
+        if run_id is None:
+            reasons.append(f"missing run_id in {file_name}")
+
+    run_ids = _collect_run_ids(package)
+    if len(set(run_ids)) > 1:
+        reasons.append("mismatched run_id values: " + ", ".join(sorted(set(run_ids))))
+    return reasons
+
+
+def _top_level_run_id(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    run_id = value.get("run_id")
+    return run_id if isinstance(run_id, str) and run_id else None
+
+
+def _collect_run_ids(package: AuditPackage) -> list[str]:
+    records: list[Any] = [
+        package.manifest,
+        package.run,
+        package.timeline,
+        package.decisions,
+        package.evaluations,
+        package.regressions,
+    ]
+    values: list[str] = []
+    for record in records:
+        values.extend(_find_run_ids(record))
+    return values
+
+
+def _find_run_ids(value: Any) -> list[str]:
+    found: list[str] = []
+    if isinstance(value, dict):
+        run_id = value.get("run_id")
+        if isinstance(run_id, str) and run_id:
+            found.append(run_id)
+        for nested in value.values():
+            found.extend(_find_run_ids(nested))
+    elif isinstance(value, list):
+        for item in value:
+            found.extend(_find_run_ids(item))
+    return found
+
+
+def _iter_dict_records(value: Any) -> Iterator[dict[str, Any]]:
+    if isinstance(value, dict):
+        yield value
+    elif isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                yield item
+
+
+def _decision_value(record: dict[str, Any]) -> str:
+    for key in ("decision", "action", "status"):
+        value = record.get(key)
+        if isinstance(value, str):
+            return value.lower().replace("-", "_")
+    return ""
+
+
+def _is_block_decision(record: dict[str, Any]) -> bool:
+    return _decision_value(record) in {"block", "blocked", "blocking", "fail", "failed"}
+
+
+def _is_review_decision(record: dict[str, Any]) -> bool:
+    return _decision_value(record) in {"require_review", "review", "review_required"}
+
+
 def export_audit_package_to_dir(
     storage: SQLiteStorage,
     run_id: str,
@@ -36,8 +278,13 @@ def export_audit_package_to_dir(
     regressions = _get_regressions(events)
 
     summary_md = _build_summary_md(
-        run_id, events, run_summary, audit_summary,
-        decisions, evaluations, regressions,
+        run_id,
+        events,
+        run_summary,
+        audit_summary,
+        decisions,
+        evaluations,
+        regressions,
     )
 
     pkg_dir = output_dir / run_id
@@ -144,16 +391,15 @@ def _build_summary_md(
     evaluations: list[dict[str, Any]],
     regressions: list[dict[str, Any]],
 ) -> str:
-    tool_names = sorted({
-        event.payload.get("tool_name", "unknown")
-        for event in events
-        if event.payload and "tool_name" in event.payload
-    })
+    tool_names = sorted(
+        {
+            event.payload.get("tool_name", "unknown")
+            for event in events
+            if event.payload and "tool_name" in event.payload
+        }
+    )
 
-    decision_types = sorted({
-        d.get("decision", "unknown")
-        for d in decisions
-    })
+    decision_types = sorted({d.get("decision", "unknown") for d in decisions})
 
     eval_summary = "not_available"
     if evaluations:
@@ -166,8 +412,7 @@ def _build_summary_md(
         passed = sum(1 for r in regressions if r.get("passed"))
         failed = sum(1 for r in regressions if not r.get("passed"))
         reg_summary = (
-            f"{len(regressions)} regression comparison(s): "
-            f"{passed} passed, {failed} failed"
+            f"{len(regressions)} regression comparison(s): {passed} passed, {failed} failed"
         )
 
     review_required = "yes" if run_summary.review_count > 0 else "no"

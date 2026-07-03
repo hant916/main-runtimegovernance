@@ -304,6 +304,16 @@ def evidence_audit(
     typer.echo(rendered)
 
 
+@app.command("validate-package")
+def validate_package(package_dir: Path) -> None:
+    from ailuros.audit_package import validate_audit_package_dir
+
+    result = validate_audit_package_dir(package_dir)
+    _print_json(result.to_dict())
+    if not result.valid:
+        raise typer.Exit(1)
+
+
 @app.command()
 def server(
     host: Annotated[
