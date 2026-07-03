@@ -81,10 +81,10 @@ def test_malformed_jsonl_fails_with_line_number(tmp_path: Path) -> None:
     assert "malformed JSONL in timeline.jsonl: line 2" in result.reasons[0]
 
 
-def test_mismatched_run_id_fails(tmp_path: Path) -> None:
+def test_mismatched_canonical_run_id_fails(tmp_path: Path) -> None:
     pkg = _write_package(tmp_path / "pkg")
-    (pkg / "decisions.json").write_text(
-        json.dumps([{"run_id": "other-run", "decision": "allow"}]),
+    (pkg / "run.json").write_text(
+        json.dumps({"run_id": "other-run", "status": "completed"}),
         encoding="utf-8",
     )
 
@@ -93,6 +93,20 @@ def test_mismatched_run_id_fails(tmp_path: Path) -> None:
     assert result.valid is False
     assert result.decision == "FAIL"
     assert result.reasons == ["mismatched run_id values: other-run, run-001"]
+
+
+def test_noncanonical_run_id_fields_do_not_affect_consistency(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg")
+    (pkg / "decisions.json").write_text(
+        json.dumps([{"run_id": "domain-run-id", "decision": "allow"}]),
+        encoding="utf-8",
+    )
+
+    result = validate_audit_package_dir(pkg)
+
+    assert result.valid is True
+    assert result.decision == "PASS"
+    assert result.reasons == []
 
 
 def test_block_decision_fails(tmp_path: Path) -> None:

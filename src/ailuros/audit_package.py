@@ -194,17 +194,17 @@ def _structure_reasons(package: AuditPackage) -> list[str]:
 
 def _run_id_reasons(package: AuditPackage) -> list[str]:
     reasons: list[str] = []
-    required_run_ids = {
+    canonical_run_ids = {
         "manifest.json": _top_level_run_id(package.manifest),
         "run.json": _top_level_run_id(package.run),
     }
-    for file_name, run_id in required_run_ids.items():
+    for file_name, run_id in canonical_run_ids.items():
         if run_id is None:
             reasons.append(f"missing run_id in {file_name}")
 
-    run_ids = _collect_run_ids(package)
-    if len(set(run_ids)) > 1:
-        reasons.append("mismatched run_id values: " + ", ".join(sorted(set(run_ids))))
+    present_run_ids = {run_id for run_id in canonical_run_ids.values() if run_id is not None}
+    if len(present_run_ids) > 1:
+        reasons.append("mismatched run_id values: " + ", ".join(sorted(present_run_ids)))
     return reasons
 
 
@@ -213,36 +213,6 @@ def _top_level_run_id(value: Any) -> str | None:
         return None
     run_id = value.get("run_id")
     return run_id if isinstance(run_id, str) and run_id else None
-
-
-def _collect_run_ids(package: AuditPackage) -> list[str]:
-    records: list[Any] = [
-        package.manifest,
-        package.run,
-        package.timeline,
-        package.decisions,
-        package.evaluations,
-        package.regressions,
-    ]
-    values: list[str] = []
-    for record in records:
-        values.extend(_find_run_ids(record))
-    return values
-
-
-def _find_run_ids(value: Any) -> list[str]:
-    found: list[str] = []
-    if isinstance(value, dict):
-        run_id = value.get("run_id")
-        if isinstance(run_id, str) and run_id:
-            found.append(run_id)
-        for nested in value.values():
-            found.extend(_find_run_ids(nested))
-    elif isinstance(value, list):
-        for item in value:
-            found.extend(_find_run_ids(item))
-    return found
-
 
 def _iter_dict_records(value: Any) -> Iterator[dict[str, Any]]:
     if isinstance(value, dict):
