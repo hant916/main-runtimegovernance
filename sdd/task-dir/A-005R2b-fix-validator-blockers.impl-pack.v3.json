@@ -1,0 +1,158 @@
+{
+  "schema": "impl-pack.v3.convergence",
+  "pack_id": "A-005R2b-fix-validator-blockers",
+  "title": "Fix PR #2 Audit Package Validator Blockers",
+  "status": "ready",
+  "repo": {
+    "name": "hant916/main-runtimegovernance",
+    "default_branch": "master",
+    "source_of_truth": [
+      "sdd/task-dir/A-005R2-tighten-package-validator-errors.impl-pack.v3.json",
+      "src/ailuros/audit_package.py",
+      "src/ailuros/cli.py",
+      "tests/test_audit_package_validator.py"
+    ]
+  },
+  "context": {
+    "product": "Ailuros",
+    "current_version": "0.3.0",
+    "target_pr": "PR #2 Add audit package loader/validator, CLI validate-package command, and tests",
+    "review_verdict": "REQUEST_CHANGES",
+    "problem": "PR #2 added useful package validation improvements but missed two required A-005R2 blockers: summary.md is still read directly with read_text and can leak raw exceptions, and run_id validation still recursively scans arbitrary nested run_id keys, causing false mismatch failures for referenced/baseline metadata run IDs.",
+    "principles": [
+      "Fix the blocker, do not redesign the feature",
+      "Keep normal CLI output machine-readable JSON",
+      "Validate canonical evidence fields only",
+      "No reference-app coupling in src/ailuros",
+      "KISS / narrow diff"
+    ]
+  },
+  "task": {
+    "summary": "Update the open validator PR so it satisfies A-005R2's mandatory requirements before merge.",
+    "user_story": "As an Ailuros maintainer, I want PR #2 to return structured validation failures for summary.md read/encoding errors and avoid false run_id mismatch failures from nested non-canonical metadata fields.",
+    "non_goals": [
+      "Do not add new product features beyond the blocker fixes.",
+      "Do not change decision names PASS, REVIEW_REQUIRED, FAIL.",
+      "Do not add HTTP API, dashboard, runtime ingestion, runtime blocking, auth, sessions, or policy DSL.",
+      "Do not introduce Clarify/EverRun/radarCreation/browser/UI/domain-specific concepts into src/ailuros.",
+      "Do not rewrite unrelated CLI formatting or export package formatting."
+    ]
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/ailuros/audit_package.py",
+      "tests/test_audit_package_validator.py"
+    ],
+    "conditionally_allowed_paths": [
+      "src/ailuros/cli.py only if needed to preserve JSON output behavior"
+    ],
+    "forbidden_paths": [
+      ".git/**",
+      ".venv/**",
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      ".tmp/**",
+      "docs/strategy/**",
+      "docs/architecture/**",
+      "docs/decisions/**"
+    ]
+  },
+  "implementation": {
+    "required_changes": [
+      "Add a deterministic text reader for summary.md, for example _read_text_file(path: Path) -> str.",
+      "Replace direct (package_dir / 'summary.md').read_text(encoding='utf-8') with the deterministic text reader.",
+      "Catch UnicodeDecodeError for summary.md and convert it into AuditPackageLoadError with a stable reason naming summary.md.",
+      "Catch OSError for summary.md and convert it into AuditPackageLoadError with a stable reason naming summary.md.",
+      "Ensure validate_audit_package_dir returns PackageValidationResult(valid=false, decision='FAIL', reasons=[...]) for summary.md read/encoding errors.",
+      "Remove recursive _find_run_ids usage from run_id consistency validation.",
+      "Collect run_ids only from canonical locations: manifest.run_id, run.run_id, timeline[*].run_id, decisions[*].run_id, evaluations[*].run_id, regressions[*].run_id.",
+      "Ignore nested non-canonical run_id values inside metadata, payload, baseline, referenced, comparison, or other nested objects unless they are the direct top-level run_id of a canonical record.",
+      "Keep required manifest.json and run.json missing run_id validation.",
+      "Keep existing aggregated JSON/JSONL parse errors if already implemented in PR #2."
+    ],
+    "suggested_api_shape": {
+      "summary_reader": "_read_text_file(path: Path) -> str",
+      "run_id_collection": "_collect_run_ids(package: AuditPackage) -> list[str]",
+      "dict_helper": "_top_level_run_id(value: Any) -> str | None",
+      "list_helper": "_record_list_run_ids(value: Any) -> list[str]"
+    },
+    "canonical_run_id_rules": [
+      "manifest.run_id is required and canonical when manifest is a JSON object.",
+      "run.run_id is required and canonical when run is a JSON object.",
+      "timeline[*].run_id is optional but canonical when each timeline entry is a JSON object.",
+      "decisions[*].run_id is optional but canonical when each decision entry is a JSON object.",
+      "evaluations[*].run_id is optional but canonical when each evaluation entry is a JSON object.",
+      "regressions[*].run_id is optional but canonical when each regression entry is a JSON object.",
+      "Nested values such as metadata.run_id, payload.run_id, baseline_run_id, compared_run_id, referenced_run_id, previous.run_id, or evidence.run_id are not part of consistency validation for this pack."
+    ],
+    "required_tests": [
+      "invalid UTF-8 bytes in summary.md returns valid=false, decision=FAIL, and a reason naming summary.md without raising a raw exception.",
+      "CLI validate-package on a package with invalid UTF-8 summary.md emits valid JSON and exits non-zero.",
+      "nested non-canonical metadata.run_id different from canonical run_id does not fail validation.",
+      "nested non-canonical baseline/reference run_id different from canonical run_id does not fail validation.",
+      "direct canonical decisions[*].run_id mismatch still fails validation.",
+      "direct canonical timeline[*].run_id mismatch still fails validation."
+    ]
+  },
+  "acceptance_criteria": [
+    "No direct read_text call remains for summary.md inside load_audit_package unless wrapped by deterministic error handling.",
+    "summary.md UnicodeDecodeError and OSError are returned as structured FAIL results through validate_audit_package_dir.",
+    "CLI output for summary.md failure is JSON with valid=false, decision=FAIL, reasons=[...].",
+    "_collect_run_ids no longer recursively scans arbitrary nested dictionaries/lists for every key named run_id.",
+    "Canonical direct run_id mismatches are still detected and fail deterministically.",
+    "Nested non-canonical run_id-like values do not trigger mismatch failure.",
+    "Existing PASS, REVIEW_REQUIRED, FAIL decision precedence is preserved.",
+    "Existing aggregated parse error tests continue to pass.",
+    "No forbidden paths are modified."
+  ],
+  "validation": {
+    "commands": [
+      "python -m pytest tests/test_audit_package_validator.py -q",
+      "python scripts/check_release_v030.py",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q"
+    ],
+    "notes": [
+      "Full pytest currently may fail due to known unrelated Clarify/release smoke baseline issues. If it fails, report exact failing tests and do not mark full validation green.",
+      "The targeted validator tests must pass."
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "summary.md invalid UTF-8 is covered by a test and returns structured FAIL without raw traceback.",
+      "validate-package CLI on invalid summary.md emits valid JSON and exits non-zero.",
+      "run_id consistency uses only canonical package-level fields and direct record-level run_id fields.",
+      "Recursive arbitrary nested run_id scanning is removed or no longer used for consistency validation.",
+      "Nested metadata/baseline/reference run_id values differing from canonical run_id do not fail validation.",
+      "Direct canonical mismatches in manifest/run/timeline/decisions/evaluations/regressions still fail.",
+      "No application-specific concepts or forbidden paths are introduced.",
+      "All validation commands are run and results are reported honestly."
+    ],
+    "reject_if": [
+      "summary.md read_text can still raise raw UnicodeDecodeError/OSError through validate_audit_package_dir.",
+      "CLI emits non-JSON output for normal validation failures.",
+      "_collect_run_ids still calls a recursive helper over arbitrary nested values.",
+      "Nested metadata.run_id or baseline/reference run_id mismatches still cause FAIL.",
+      "Canonical run_id mismatch checks are removed or weakened.",
+      "The patch expands into unrelated architecture, docs, HTTP API, dashboard, live ingestion, runtime blocking, auth, sessions, or policy DSL.",
+      "Tests are loosened or deleted instead of adding targeted regression tests.",
+      "Validation failures are hidden or reported as success."
+    ]
+  },
+  "expected_output": {
+    "invalid_summary_utf8": {
+      "valid": false,
+      "decision": "FAIL",
+      "reasons": [
+        "malformed text in summary.md: invalid UTF-8"
+      ]
+    },
+    "nested_noncanonical_run_id": {
+      "valid": true,
+      "decision": "PASS",
+      "reasons": []
+    }
+  }
+}
