@@ -8,8 +8,11 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from ailuros.audit import build_audit_summary
+from ailuros.core.execution import ExecutionProjection
 from ailuros.errors import AilurosNotFoundError
+from ailuros.execution_report import build_run_report
 from ailuros.replay import ReplayService
+from ailuros.signals import RULE_VERSION, GovernanceSignal
 from ailuros.storage import SQLiteStorage
 
 logger = logging.getLogger(__name__)
@@ -118,6 +121,12 @@ class _Handler(BaseHTTPRequestHandler):
                         return
                     self._handle_run_events(storage, run_id, limit=limit, offset=offset)
                     return
+                if parts[3] == "report":
+                    self._handle_run_report(storage, run_id)
+                    return
+                if parts[3] == "signals":
+                    self._handle_run_signals(storage, run_id)
+                    return
 
             if len(parts) == 3 and parts[1] == "runs" and parts[2]:
                 self._handle_run_detail(storage, parts[2])
@@ -214,6 +223,39 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_error(404, f"Decision not found: {decision_id}")
             return
         self._send_json(decision.model_dump(mode="json"))
+
+    def _handle_run_report(self, storage: SQLiteStorage, run_id: str) -> None:
+        try:
+            storage.get_run(run_id)
+        except AilurosNotFoundError:
+            self._send_error(404, f"Run not found: {run_id}")
+            return
+
+        proj_data = storage.get_projection(run_id)
+        if proj_data is None:
+            self._send_error(404, f"Projection unavailable for run: {run_id}")
+            return
+
+        projection = ExecutionProjection.model_validate(proj_data["projection"])
+
+        signal_dicts = storage.get_signals(run_id)
+        signals = [
+            GovernanceSignal.model_validate({**s, "rule_version": RULE_VERSION})
+            for s in signal_dicts
+        ]
+
+        report = build_run_report(projection, signals)
+        self._send_json(report.model_dump(mode="json"))
+
+    def _handle_run_signals(self, storage: SQLiteStorage, run_id: str) -> None:
+        try:
+            storage.get_run(run_id)
+        except AilurosNotFoundError:
+            self._send_error(404, f"Run not found: {run_id}")
+            return
+
+        signal_dicts = storage.get_signals(run_id)
+        self._send_json(signal_dicts)
 
     def log_message(self, format: str, *args: Any) -> None:
         logger.info("access: %s", format % args)
