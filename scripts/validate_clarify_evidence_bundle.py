@@ -157,7 +157,12 @@ def validate_bundle(bundle_dir: Path) -> tuple[list[CheckResult], str]:
 
     check = CheckResult("manifest_artifacts_exist")
     missing_artifacts = []
-    for artifact in artifacts:
+    if not isinstance(artifacts, (dict, list)):
+        check.fail("manifest.artifacts must be an object or array")
+        add(check)
+        return checks, status
+    artifact_paths = artifacts.values() if isinstance(artifacts, dict) else artifacts
+    for artifact in artifact_paths:
         if not (bundle_dir / artifact).is_file():
             missing_artifacts.append(artifact)
     if missing_artifacts:
