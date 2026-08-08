@@ -432,6 +432,64 @@ class SQLiteStorage:
             for row in rows
         ]
 
+    def list_projections_in_window(
+        self, window_start: datetime, window_end: datetime, source: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            query = """
+                SELECT p.run_id, p.projection_schema, p.projection_version,
+                       p.source, p.lifecycle_status, p.outcome_summary,
+                       p.validation_summary, p.projection_json, p.updated_at,
+                       r.created_at as run_created_at
+                FROM projections p
+                JOIN runs r ON p.run_id = r.run_id
+                WHERE r.created_at >= ? AND r.created_at <= ?
+            """
+            params: list[Any] = [window_start.isoformat(), window_end.isoformat()]
+            if source is not None:
+                query += " AND p.source = ?"
+                params.append(source)
+            rows = conn.execute(query, params).fetchall()
+
+        return [
+            {
+                "run_id": row["run_id"],
+                "projection_schema": row["projection_schema"],
+                "projection_version": row["projection_version"],
+                "source": row["source"],
+                "lifecycle_status": row["lifecycle_status"],
+                "outcome_summary": row["outcome_summary"],
+                "validation_summary": row["validation_summary"],
+                "projection": self._loads(row["projection_json"]),
+                "updated_at": datetime.fromisoformat(row["updated_at"]),
+                "run_created_at": datetime.fromisoformat(row["run_created_at"]),
+            }
+            for row in rows
+        ]
+
+    def list_signals_for_runs(self, run_ids: list[str]) -> list[dict[str, Any]]:
+        if not run_ids:
+            return []
+        with self._connect() as conn:
+            placeholders = ",".join("?" for _ in run_ids)
+            rows = conn.execute(
+                f"SELECT * FROM signals WHERE run_id IN ({placeholders}) ORDER BY created_at",
+                run_ids,
+            ).fetchall()
+        return [
+            {
+                "signal_id": row["signal_id"],
+                "run_id": row["run_id"],
+                "type": row["type"],
+                "severity": row["severity"],
+                "subject": row["subject"],
+                "evidence_refs": self._loads(row["evidence_refs_json"]),
+                "details": self._loads(row["details_json"]),
+                "created_at": datetime.fromisoformat(row["created_at"]),
+            }
+            for row in rows
+        ]
+
     def _connect(self) -> sqlite3.Connection:
         try:
             conn = sqlite3.connect(self.path, isolation_level=None)
