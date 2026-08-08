@@ -1,0 +1,20 @@
+{
+  "schema_version": "ailuros.timeline.v1",
+  "run_id": "run-v1-001",
+  "events": [
+    {
+      "event_id": "evt-v1-001",
+      "event_type": "run_started",
+      "timestamp": "2025-01-15T10:00:00+00:00",
+      "payload": {"input": "test v1 input"},
+      "metadata": {}
+    },
+    {
+      "event_id": "evt-v1-002",
+      "event_type": "run_completed",
+      "timestamp": "2025-01-15T10:01:00+00:00",
+      "payload": {"result": "completed"},
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "package_version": "1",
+  "source": "sample-agent-v1",
+  "target": "ailuros",
+  "governance_mode": "observe",
+  "schema_version": "ailuros.timeline.v1",
+  "run_id": "run-v1-001",
+  "generated_at": "2025-01-15T10:01:30+00:00",
+  "files": [
+    {"name": "manifest.json", "required": true},
+    {"name": "timeline.json", "required": true},
+    {"name": "notes.md", "required": false}
+  ],
+  "metadata": {
+    "agent_name": "sample-agent-v1",
+    "description": "V1 evidence package for testing"
+  },
+  "provenance": {
+    "source_artifact": "exporter-v1",
+    "source_pointer": "pipeline/run-42",
+    "source_event_type": "run_started",
+    "metadata": {"framework": "ailuros"}
+  },
+  "pkg_metadata": {
+    "exporter_version": "1.0.0",
+    "source_digest": "sha256:abc123",
+    "coverage": {"events": 2, "files": 3}
+  }
+}
