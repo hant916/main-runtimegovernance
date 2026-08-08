@@ -28,12 +28,15 @@
     </div>
     <div id="view-runs" class="view hidden">
       <h2>Runs</h2>
+      <div id="runs-loading" class="state-loading hidden">Loading runs...</div>
+      <div id="runs-empty" class="state-empty hidden">No runs recorded yet.</div>
       <table class="data-table" id="runs-table">
         <thead>
           <tr>
             <th>ID</th>
+            <th>Source</th>
             <th>Status</th>
-            <th>Timestamp</th>
+            <th>Time</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -51,6 +54,38 @@
         </thead>
         <tbody></tbody>
       </table>
+    </div>
+    <div id="view-run-detail" class="view hidden">
+      <a href="#runs" class="back-link" data-route="runs">&larr; Back to Runs</a>
+      <h2>Run Detail</h2>
+      <div id="run-detail-loading" class="state-loading hidden">Loading run detail...</div>
+      <div id="run-detail-error" class="state-error hidden" role="alert"></div>
+      <div id="run-detail-content" class="hidden">
+        <section id="rd-basics">
+          <h3>Summary</h3>
+          <dl class="detail-dl" id="rd-basics-dl"></dl>
+        </section>
+        <section id="rd-signals">
+          <h3>Signals</h3>
+          <div id="rd-signals-empty" class="state-empty hidden">No signals for this run.</div>
+          <div id="rd-signals-list"></div>
+        </section>
+        <section id="rd-decisions">
+          <h3>Decisions</h3>
+          <div id="rd-decisions-empty" class="state-empty hidden">No decisions recorded.</div>
+          <ul id="rd-decisions-list" class="detail-list"></ul>
+        </section>
+        <section id="rd-changes">
+          <h3>Changes</h3>
+          <div id="rd-changes-empty" class="state-empty hidden">No changes recorded.</div>
+          <ul id="rd-changes-list" class="detail-list"></ul>
+        </section>
+        <section id="rd-evidence">
+          <h3>Evidence References</h3>
+          <div id="rd-evidence-empty" class="state-empty hidden">No evidence references.</div>
+          <div id="rd-evidence-list"></div>
+        </section>
+      </div>
     </div>
     <div id="view-error" class="view hidden" role="alert">
       <h2>Error</h2>
