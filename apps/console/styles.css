@@ -108,6 +108,59 @@ main {
   font-weight: 700;
 }
 
+.card-desc {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+
+.filter-bar label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: #666;
+}
+
+.filter-bar input {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  width: 180px;
+}
+
+.filter-bar button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #0066cc;
+  border-radius: 4px;
+  background: #0066cc;
+  color: #fff;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.filter-bar button:hover {
+  background: #0052a3;
+}
+
+a.run-link {
+  color: #0066cc;
+  text-decoration: none;
+}
+
+a.run-link:hover {
+  text-decoration: underline;
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;

@@ -24,6 +24,15 @@
   <main id="main-content" aria-live="polite">
     <div id="view-overview" class="view">
       <h2>Overview</h2>
+      <div class="filter-bar" id="overview-filters">
+        <label>Start: <input type="text" id="overview-start" placeholder="ISO 8601"></label>
+        <label>End: <input type="text" id="overview-end" placeholder="ISO 8601"></label>
+        <label>Source: <input type="text" id="overview-source" placeholder="all"></label>
+        <button id="overview-refresh">Refresh</button>
+      </div>
+      <div id="overview-loading" class="state-loading hidden">Loading overview...</div>
+      <div id="overview-error" class="state-error hidden" role="alert"></div>
+      <div id="overview-empty" class="state-empty hidden">No run data in the selected window.</div>
       <div class="card-container" id="overview-cards"></div>
     </div>
     <div id="view-runs" class="view hidden">
@@ -44,16 +53,61 @@
     </div>
     <div id="view-problems" class="view hidden">
       <h2>Problems</h2>
+      <div class="filter-bar" id="problems-filters">
+        <label>Start: <input type="text" id="problems-start" placeholder="ISO 8601 (optional)"></label>
+        <label>End: <input type="text" id="problems-end" placeholder="ISO 8601 (optional)"></label>
+        <label>Source: <input type="text" id="problems-source" placeholder="all"></label>
+        <button id="problems-refresh">Refresh</button>
+      </div>
+      <div id="problems-loading" class="state-loading hidden">Loading problems...</div>
+      <div id="problems-error" class="state-error hidden" role="alert"></div>
+      <div id="problems-empty" class="state-empty hidden">No problems detected in the selected window.</div>
       <table class="data-table" id="problems-table">
         <thead>
           <tr>
-            <th>ID</th>
+            <th>Signal Type</th>
+            <th>Subject</th>
+            <th>Count</th>
+            <th>First Seen</th>
+            <th>Last Seen</th>
             <th>Severity</th>
-            <th>Description</th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
+    </div>
+    <div id="view-problem-detail" class="view hidden">
+      <a href="#problems" class="back-link" data-route="problems">&larr; Back to Problems</a>
+      <h2>Problem Detail</h2>
+      <div id="pd-loading" class="state-loading hidden">Loading problem detail...</div>
+      <div id="pd-error" class="state-error hidden" role="alert"></div>
+      <div id="pd-content" class="hidden">
+        <section id="pd-summary">
+          <h3>Summary</h3>
+          <dl class="detail-dl" id="pd-summary-dl"></dl>
+        </section>
+        <section id="pd-trend">
+          <h3>Daily Trend</h3>
+          <div id="pd-trend-empty" class="state-empty hidden">No trend data.</div>
+          <table class="data-table" id="pd-trend-table">
+            <thead><tr><th>Day</th><th>Count</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </section>
+        <section id="pd-signals">
+          <h3>Contributing Signals</h3>
+          <div id="pd-signals-empty" class="state-empty hidden">No contributing signals.</div>
+          <table class="data-table" id="pd-signals-table">
+            <thead><tr><th>Signal ID</th><th>Run</th><th>Severity</th><th>Evidence</th><th>Time</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </section>
+        <section id="pd-affected">
+          <h3>Affected Runs</h3>
+          <div id="pd-affected-empty" class="state-empty hidden">No affected runs.</div>
+          <ul id="pd-affected-list" class="detail-list"></ul>
+        </section>
+      </div>
     </div>
     <div id="view-run-detail" class="view hidden">
       <a href="#runs" class="back-link" data-route="runs">&larr; Back to Runs</a>
