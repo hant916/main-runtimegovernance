@@ -6,6 +6,30 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
+class Provenance(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source_artifact: str | None = None
+    source_pointer: str | None = None
+    source_event_type: str | None = None
+    metadata: dict[str, Any] = {}
+
+
+class PackageMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    exporter_version: str | None = None
+    source_digest: str | None = None
+    coverage: dict[str, Any] | None = None
+
+    @field_validator("exporter_version")
+    @classmethod
+    def validate_exporter_version(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("exporter_version must not be empty if present")
+        return value
+
+
 class EvidenceEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -14,6 +38,20 @@ class EvidenceEvent(BaseModel):
     timestamp: datetime
     payload: dict[str, Any] = {}
     metadata: dict[str, Any] = {}
+
+    @field_validator("event_id")
+    @classmethod
+    def require_non_empty_event_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("event_id must not be empty")
+        return value
+
+    @field_validator("event_type")
+    @classmethod
+    def require_non_empty_event_type(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("event_type must not be empty")
+        return value
 
     @field_validator("timestamp")
     @classmethod
@@ -32,3 +70,5 @@ class EvidencePackage(BaseModel):
     events: list[EvidenceEvent] = []
     files: dict[str, str] = {}
     metadata: dict[str, Any] = {}
+    provenance: Provenance | None = None
+    pkg_metadata: PackageMetadata | None = None
