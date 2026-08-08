@@ -209,6 +209,23 @@ class SQLiteStorage:
             for row in rows
         ]
 
+    def get_event_by_id(self, event_id: str) -> RuntimeEvent | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM events WHERE event_id = ?", (event_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return RuntimeEvent(
+            event_id=row["event_id"],
+            run_id=row["run_id"],
+            step_id=row["step_id"],
+            event_type=row["event_type"],
+            timestamp=datetime.fromisoformat(row["timestamp"]),
+            payload=self._loads(row["payload_json"]),
+            sequence=row["sequence"],
+        )
+
     def get_decision(self, decision_id: str) -> GovernanceDecision:
         with self._connect() as conn:
             row = conn.execute(
