@@ -62,6 +62,7 @@ class DecisionSummary(BaseModel):
 
     domain: str
     decision: str
+    projected_domain: str = "source_preserved_unknown"
 
 
 class ExecutionProjection(BaseModel):
