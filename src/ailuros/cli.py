@@ -307,6 +307,41 @@ def evidence_audit(
     typer.echo(rendered)
 
 
+@app.command("import-evidence-package")
+def import_evidence_package(
+    package_dir: Path,
+) -> None:
+    from ailuros.adapters.evidence_package import (
+        ImportStatus,
+        ingest_evidence_package,
+        load_evidence_package,
+    )
+    from ailuros.cli_run import open_storage
+
+    try:
+        storage = open_storage()
+    except typer.BadParameter as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    try:
+        package = load_evidence_package(package_dir)
+    except (FileNotFoundError, ValueError) as exc:
+        _print_json({"status": "invalid", "detail": str(exc)})
+        raise typer.Exit(1) from exc
+
+    try:
+        result = ingest_evidence_package(storage, package)
+    except Exception as exc:
+        _print_json({"status": "invalid", "detail": str(exc)})
+        raise typer.Exit(1) from exc
+
+    _print_json(result.model_dump(mode="json"))
+
+    if result.status == ImportStatus.CONFLICT:
+        raise typer.Exit(1)
+
+
 @app.command("validate-package")
 def validate_package(package_dir: Path) -> None:
     from ailuros.audit_package import validate_audit_package_dir
