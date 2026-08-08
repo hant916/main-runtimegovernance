@@ -414,6 +414,29 @@ def import_evidence_package(
         raise typer.Exit(1)
 
 
+@app.command("batch-import")
+def batch_import(
+    root_dir: Path,
+) -> None:
+    if not root_dir.is_dir():
+        typer.echo(f"directory not found: {root_dir}", err=True)
+        raise typer.Exit(1)
+
+    try:
+        storage = open_storage()
+    except typer.BadParameter as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    from ailuros.backfill import batch_import_project
+
+    summary = batch_import_project(storage, root_dir)
+    _print_json(summary.model_dump(mode="json"))
+
+    if summary.invalid > 0 or summary.conflict > 0 or summary.projection_failed > 0:
+        raise typer.Exit(1)
+
+
 @app.command("validate-package")
 def validate_package(package_dir: Path) -> None:
     from ailuros.audit_package import validate_audit_package_dir
