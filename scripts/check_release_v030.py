@@ -102,9 +102,9 @@ def main() -> int:
     check_file_exists("docs/release/v0.3.0-scope.md")
     check_file_exists("docs/release/v0.3.0-finalization.md")
 
-    check_file_exists("src/ailuros/audit_package.py")
+    check_file_exists("src/ailuros/audit_package/__init__.py")
     check_file_contains(
-        "src/ailuros/audit_package.py",
+        "src/ailuros/audit_package/__init__.py",
         "export_audit_package_to_dir",
         "export_audit_package_to_dir",
     )

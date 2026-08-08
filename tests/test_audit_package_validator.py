@@ -139,3 +139,12 @@ def test_validate_package_cli_allows_review_exit_zero(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert json.loads(result.output)["decision"] == "REVIEW_REQUIRED"
+
+
+def test_validate_package_cli_fails_for_blocking_decision(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg", decisions=[{"run_id": "run-001", "decision": "block"}])
+
+    result = CliRunner().invoke(app, ["validate-package", str(pkg)])
+
+    assert result.exit_code != 0
+    assert json.loads(result.output)["decision"] == "FAIL"

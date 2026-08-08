@@ -47,9 +47,9 @@ def test_release_doc_non_goals_are_explicit() -> None:
 
 
 def test_audit_package_contract_marker_present() -> None:
-    ap = ROOT / "src" / "ailuros" / "audit_package.py"
-    assert ap.exists()
-    content = ap.read_text(encoding="utf-8")
+    init = ROOT / "src" / "ailuros" / "audit_package" / "__init__.py"
+    assert init.exists()
+    content = init.read_text(encoding="utf-8")
     assert "export_audit_package_to_dir" in content
     assert "ailuros.audit-package.v1" in content
 

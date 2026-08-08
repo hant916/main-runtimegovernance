@@ -313,7 +313,7 @@ def validate_package(package_dir: Path) -> None:
 
     result = validate_audit_package_dir(package_dir)
     _print_json(result.to_dict())
-    if not result.valid:
+    if result.decision == "FAIL":
         raise typer.Exit(1)
 
 
