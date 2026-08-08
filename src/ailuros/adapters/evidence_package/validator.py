@@ -8,6 +8,8 @@ from typing import Any
 from ailuros.core.validation import ValidationResult
 from ailuros.models.event import RuntimeEventType
 
+_V1_SCHEMA = "ailuros.timeline.v1"
+
 # Canonical event-type vocabulary. Well-formed events whose type is outside this
 # set are preserved as warnings rather than errors.
 _KNOWN_EVENT_TYPES = {member.value for member in RuntimeEventType}
@@ -35,6 +37,91 @@ def _parse_timestamp(value: Any) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _check_path_traversal(value: str) -> bool:
+    if not value:
+        return False
+    if value.startswith("/") or value.startswith("\\"):
+        return True
+    if len(value) >= 2 and value[0].isalpha() and value[1] == ":":
+        return True
+    parts = value.replace("\\", "/").split("/")
+    if ".." in parts:
+        return True
+    return False
+
+
+def _validate_v1_identity_and_uniqueness(
+    timeline: dict[str, Any],
+    errors: list[str],
+) -> None:
+    events = timeline.get("events")
+    if not isinstance(events, list):
+        return
+    seen_ids: set[str] = set()
+    for _i, event in enumerate(events):
+        if not isinstance(event, dict):
+            continue
+        event_id = event.get("event_id")
+        if not isinstance(event_id, str) or not event_id:
+            continue
+        if event_id in seen_ids:
+            errors.append(f"duplicate event_id in timeline: {event_id}")
+        seen_ids.add(event_id)
+
+
+def _validate_v1_provenance_safety(
+    manifest: dict[str, Any],
+    errors: list[str],
+) -> None:
+    provenance = manifest.get("provenance")
+    if not isinstance(provenance, dict):
+        return
+
+    source_artifact = provenance.get("source_artifact")
+    if isinstance(source_artifact, str) and _check_path_traversal(source_artifact):
+        errors.append(
+            "provenance.source_artifact must be a package-relative logical ref, "
+            f"not a filesystem path: {source_artifact}"
+        )
+
+    source_pointer = provenance.get("source_pointer")
+    if isinstance(source_pointer, str) and _check_path_traversal(source_pointer):
+        errors.append(
+            "provenance.source_pointer must be a package-relative logical ref, "
+            f"not a filesystem path: {source_pointer}"
+        )
+
+
+def _validate_v1_counts(
+    manifest: dict[str, Any],
+    events_count: int,
+    errors: list[str],
+) -> None:
+    pkg_metadata = manifest.get("pkg_metadata")
+    if not isinstance(pkg_metadata, dict):
+        return
+    coverage = pkg_metadata.get("coverage")
+    if not isinstance(coverage, dict):
+        return
+
+    declared_events = coverage.get("events")
+    if isinstance(declared_events, int) and declared_events != events_count:
+        errors.append(
+            f"pkg_metadata.coverage.events declares {declared_events} events "
+            f"but timeline contains {events_count}"
+        )
+
+    declared_files = coverage.get("files")
+    if isinstance(declared_files, int):
+        files_list = manifest.get("files", [])
+        actual_files = len(files_list) if isinstance(files_list, list) else 0
+        if declared_files != actual_files:
+            errors.append(
+                f"pkg_metadata.coverage.files declares {declared_files} files "
+                f"but manifest declares {actual_files}"
+            )
 
 
 def _validate_files(
@@ -178,6 +265,11 @@ def validate_evidence_package_contract(package_dir: str | Path) -> ValidationRes
 
     _validate_manifest(manifest, pkg_path, errors)
     events_count = _validate_timeline(timeline, manifest, errors, warnings)
+
+    if manifest.get("schema_version") == _V1_SCHEMA and isinstance(timeline, dict):
+        _validate_v1_identity_and_uniqueness(timeline, errors)
+        _validate_v1_provenance_safety(manifest, errors)
+        _validate_v1_counts(manifest, events_count, errors)
 
     return ValidationResult(
         ok=not errors,
