@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ailuros.core.execution import (
     ChangeSummary,
@@ -14,6 +14,12 @@ from ailuros.core.execution import (
     Scope,
     Validation,
 )
+
+if TYPE_CHECKING:
+    from ailuros.signals import GovernanceSignal
+    from ailuros.storage import SQLiteStorage
+
+PROJECTION_VERSION = "1.0.0"
 
 _OUTCOME_PRIORITY: dict[str, int] = {
     "block": 4,
@@ -189,3 +195,51 @@ def build_execution_projection(
         decisions=decisions,
         evidence_refs=evidence_refs,
     )
+
+
+def rebuild_projections_and_signals(
+    storage: SQLiteStorage,
+    run_id: str,
+    *,
+    source: str = "rebuild",
+    schema_version: str = "1.0",
+) -> tuple[ExecutionProjection, list[GovernanceSignal]]:
+    from ailuros.signals import derive_signals
+
+    events = storage.list_events(run_id)
+    event_dicts: list[dict[str, Any]] = [
+        {
+            "event_id": e.event_id,
+            "event_type": e.event_type.value,
+            "timestamp": e.timestamp,
+            "payload": e.payload,
+            "step_id": e.step_id,
+        }
+        for e in events
+    ]
+
+    projection = build_execution_projection(
+        run_id=run_id,
+        source=source,
+        events=event_dicts,
+        schema_version=schema_version,
+    )
+
+    signals = derive_signals(projection)
+
+    projection_dict = projection.model_dump(mode="json")
+    storage.upsert_projection(
+        run_id=run_id,
+        projection_schema=f"execution_summary/v{schema_version}",
+        projection_version=PROJECTION_VERSION,
+        source=source,
+        projection_json=projection_dict,
+        lifecycle_status=projection.lifecycle.value,
+        outcome_summary=projection.outcome.value,
+        validation_summary=projection.validation.value,
+    )
+
+    signal_dicts = [s.model_dump(mode="json") for s in signals]
+    storage.replace_signals(run_id, signal_dicts)
+
+    return projection, signals
