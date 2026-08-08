@@ -331,6 +331,107 @@ class SQLiteStorage:
                 ),
             )
 
+    def upsert_projection(
+        self,
+        run_id: str,
+        projection_schema: str,
+        projection_version: str,
+        source: str,
+        projection_json: dict[str, Any],
+        lifecycle_status: str | None = None,
+        outcome_summary: str | None = None,
+        validation_summary: str | None = None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """INSERT INTO projections
+                   (run_id, projection_schema, projection_version, source,
+                    lifecycle_status, outcome_summary, validation_summary,
+                    projection_json, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(run_id) DO UPDATE SET
+                    projection_schema = excluded.projection_schema,
+                    projection_version = excluded.projection_version,
+                    source = excluded.source,
+                    lifecycle_status = excluded.lifecycle_status,
+                    outcome_summary = excluded.outcome_summary,
+                    validation_summary = excluded.validation_summary,
+                    projection_json = excluded.projection_json,
+                    updated_at = excluded.updated_at""",
+                (
+                    run_id,
+                    projection_schema,
+                    projection_version,
+                    source,
+                    lifecycle_status,
+                    outcome_summary,
+                    validation_summary,
+                    self._dumps(projection_json),
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+
+    def get_projection(self, run_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT * FROM projections WHERE run_id = ?", (run_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "run_id": row["run_id"],
+            "projection_schema": row["projection_schema"],
+            "projection_version": row["projection_version"],
+            "source": row["source"],
+            "lifecycle_status": row["lifecycle_status"],
+            "outcome_summary": row["outcome_summary"],
+            "validation_summary": row["validation_summary"],
+            "projection": self._loads(row["projection_json"]),
+            "updated_at": datetime.fromisoformat(row["updated_at"]),
+        }
+
+    def replace_signals(self, run_id: str, signals: list[dict[str, Any]]) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM signals WHERE run_id = ?", (run_id,))
+            now = datetime.now(UTC).isoformat()
+            for signal in signals:
+                conn.execute(
+                    """INSERT INTO signals
+                       (signal_id, run_id, type, severity, subject,
+                        evidence_refs_json, details_json, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        signal["signal_id"],
+                        run_id,
+                        signal["type"],
+                        signal["severity"],
+                        signal["subject"],
+                        self._dumps(signal.get("evidence_refs", [])),
+                        self._dumps(signal.get("details", {})),
+                        signal.get("created_at", now),
+                    ),
+                )
+
+    def get_signals(self, run_id: str) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM signals WHERE run_id = ? ORDER BY created_at",
+                (run_id,),
+            ).fetchall()
+        return [
+            {
+                "signal_id": row["signal_id"],
+                "run_id": row["run_id"],
+                "type": row["type"],
+                "severity": row["severity"],
+                "subject": row["subject"],
+                "evidence_refs": self._loads(row["evidence_refs_json"]),
+                "details": self._loads(row["details_json"]),
+                "created_at": datetime.fromisoformat(row["created_at"]),
+            }
+            for row in rows
+        ]
+
     def _connect(self) -> sqlite3.Connection:
         try:
             conn = sqlite3.connect(self.path, isolation_level=None)
