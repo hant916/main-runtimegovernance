@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="ailuros-api-base" content="">
+  <title>Ailuros Console</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Skip to content</a>
+
+  <header>
+    <h1>Ailuros Console</h1>
+    <nav aria-label="Primary">
+      <ul>
+        <li><a href="#overview" data-route="overview">Overview</a></li>
+        <li><a href="#runs" data-route="runs">Runs</a></li>
+        <li><a href="#problems" data-route="problems">Problems</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="main-content" aria-live="polite">
+    <div id="view-overview" class="view">
+      <h2>Overview</h2>
+      <div class="card-container" id="overview-cards"></div>
+    </div>
+    <div id="view-runs" class="view hidden">
+      <h2>Runs</h2>
+      <table class="data-table" id="runs-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Status</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="view-problems" class="view hidden">
+      <h2>Problems</h2>
+      <table class="data-table" id="problems-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Severity</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="view-error" class="view hidden" role="alert">
+      <h2>Error</h2>
+      <div class="error-message" id="error-message"></div>
+    </div>
+  </main>
+
+  <footer>
+    <p>Ailuros Runtime Governance</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
