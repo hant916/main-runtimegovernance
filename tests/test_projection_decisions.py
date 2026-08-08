@@ -1,0 +1,353 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from ailuros.core.execution import Outcome
+from ailuros.projection import _project_decision_domain, build_execution_projection
+
+
+def _event(
+    event_type: str,
+    *,
+    event_id: str | None = None,
+    timestamp: datetime | None = None,
+    payload: dict | None = None,
+    step_id: str | None = None,
+) -> dict:
+    ts = timestamp or datetime.now(UTC)
+    eid = event_id or f"evt-{event_type}"
+    return {
+        "event_id": eid,
+        "event_type": event_type,
+        "timestamp": ts,
+        "payload": payload or {},
+        "step_id": step_id,
+    }
+
+
+# ── T1: Recognize explicit domains ─────────────────────────────────────
+
+
+def test_tool_name_maps_to_runtime_action() -> None:
+    assert _project_decision_domain({"tool_name": "read"}, "allow") == "runtime_action"
+
+
+def test_tool_name_present_always_yields_runtime_action() -> None:
+    assert _project_decision_domain(
+        {"tool_name": "bash", "domain": "something_else"}, "block"
+    ) == "runtime_action"
+
+
+def test_explicit_execution_control_domain() -> None:
+    assert _project_decision_domain(
+        {"domain": "execution_control"}, "block"
+    ) == "execution_control"
+
+
+def test_explicit_post_run_audit_domain() -> None:
+    assert _project_decision_domain(
+        {"domain": "post_run_audit"}, "pass"
+    ) == "post_run_audit"
+
+
+def test_audit_decision_values_map_to_post_run_audit() -> None:
+    assert _project_decision_domain({}, "pass") == "post_run_audit"
+    assert _project_decision_domain({}, "warn") == "post_run_audit"
+    assert _project_decision_domain({}, "fail") == "post_run_audit"
+
+
+def test_unknown_domain_remains_source_preserved_unknown() -> None:
+    assert _project_decision_domain({}, "allow") == "source_preserved_unknown"
+    assert (
+        _project_decision_domain({"domain": "custom"}, "custom_action")
+        == "source_preserved_unknown"
+    )
+
+
+def test_runtime_action_in_projection() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert len(proj.decisions) == 1
+    assert proj.decisions[0].projected_domain == "runtime_action"
+
+
+def test_execution_control_in_projection() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "domain": "execution_control"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.decisions[0].projected_domain == "execution_control"
+
+
+def test_post_run_audit_in_projection() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "fail"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.decisions[0].projected_domain == "post_run_audit"
+
+
+def test_source_preserved_unknown_in_projection() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "unknown_decision"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.decisions[0].projected_domain == "source_preserved_unknown"
+
+
+# ── T2: Preserve source value ──────────────────────────────────────────
+
+
+def test_native_decision_stored_verbatim() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "CUSTOM_VALUE", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.decisions[0].decision == "CUSTOM_VALUE"
+
+
+def test_native_domain_stored_verbatim() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.decisions[0].domain == "bash"
+
+
+def test_projected_domain_does_not_replace_native_values() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "pass", "domain": "custom_domain"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    d = proj.decisions[0]
+    assert d.domain == "custom_domain"
+    assert d.decision == "pass"
+    assert d.projected_domain == "post_run_audit"
+    assert d.projected_domain != d.domain
+
+
+def test_projected_domain_coexists_with_native_values() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "allow", "tool_name": "read"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    d = proj.decisions[0]
+    assert d.domain == "read"
+    assert d.decision == "allow"
+    assert d.projected_domain == "runtime_action"
+    assert hasattr(d, "projected_domain")
+
+
+def test_multiple_decisions_each_preserve_their_source() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event(
+            "governance_decision",
+            event_id="e3",
+            payload={"decision": "warn", "tool_name": "write"},
+        ),
+        _event("run_completed", event_id="e4"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.decisions[0].domain == "bash"
+    assert proj.decisions[0].decision == "block"
+    assert proj.decisions[0].projected_domain == "runtime_action"
+    assert proj.decisions[1].domain == "write"
+    assert proj.decisions[1].decision == "warn"
+    assert proj.decisions[1].projected_domain == "runtime_action"
+
+
+# ── T3: Preserve reason/applied rules as details ───────────────────────
+
+
+def test_evidence_refs_point_to_decision_event() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="decision-evt",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    decision_refs = [
+        r for r in proj.evidence_refs if r.event_id == "decision-evt"
+    ]
+    assert len(decision_refs) == 1
+
+
+def test_no_synthesized_reason_in_decision_summary() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    d = proj.decisions[0]
+    assert not hasattr(d, "reason")
+    assert not hasattr(d, "rules")
+
+
+def test_multiple_decision_evidence_refs_preserved() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "allow", "tool_name": "read"},
+        ),
+        _event(
+            "governance_decision",
+            event_id="e3",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e4"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    decision_event_ids = {r.event_id for r in proj.evidence_refs if r.event_id in ("e2", "e3")}
+    assert decision_event_ids == {"e2", "e3"}
+
+
+# ── T4: Same-word ambiguity ────────────────────────────────────────────
+
+
+def test_block_in_runtime_action_distinct_from_outcome() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.outcome == Outcome.BLOCKED
+    d = proj.decisions[0]
+    assert d.decision == "block"
+    assert d.projected_domain == "runtime_action"
+    assert d.projected_domain != "block"
+
+
+def test_block_in_execution_control_is_distinct_domain() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "domain": "execution_control"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.decisions[0].projected_domain == "execution_control"
+    assert proj.decisions[0].projected_domain != "runtime_action"
+
+
+def test_pass_decision_remains_audit_domain() -> None:
+    assert _project_decision_domain({}, "pass") == "post_run_audit"
+
+
+def test_warn_decision_remains_audit_domain() -> None:
+    assert _project_decision_domain({}, "warn") == "post_run_audit"
+
+
+def test_fail_decision_remains_audit_domain() -> None:
+    assert _project_decision_domain({}, "fail") == "post_run_audit"
+
+
+def test_warn_with_tool_name_is_runtime_action_not_audit() -> None:
+    assert _project_decision_domain(
+        {"tool_name": "exec"}, "warn"
+    ) == "runtime_action"
+
+
+def test_runtime_block_and_audit_fail_are_different_domains() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event(
+            "governance_decision",
+            event_id="e3",
+            payload={"decision": "fail"},
+        ),
+        _event("run_completed", event_id="e4"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.decisions[0].projected_domain == "runtime_action"
+    assert proj.decisions[1].projected_domain == "post_run_audit"
+    assert proj.decisions[0].projected_domain != proj.decisions[1].projected_domain
+
+
+# ── Default value for DecisionSummary.projected_domain ─────────────────
+
+
+def test_decision_summary_default_projected_domain() -> None:
+    from ailuros.core.execution import DecisionSummary
+
+    d = DecisionSummary(domain="test", decision="allow")
+    assert d.projected_domain == "source_preserved_unknown"

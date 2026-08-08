@@ -26,6 +26,19 @@ _VALIDATION_AGGREGATION_PRIORITY: dict[str, int] = {
     "not_run": 1,
 }
 
+_AUDIT_DECISIONS: frozenset[str] = frozenset({"pass", "warn", "fail"})
+
+
+def _project_decision_domain(payload: dict[str, Any], decision: str) -> str:
+    if payload.get("tool_name"):
+        return "runtime_action"
+    explicit_domain = payload.get("domain", "")
+    if explicit_domain == "execution_control":
+        return "execution_control"
+    if explicit_domain == "post_run_audit" or decision in _AUDIT_DECISIONS:
+        return "post_run_audit"
+    return "source_preserved_unknown"
+
 
 def _resolve_validation(validation_presence: set[str]) -> Validation:
     if not validation_presence:
@@ -95,9 +108,14 @@ def build_execution_projection(
             decision_count += 1
             decision_type = payload.get("decision", "")
             domain = payload.get("tool_name") or payload.get("domain") or "unknown"
+            projected_domain = _project_decision_domain(payload, decision_type)
 
             decisions.append(
-                DecisionSummary(domain=domain, decision=decision_type)
+                DecisionSummary(
+                    domain=domain,
+                    decision=decision_type,
+                    projected_domain=projected_domain,
+                )
             )
             evidence_refs.append(EvidenceRef(event_id=event_id))
 
