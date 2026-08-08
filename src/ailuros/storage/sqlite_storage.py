@@ -490,6 +490,53 @@ class SQLiteStorage:
             for row in rows
         ]
 
+    def list_signals_in_window(
+        self,
+        window_start: datetime | None = None,
+        window_end: datetime | None = None,
+        source: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            query = """
+                SELECT s.signal_id, s.run_id, s.type, s.severity, s.subject,
+                       s.evidence_refs_json, s.details_json, s.created_at
+                FROM signals s
+            """
+            params: list[Any] = []
+            conditions: list[str] = []
+
+            if source is not None:
+                query += " JOIN projections p ON s.run_id = p.run_id"
+                conditions.append("p.source = ?")
+                params.append(source)
+
+            if window_start is not None:
+                conditions.append("s.created_at >= ?")
+                params.append(window_start.isoformat())
+            if window_end is not None:
+                conditions.append("s.created_at <= ?")
+                params.append(window_end.isoformat())
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY s.created_at"
+            rows = conn.execute(query, params).fetchall()
+
+        return [
+            {
+                "signal_id": row["signal_id"],
+                "run_id": row["run_id"],
+                "type": row["type"],
+                "severity": row["severity"],
+                "subject": row["subject"],
+                "evidence_refs": self._loads(row["evidence_refs_json"]),
+                "details": self._loads(row["details_json"]),
+                "created_at": datetime.fromisoformat(row["created_at"]),
+            }
+            for row in rows
+        ]
+
     def _connect(self) -> sqlite3.Connection:
         try:
             conn = sqlite3.connect(self.path, isolation_level=None)
