@@ -160,8 +160,12 @@ def test_app_js_has_problem_detail_hash_routing() -> None:
 
 def test_app_js_wires_filter_refresh_buttons() -> None:
     js = _read_file(CONSOLE_DIR / "app.js")
-    assert '"overview-refresh"' in js or "overview-refresh" in js, "app.js must wire overview refresh button"
-    assert '"problems-refresh"' in js or "problems-refresh" in js, "app.js must wire problems refresh button"
+    assert '"overview-refresh"' in js or "overview-refresh" in js, (
+        "app.js must wire overview refresh button"
+    )
+    assert '"problems-refresh"' in js or "problems-refresh" in js, (
+        "app.js must wire problems refresh button"
+    )
 
 
 # -- T4: Red lines - no governance score labels -----------------------------
@@ -253,7 +257,11 @@ def test_app_js_has_filter_helper() -> None:
 
 def test_index_html_problems_table_has_proper_columns() -> None:
     html = _read_file(CONSOLE_DIR / "index.html")
-    problems_section = html.split('id="view-problems"')[1].split('id="view-problem-detail"')[0] if 'id="view-problem-detail"' in html else html.split('id="view-problems"')[1]
+    after_problems = html.split('id="view-problems"')[1]
+    if 'id="view-problem-detail"' in html:
+        problems_section = after_problems.split('id="view-problem-detail"')[0]
+    else:
+        problems_section = after_problems
     assert "Signal Type" in problems_section, "problems table must have Signal Type column"
     assert "First Seen" in problems_section, "problems table must have First Seen column"
     assert "Last Seen" in problems_section, "problems table must have Last Seen column"

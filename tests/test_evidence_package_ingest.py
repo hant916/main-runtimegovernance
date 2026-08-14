@@ -4,8 +4,6 @@ import json
 import shutil
 from pathlib import Path
 
-import pytest
-
 from ailuros.adapters.evidence_package import (
     ImportStatus,
     ingest_evidence_package,
