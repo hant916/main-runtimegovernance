@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from ailuros.core.execution import (
+    ApprovalRecord,
+    ApprovalState,
     ChangeSummary,
     DecisionSummary,
     EvidenceRef,
@@ -140,6 +142,28 @@ def _project_governance_context(
     )
 
 
+_APPROVAL_EVENT_TYPES: frozenset[str] = frozenset({"approval_evidence"})
+
+_APPROVED_DECISIONS: frozenset[str] = frozenset(
+    {"approved", "approve", "granted"}
+)
+
+_DENIED_DECISIONS: frozenset[str] = frozenset(
+    {"denied", "deny", "rejected", "reject", "declined"}
+)
+
+
+def _normalize_approval_state(decision: str | None) -> ApprovalState:
+    if decision is None:
+        return ApprovalState.UNKNOWN
+    lowered = decision.strip().lower()
+    if lowered in _APPROVED_DECISIONS:
+        return ApprovalState.APPROVED
+    if lowered in _DENIED_DECISIONS:
+        return ApprovalState.DENIED
+    return ApprovalState.UNKNOWN
+
+
 def build_execution_projection(
     run_id: str,
     source: str,
@@ -164,6 +188,7 @@ def build_execution_projection(
     scope_clean: bool = False
     role_names: set[str] = set()
     change_descriptions: list[str] = []
+    approval_records: list[ApprovalRecord] = []
 
     for event in events:
         event_type: str = event.get("event_type", "")
@@ -242,6 +267,38 @@ def build_execution_projection(
         elif event_type == "governance_context":
             evidence_refs.append(EvidenceRef(event_id=event_id))
 
+        elif event_type in _APPROVAL_EVENT_TYPES:
+            subject = payload.get("subject")
+            if isinstance(subject, str) and subject:
+                action = payload.get("action")
+                required = payload.get("required")
+                decision = payload.get("decision")
+                approver_ref = payload.get("approver_ref")
+                approval_records.append(
+                    ApprovalRecord(
+                        subject=subject,
+                        action=action if isinstance(action, str) and action else None,
+                        required=required if isinstance(required, bool) else None,
+                        decision=(
+                            decision if isinstance(decision, str) and decision else None
+                        ),
+                        state=_normalize_approval_state(
+                            decision if isinstance(decision, str) and decision else None
+                        ),
+                        approver_ref=(
+                            approver_ref
+                            if isinstance(approver_ref, str) and approver_ref
+                            else None
+                        ),
+                        timestamp=timestamp or datetime.now(UTC),
+                        evidence_refs=[EvidenceRef(event_id=event_id)]
+                        if event_id
+                        else [],
+                        source={"event_id": event_id, "event_type": event_type},
+                    )
+                )
+            evidence_refs.append(EvidenceRef(event_id=event_id))
+
     validation = _resolve_validation(validation_presence)
     governance_context = _project_governance_context(events)
 
@@ -279,6 +336,7 @@ def build_execution_projection(
         decisions=decisions,
         evidence_refs=evidence_refs,
         governance_context=governance_context,
+        approval_records=approval_records,
     )
 
 

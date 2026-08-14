@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -84,6 +85,33 @@ class GovernanceContext(BaseModel):
     inconsistencies: list[GovernanceContextConflict] = Field(default_factory=list)
 
 
+class ApprovalState(StrEnum):
+    APPROVED = "approved"
+    DENIED = "denied"
+    UNKNOWN = "unknown"
+
+
+class ApprovalRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    action: str | None = None
+    required: bool | None = None
+    decision: str | None = None
+    state: ApprovalState
+    approver_ref: str | None = None
+    timestamp: datetime
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    source: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("timestamp")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+            raise ValueError("datetime must be timezone-aware")
+        return value
+
+
 class ExecutionProjection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -104,6 +132,7 @@ class ExecutionProjection(BaseModel):
     decisions: list[DecisionSummary] = Field(default_factory=list)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
     governance_context: GovernanceContext | None = None
+    approval_records: list[ApprovalRecord] = Field(default_factory=list)
     version: int = 1
 
     @field_validator("started_at", "completed_at")

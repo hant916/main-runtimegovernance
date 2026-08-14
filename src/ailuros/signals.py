@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict
 
 from ailuros._compat import StrEnum
 from ailuros.core.execution import (
+    ApprovalRecord,
+    ApprovalState,
     DecisionSummary,
     EvidenceRef,
     ExecutionProjection,
@@ -29,6 +31,8 @@ class SignalType(StrEnum):
     CONTEXT_TOO_LARGE = "context_too_large"
     CODER_SEMANTIC_FAILURE = "coder_semantic_failure"
     HUMAN_REVIEW_REQUIRED = "human_review_required"
+    APPROVAL_REQUIRED_UNRESOLVED = "approval_required_unresolved"
+    APPROVAL_DENIED = "approval_denied"
 
 
 RULE_VERSION = "1.0.0"
@@ -370,6 +374,69 @@ def _human_review_required_rule(
     ]
 
 
+def _approval_details(record: ApprovalRecord) -> dict[str, Any]:
+    return {
+        "subject": record.subject,
+        "action": record.action,
+        "approver_ref": record.approver_ref,
+        "decision": record.decision,
+        "state": record.state.value,
+    }
+
+
+def _approval_subject_action(record: ApprovalRecord) -> tuple[str, str | None]:
+    return record.subject, record.action
+
+
+def _approval_required_unresolved_rule(
+    projection: ExecutionProjection,
+) -> list[GovernanceSignal]:
+    resolved_subject_actions = {
+        _approval_subject_action(record)
+        for record in projection.approval_records
+        if record.state in {ApprovalState.APPROVED, ApprovalState.DENIED}
+    }
+    records = [
+        r
+        for r in projection.approval_records
+        if (
+            r.required is True
+            and r.state == ApprovalState.UNKNOWN
+            and _approval_subject_action(r) not in resolved_subject_actions
+        )
+    ]
+    return [
+        GovernanceSignal.build(
+            run_id=projection.run_id,
+            signal_type=SignalType.APPROVAL_REQUIRED_UNRESOLVED,
+            severity=Severity.MEDIUM,
+            subject="approval",
+            details=_approval_details(r),
+            evidence_refs=list(r.evidence_refs),
+        )
+        for r in records
+    ]
+
+
+def _approval_denied_rule(
+    projection: ExecutionProjection,
+) -> list[GovernanceSignal]:
+    records = [
+        r for r in projection.approval_records if r.state == ApprovalState.DENIED
+    ]
+    return [
+        GovernanceSignal.build(
+            run_id=projection.run_id,
+            signal_type=SignalType.APPROVAL_DENIED,
+            severity=Severity.HIGH,
+            subject="approval",
+            details=_approval_details(r),
+            evidence_refs=list(r.evidence_refs),
+        )
+        for r in records
+    ]
+
+
 _RULES: list[Callable[[ExecutionProjection], list[GovernanceSignal]]] = [
     _validation_failure_rule,
     _repeated_validation_failure_rule,
@@ -381,6 +448,8 @@ _RULES: list[Callable[[ExecutionProjection], list[GovernanceSignal]]] = [
     _context_too_large_rule,
     _coder_semantic_failure_rule,
     _human_review_required_rule,
+    _approval_required_unresolved_rule,
+    _approval_denied_rule,
 ]
 
 
