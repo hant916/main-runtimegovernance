@@ -65,6 +65,25 @@ class DecisionSummary(BaseModel):
     projected_domain: str = "source_preserved_unknown"
 
 
+class GovernanceContextConflict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    field: str
+    values: list[str]
+    source_pointers: list[str]
+
+
+class GovernanceContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    principal_ref: str | None = None
+    workflow_ref: str | None = None
+    invocation_ref: str | None = None
+    policy_snapshot_ref: str | None = None
+    source_pointers: list[str] = Field(default_factory=list)
+    inconsistencies: list[GovernanceContextConflict] = Field(default_factory=list)
+
+
 class ExecutionProjection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -84,6 +103,7 @@ class ExecutionProjection(BaseModel):
     changes: list[ChangeSummary] = Field(default_factory=list)
     decisions: list[DecisionSummary] = Field(default_factory=list)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    governance_context: GovernanceContext | None = None
     version: int = 1
 
     @field_validator("started_at", "completed_at")

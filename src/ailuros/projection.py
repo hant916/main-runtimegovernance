@@ -8,6 +8,8 @@ from ailuros.core.execution import (
     DecisionSummary,
     EvidenceRef,
     ExecutionProjection,
+    GovernanceContext,
+    GovernanceContextConflict,
     Lifecycle,
     Outcome,
     RoleSummary,
@@ -58,6 +60,84 @@ def _resolve_validation(validation_presence: set[str]) -> Validation:
     if "not_run" in validation_presence:
         return Validation.NOT_RUN
     return Validation.UNKNOWN
+
+
+_GOVERNANCE_CONTEXT_FIELDS: tuple[str, ...] = (
+    "principal_ref",
+    "workflow_ref",
+    "invocation_ref",
+    "policy_snapshot_ref",
+)
+
+
+def _project_governance_context(
+    events: list[dict[str, Any]],
+) -> GovernanceContext | None:
+    field_values: dict[str, dict[str, set[str]]] = {
+        field: {} for field in _GOVERNANCE_CONTEXT_FIELDS
+    }
+    source_pointers: list[str] = []
+    seen_pointers: set[str] = set()
+
+    for event in events:
+        if event.get("event_type") != "governance_context":
+            continue
+        event_id: str = event.get("event_id", "")
+        payload: dict[str, Any] = event.get("payload", {})
+        if not isinstance(payload, dict):
+            payload = {}
+
+        if event_id and event_id not in seen_pointers:
+            seen_pointers.add(event_id)
+            source_pointers.append(event_id)
+
+        payload_pointers = payload.get("source_pointers")
+        if isinstance(payload_pointers, list):
+            for pointer in payload_pointers:
+                if isinstance(pointer, str) and pointer and pointer not in seen_pointers:
+                    seen_pointers.add(pointer)
+                    source_pointers.append(pointer)
+
+        for field in _GOVERNANCE_CONTEXT_FIELDS:
+            value = payload.get(field)
+            if not isinstance(value, str) or not value:
+                continue
+            field_values[field].setdefault(value, set())
+            if event_id:
+                field_values[field][value].add(event_id)
+
+    if not any(field_values[field] for field in _GOVERNANCE_CONTEXT_FIELDS):
+        return None
+
+    resolved: dict[str, str | None] = {}
+    inconsistencies: list[GovernanceContextConflict] = []
+    for field in _GOVERNANCE_CONTEXT_FIELDS:
+        distinct = field_values[field]
+        if not distinct:
+            resolved[field] = None
+        elif len(distinct) == 1:
+            resolved[field] = next(iter(distinct))
+        else:
+            resolved[field] = None
+            pointers = sorted(
+                {event_id for ids in distinct.values() for event_id in ids}
+            )
+            inconsistencies.append(
+                GovernanceContextConflict(
+                    field=field,
+                    values=sorted(distinct),
+                    source_pointers=pointers,
+                )
+            )
+
+    return GovernanceContext(
+        principal_ref=resolved["principal_ref"],
+        workflow_ref=resolved["workflow_ref"],
+        invocation_ref=resolved["invocation_ref"],
+        policy_snapshot_ref=resolved["policy_snapshot_ref"],
+        source_pointers=source_pointers,
+        inconsistencies=inconsistencies,
+    )
 
 
 def build_execution_projection(
@@ -159,7 +239,11 @@ def build_execution_projection(
                 role_names.add(role_name)
             evidence_refs.append(EvidenceRef(event_id=event_id))
 
+        elif event_type == "governance_context":
+            evidence_refs.append(EvidenceRef(event_id=event_id))
+
     validation = _resolve_validation(validation_presence)
+    governance_context = _project_governance_context(events)
 
     if scope_violated:
         scope = Scope.VIOLATED
@@ -194,6 +278,7 @@ def build_execution_projection(
         changes=[ChangeSummary(description=d) for d in change_descriptions],
         decisions=decisions,
         evidence_refs=evidence_refs,
+        governance_context=governance_context,
     )
 
 
