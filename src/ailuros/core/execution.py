@@ -112,6 +112,21 @@ class ApprovalRecord(BaseModel):
         return value
 
 
+class BudgetRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    unit: str
+    scope_ref: str | None = None
+    limit: float | None = None
+    consumed: float | None = None
+    remaining: float | None = None
+    status: str = "unknown"
+    required: bool | None = None
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    source: dict[str, Any] = Field(default_factory=dict)
+
+
 class ExecutionProjection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -133,6 +148,7 @@ class ExecutionProjection(BaseModel):
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
     governance_context: GovernanceContext | None = None
     approval_records: list[ApprovalRecord] = Field(default_factory=list)
+    budget_records: list[BudgetRecord] = Field(default_factory=list)
     version: int = 1
 
     @field_validator("started_at", "completed_at")

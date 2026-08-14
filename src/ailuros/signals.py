@@ -11,6 +11,7 @@ from ailuros._compat import StrEnum
 from ailuros.core.execution import (
     ApprovalRecord,
     ApprovalState,
+    BudgetRecord,
     DecisionSummary,
     EvidenceRef,
     ExecutionProjection,
@@ -33,6 +34,8 @@ class SignalType(StrEnum):
     HUMAN_REVIEW_REQUIRED = "human_review_required"
     APPROVAL_REQUIRED_UNRESOLVED = "approval_required_unresolved"
     APPROVAL_DENIED = "approval_denied"
+    BUDGET_EXCEEDED = "budget_exceeded"
+    BUDGET_UNKNOWN = "budget_unknown"
 
 
 RULE_VERSION = "1.0.0"
@@ -437,6 +440,81 @@ def _approval_denied_rule(
     ]
 
 
+def _budget_details(record: BudgetRecord) -> dict[str, Any]:
+    return {
+        "subject": record.subject,
+        "unit": record.unit,
+        "scope_ref": record.scope_ref,
+        "limit": record.limit,
+        "consumed": record.consumed,
+        "remaining": record.remaining,
+        "status": record.status,
+    }
+
+
+_BUDGET_EXCEEDED_STATUSES: frozenset[str] = frozenset(
+    {"exceeded", "exceed", "over_limit", "overlimit", "exhausted", "breached"}
+)
+
+
+def _budget_exceeded_rule(
+    projection: ExecutionProjection,
+) -> list[GovernanceSignal]:
+    signals: list[GovernanceSignal] = []
+    for record in projection.budget_records:
+        status_lowered = record.status.strip().lower()
+        explicit_exceeded = status_lowered in _BUDGET_EXCEEDED_STATUSES
+        deterministic_exceeded = (
+            record.limit is not None
+            and record.consumed is not None
+            and record.consumed > record.limit
+        )
+        if not explicit_exceeded and not deterministic_exceeded:
+            continue
+        signals.append(
+            GovernanceSignal.build(
+                run_id=projection.run_id,
+                signal_type=SignalType.BUDGET_EXCEEDED,
+                severity=Severity.HIGH,
+                subject="budget",
+                details=_budget_details(record),
+                evidence_refs=list(record.evidence_refs),
+            )
+        )
+    return signals
+
+
+_BUDGET_UNKNOWN_STATUSES: frozenset[str] = frozenset({"", "unknown"})
+
+
+def _budget_unknown_rule(
+    projection: ExecutionProjection,
+) -> list[GovernanceSignal]:
+    signals: list[GovernanceSignal] = []
+    for record in projection.budget_records:
+        if record.required is not True:
+            continue
+        status_lowered = record.status.strip().lower()
+        insufficient = (
+            record.limit is None
+            and record.consumed is None
+            and status_lowered in _BUDGET_UNKNOWN_STATUSES
+        )
+        if not insufficient:
+            continue
+        signals.append(
+            GovernanceSignal.build(
+                run_id=projection.run_id,
+                signal_type=SignalType.BUDGET_UNKNOWN,
+                severity=Severity.MEDIUM,
+                subject="budget",
+                details=_budget_details(record),
+                evidence_refs=list(record.evidence_refs),
+            )
+        )
+    return signals
+
+
 _RULES: list[Callable[[ExecutionProjection], list[GovernanceSignal]]] = [
     _validation_failure_rule,
     _repeated_validation_failure_rule,
@@ -450,6 +528,8 @@ _RULES: list[Callable[[ExecutionProjection], list[GovernanceSignal]]] = [
     _human_review_required_rule,
     _approval_required_unresolved_rule,
     _approval_denied_rule,
+    _budget_exceeded_rule,
+    _budget_unknown_rule,
 ]
 
 

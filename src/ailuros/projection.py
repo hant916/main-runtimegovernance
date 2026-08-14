@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from ailuros.core.execution import (
     ApprovalRecord,
     ApprovalState,
+    BudgetRecord,
     ChangeSummary,
     DecisionSummary,
     EvidenceRef,
@@ -144,6 +145,8 @@ def _project_governance_context(
 
 _APPROVAL_EVENT_TYPES: frozenset[str] = frozenset({"approval_evidence"})
 
+_BUDGET_EVENT_TYPES: frozenset[str] = frozenset({"budget_evidence"})
+
 _APPROVED_DECISIONS: frozenset[str] = frozenset(
     {"approved", "approve", "granted"}
 )
@@ -162,6 +165,14 @@ def _normalize_approval_state(decision: str | None) -> ApprovalState:
     if lowered in _DENIED_DECISIONS:
         return ApprovalState.DENIED
     return ApprovalState.UNKNOWN
+
+
+def _as_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
 
 def build_execution_projection(
@@ -189,6 +200,7 @@ def build_execution_projection(
     role_names: set[str] = set()
     change_descriptions: list[str] = []
     approval_records: list[ApprovalRecord] = []
+    budget_records: list[BudgetRecord] = []
 
     for event in events:
         event_type: str = event.get("event_type", "")
@@ -299,6 +311,33 @@ def build_execution_projection(
                 )
             evidence_refs.append(EvidenceRef(event_id=event_id))
 
+        elif event_type in _BUDGET_EVENT_TYPES:
+            subject = payload.get("subject")
+            unit = payload.get("unit")
+            if isinstance(subject, str) and subject and isinstance(unit, str) and unit:
+                scope_ref = payload.get("scope_ref")
+                status = payload.get("status")
+                required = payload.get("required")
+                budget_records.append(
+                    BudgetRecord(
+                        subject=subject,
+                        unit=unit,
+                        scope_ref=(
+                            scope_ref if isinstance(scope_ref, str) and scope_ref else None
+                        ),
+                        limit=_as_number(payload.get("limit")),
+                        consumed=_as_number(payload.get("consumed")),
+                        remaining=_as_number(payload.get("remaining")),
+                        status=status if isinstance(status, str) and status else "unknown",
+                        required=required if isinstance(required, bool) else None,
+                        evidence_refs=[EvidenceRef(event_id=event_id)]
+                        if event_id
+                        else [],
+                        source={"event_id": event_id, "event_type": event_type},
+                    )
+                )
+            evidence_refs.append(EvidenceRef(event_id=event_id))
+
     validation = _resolve_validation(validation_presence)
     governance_context = _project_governance_context(events)
 
@@ -337,6 +376,7 @@ def build_execution_projection(
         evidence_refs=evidence_refs,
         governance_context=governance_context,
         approval_records=approval_records,
+        budget_records=budget_records,
     )
 
 

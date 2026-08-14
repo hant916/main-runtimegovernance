@@ -1,0 +1,180 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "control-context-evidence-governance-v4",
+    "id": "8035.project-budget-evidence",
+    "sequence": 8035,
+    "slug": "project-budget-evidence",
+    "title": "Add evidence-backed budget snapshots without billing or payment infrastructure",
+    "type": "runtime_governance"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Represent explicit budget/usage facts as source-neutral records: subject/scope, unit, optional limit, consumed, remaining, native status and evidence refs. Emit budget_exceeded / budget_unknown only when justified. Do not add Stripe, invoices, pricing plans or accounting ledgers. Dependency: 8034.project-approval-evidence.",
+    "why_now": "Budget is a governance constraint ('how much may this invocation/workflow spend?'), not a transport monetization feature. The safe next step is evidence projection, not billing infrastructure.",
+    "do_not_misread": [
+      "This repository is the canonical Ailuros governance runtime; do not apply cleanup assumptions from the legacy MCP Gateway repository.",
+      "Identity references are governance provenance, not login/authentication/session management.",
+      "Approval and budget in this batch are evidence-backed records/projections, not workflow/payment services.",
+      "Do not turn Ailuros into an agent executor or coding harness."
+    ],
+    "red_lines": [
+      "No billing/payment infrastructure.",
+      "No guessed cost."
+    ]
+  },
+  "machine_core": {
+    "goal": "Add deterministic budget evidence projection and bounded governance signals.",
+    "red_lines": [
+      "No billing/payment infrastructure.",
+      "No guessed cost."
+    ],
+    "invariants": [
+      "Depends on: 8034.project-approval-evidence. Do not implement this pack against an incompatible predecessor state.",
+      "Budget facts are orthogonal to execution success.",
+      "Budget projection is derived/read-side and rebuildable."
+    ],
+    "contracts": [
+      "BudgetRecord preserves native values/status and evidence refs."
+    ],
+    "failure_semantics": [
+      "Missing governance-context evidence remains unknown/absent; it is never inferred as allowed, approved, within budget or clean.",
+      "Explicit denial/violation evidence is preserved with evidence refs.",
+      "Derived control-context state remains rebuildable from immutable evidence.",
+      "Producer-native values remain preserved alongside normalized projections."
+    ],
+    "complexity_budget": {
+      "max_new_files": 3,
+      "max_new_abstractions": 2,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": [
+        "IAM/RBAC platform",
+        "authentication/session system",
+        "agent orchestration",
+        "workflow engine",
+        "billing/payment system",
+        "message broker",
+        "new database technology",
+        "LLM-generated governance facts"
+      ]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/core/execution.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "tests/test_budget_governance.py"
+      ],
+      "create": [
+        "tests/test_budget_governance.py"
+      ],
+      "forbid": [
+        ".everrun/**",
+        "*.log",
+        "**/*.log",
+        "runtime artifacts",
+        "runtime history",
+        "generated execution reports",
+        "large generated artifacts",
+        "lockfiles unless explicitly required",
+        "legacy MCP Gateway repositories/files"
+      ]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Define minimal BudgetRecord",
+        "details": [
+          "subject/scope ref, unit (currency/tokens/requests/producer-defined), optional limit/consumed/remaining, native status, evidence refs.",
+          "Do not assume EUR/USD or monetary billing; units remain explicit."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Project explicit values",
+        "details": [
+          "Use producer-provided measured/declared budget evidence only.",
+          "Do not estimate token cost, model price or remaining budget without explicit evidence."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Emit bounded signals",
+        "details": [
+          "budget_exceeded requires explicit exceeded evidence or deterministic consumed > explicit limit using compatible units.",
+          "budget_unknown only when evidence explicitly establishes that a required budget evaluation exists but values/status are insufficient."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Keep billing out",
+        "details": [
+          "No payment provider, subscription, invoice, pricing table, wallet or transport-charge concept.",
+          "Tests cover monetary and non-monetary units."
+        ]
+      }
+    ],
+    "acceptance": [
+      "Budget records are evidence-backed and unit-explicit.",
+      "No cost is guessed from vendor/model pricing.",
+      "budget_exceeded cannot arise from incompatible/missing units.",
+      "No billing/payment system is introduced."
+    ],
+    "validate": [
+      "python -m pytest tests/test_budget_governance.py tests/test_governance_signals.py -q",
+      "python -m ruff check src/ailuros/core/execution.py src/ailuros/projection.py src/ailuros/signals.py tests/test_budget_governance.py",
+      "python -m mypy src"
+    ],
+    "judge": {
+      "must_check": [
+        "Dependency is satisfied: 8034.project-approval-evidence.",
+        "Budget governance is separate from monetization.",
+        "All calculations use explicit compatible units.",
+        "No vendor pricing lookup is introduced."
+      ],
+      "reject_if": [
+        "Stripe/payment/subscription/invoice code is added.",
+        "Model pricing is fetched or hardcoded to estimate cost.",
+        "Missing budget evidence becomes within-budget.",
+        "Incompatible units are compared.",
+        "Validation fails.",
+        "Forbidden files are changed.",
+        "Unknown or missing evidence is treated as passed/approved/within-budget."
+      ]
+    },
+    "execution_policy": {
+      "max_attempts": 3,
+      "on_max_attempts": "stop_and_keep_todo"
+    },
+    "validation_notes": {
+      "validation_profile": "focused_custom",
+      "commands_are_profile_based": false,
+      "completion_needed": false,
+      "completion_reason": null
+    },
+    "evidence_matrix_requested_from_coder": true,
+    "expected_coder_final_response": [
+      "## Implementation Summary",
+      "### What changed",
+      "### Why this approach",
+      "### What was explicitly not changed",
+      "## Files modified",
+      "## Validation",
+      "## Evidence Matrix",
+      "| Requirement | Evidence |",
+      "|---|---|",
+      "## Known limitations",
+      "## Suggested next pack"
+    ]
+  }
+}
