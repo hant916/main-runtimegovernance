@@ -175,6 +175,95 @@ def _as_number(value: Any) -> float | None:
     return None
 
 
+_BUDGET_EXCEEDED_STATUSES: frozenset[str] = frozenset(
+    {"exceeded", "exceed", "over_limit", "overlimit", "exhausted", "breached"}
+)
+
+_BUDGET_UNKNOWN_STATUSES: frozenset[str] = frozenset({"", "unknown"})
+
+
+def _budget_exceeded(record: BudgetRecord) -> bool:
+    status_lowered = record.status.strip().lower()
+    explicit_exceeded = status_lowered in _BUDGET_EXCEEDED_STATUSES
+    deterministic_exceeded = (
+        record.limit is not None
+        and record.consumed is not None
+        and record.consumed > record.limit
+    )
+    return explicit_exceeded or deterministic_exceeded
+
+
+def _budget_unknown_required(record: BudgetRecord) -> bool:
+    if record.required is not True:
+        return False
+    status_lowered = record.status.strip().lower()
+    return (
+        record.limit is None
+        and record.consumed is None
+        and status_lowered in _BUDGET_UNKNOWN_STATUSES
+    )
+
+
+def _approval_denied_observed_action(record: ApprovalRecord) -> bool:
+    return record.state == ApprovalState.DENIED and record.action is not None
+
+
+def _approval_unresolved_required(records: list[ApprovalRecord]) -> bool:
+    resolved_subject_actions = {
+        (r.subject, r.action)
+        for r in records
+        if r.state in {ApprovalState.APPROVED, ApprovalState.DENIED}
+    }
+    return any(
+        r.required is True
+        and r.state == ApprovalState.UNKNOWN
+        and (r.subject, r.action) not in resolved_subject_actions
+        for r in records
+    )
+
+
+def derive_native_outcome(
+    lifecycle: Lifecycle,
+    decisions: list[DecisionSummary],
+) -> Outcome:
+    outcome = Outcome.UNKNOWN
+    priority = 0
+    for decision in decisions:
+        decision_priority = _OUTCOME_PRIORITY.get(decision.decision, 0)
+        if decision_priority > priority:
+            priority = decision_priority
+            if decision.decision == "block":
+                outcome = Outcome.BLOCKED
+            elif decision.decision == "require_review":
+                outcome = Outcome.REVIEW_REQUIRED
+    if outcome == Outcome.UNKNOWN:
+        if lifecycle == Lifecycle.COMPLETED:
+            outcome = Outcome.SUCCESS
+        elif lifecycle == Lifecycle.FAILED:
+            outcome = Outcome.FAILED
+    return outcome
+
+
+def _governed_outcome(
+    outcome: Outcome,
+    approval_records: list[ApprovalRecord],
+    budget_records: list[BudgetRecord],
+) -> Outcome:
+    if any(_budget_exceeded(record) for record in budget_records):
+        return Outcome.FAILED
+    if any(_approval_denied_observed_action(record) for record in approval_records):
+        return Outcome.FAILED
+    if outcome in {Outcome.BLOCKED, Outcome.FAILED}:
+        return outcome
+    if _approval_unresolved_required(approval_records):
+        return Outcome.REVIEW_REQUIRED
+    if any(_budget_unknown_required(record) for record in budget_records):
+        return Outcome.REVIEW_REQUIRED
+    if outcome == Outcome.REVIEW_REQUIRED:
+        return outcome
+    return outcome
+
+
 def build_execution_projection(
     run_id: str,
     source: str,
@@ -185,10 +274,8 @@ def build_execution_projection(
     started_at: datetime | None = None
     completed_at: datetime | None = None
     lifecycle = Lifecycle.UNKNOWN
-    outcome = Outcome.UNKNOWN
 
     decisions: list[DecisionSummary] = []
-    outcome_priority = 0
 
     step_ids: set[str] = set()
     decision_count = 0
@@ -241,14 +328,6 @@ def build_execution_projection(
                 )
             )
             evidence_refs.append(EvidenceRef(event_id=event_id))
-
-            priority = _OUTCOME_PRIORITY.get(decision_type, 0)
-            if priority > outcome_priority:
-                outcome_priority = priority
-                if decision_type == "block":
-                    outcome = Outcome.BLOCKED
-                elif decision_type == "require_review":
-                    outcome = Outcome.REVIEW_REQUIRED
 
         elif event_type == "project_validation":
             status = payload.get("status", "")
@@ -348,11 +427,8 @@ def build_execution_projection(
     else:
         scope = Scope.UNKNOWN
 
-    if outcome == Outcome.UNKNOWN:
-        if lifecycle == Lifecycle.COMPLETED:
-            outcome = Outcome.SUCCESS
-        elif lifecycle == Lifecycle.FAILED:
-            outcome = Outcome.FAILED
+    outcome = derive_native_outcome(lifecycle, decisions)
+    outcome = _governed_outcome(outcome, approval_records, budget_records)
 
     if started_at is None:
         started_at = datetime.now(UTC)

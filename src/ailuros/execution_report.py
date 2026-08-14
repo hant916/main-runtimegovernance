@@ -13,6 +13,8 @@ from ailuros.core.execution import (
     Outcome,
     RoleSummary,
 )
+from ailuros.projection import derive_native_outcome
+from ailuros.signals import SignalType
 
 if TYPE_CHECKING:
     from ailuros.signals import GovernanceSignal
@@ -24,9 +26,11 @@ class RunReport(BaseModel):
     run_id: str
     lifecycle: str
     outcome: str
+    native_outcome: str = ""
     validation: str
     scope: str
     why_stopped: str
+    outcome_reasons: list[OutcomeReason] = Field(default_factory=list)
     signal_summaries: list[SignalSummary] = Field(default_factory=list)
     decision_reasons: list[str] = Field(default_factory=list)
     changes: list[ChangeSummary] = Field(default_factory=list)
@@ -55,6 +59,13 @@ class SignalSummary(BaseModel):
     type: str
     severity: str
     subject: str
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+
+
+class OutcomeReason(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    code: str
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
 
 
@@ -99,6 +110,29 @@ def _build_decision_reasons(projection: ExecutionProjection) -> list[str]:
     return reasons
 
 
+_APPROVAL_BUDGET_REASON_TYPES: frozenset[str] = frozenset(
+    {
+        SignalType.APPROVAL_DENIED.value,
+        SignalType.APPROVAL_REQUIRED_UNRESOLVED.value,
+        SignalType.BUDGET_EXCEEDED.value,
+        SignalType.BUDGET_UNKNOWN.value,
+    }
+)
+
+
+def _build_outcome_reasons(signals: list[GovernanceSignal]) -> list[OutcomeReason]:
+    reasons: list[OutcomeReason] = []
+    for signal in signals:
+        if signal.type in _APPROVAL_BUDGET_REASON_TYPES:
+            reasons.append(
+                OutcomeReason(
+                    code=signal.type,
+                    evidence_refs=list(signal.evidence_refs),
+                )
+            )
+    return reasons
+
+
 def build_run_report(
     projection: ExecutionProjection,
     signals: list[GovernanceSignal],
@@ -107,9 +141,13 @@ def build_run_report(
         run_id=projection.run_id,
         lifecycle=projection.lifecycle.value,
         outcome=projection.outcome.value,
+        native_outcome=derive_native_outcome(
+            projection.lifecycle, projection.decisions
+        ).value,
         validation=projection.validation.value,
         scope=projection.scope.value,
         why_stopped=_derive_why_stopped(projection, signals),
+        outcome_reasons=_build_outcome_reasons(signals),
         signal_summaries=[
             SignalSummary(
                 signal_id=s.signal_id,
@@ -153,6 +191,7 @@ def render_run_report_markdown(
     lines.append(f"| Run ID | {report.run_id} |")
     lines.append(f"| Lifecycle | {report.lifecycle} |")
     lines.append(f"| Outcome | {report.outcome} |")
+    lines.append(f"| Native Outcome | {report.native_outcome} |")
     lines.append(f"| Validation | {report.validation} |")
     lines.append(f"| Scope | {report.scope} |")
     lines.append("")
@@ -160,6 +199,16 @@ def render_run_report_markdown(
     lines.append("## Why Stopped")
     lines.append("")
     lines.append(report.why_stopped)
+    lines.append("")
+
+    lines.append("## Outcome Reasons")
+    lines.append("")
+    if report.outcome_reasons:
+        for outcome_reason in report.outcome_reasons:
+            ref_ids = ", ".join(r.event_id for r in outcome_reason.evidence_refs) or "none"
+            lines.append(f"- `{outcome_reason.code}` ({ref_ids})")
+    else:
+        lines.append("None.")
     lines.append("")
 
     lines.append("## Timeline")
@@ -177,8 +226,8 @@ def render_run_report_markdown(
     lines.append("## Decision Reasons")
     lines.append("")
     if report.decision_reasons:
-        for reason in report.decision_reasons:
-            lines.append(f"- `{reason}`")
+        for decision_reason in report.decision_reasons:
+            lines.append(f"- `{decision_reason}`")
     else:
         lines.append("None.")
     lines.append("")

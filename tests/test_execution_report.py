@@ -219,6 +219,67 @@ class TestBuildRunReport:
         assert report.roles[0].name == "planner"
 
 
+class TestOutcomeReasons:
+    def test_native_outcome_derived_from_lifecycle(self) -> None:
+        proj = _make_projection(
+            lifecycle=Lifecycle.COMPLETED,
+            outcome=Outcome.SUCCESS,
+        )
+        report = build_run_report(proj, [])
+        assert report.native_outcome == "success"
+
+    def test_native_outcome_preserved_separately_from_outcome(self) -> None:
+        proj = _make_projection(
+            lifecycle=Lifecycle.COMPLETED,
+            outcome=Outcome.REVIEW_REQUIRED,
+        )
+        report = build_run_report(proj, [])
+        assert report.native_outcome == "success"
+        assert report.outcome == "review_required"
+
+    def test_approval_budget_signal_becomes_outcome_reason(self) -> None:
+        ref = _make_ref("evt-a")
+        sig = _make_signal(
+            signal_type=SignalType.BUDGET_EXCEEDED,
+            severity=Severity.HIGH,
+            subject="budget",
+            evidence_refs=[ref],
+        )
+        proj = _make_projection(lifecycle=Lifecycle.COMPLETED, outcome=Outcome.FAILED)
+        report = build_run_report(proj, [sig])
+        assert len(report.outcome_reasons) == 1
+        assert report.outcome_reasons[0].code == "budget_exceeded"
+        assert report.outcome_reasons[0].evidence_refs == [ref]
+
+    def test_non_approval_budget_signal_is_not_an_outcome_reason(self) -> None:
+        sig = _make_signal(
+            signal_type=SignalType.SCOPE_VIOLATION,
+            severity=Severity.CRITICAL,
+            subject="scope",
+        )
+        proj = _make_projection()
+        report = build_run_report(proj, [sig])
+        assert report.outcome_reasons == []
+
+    def test_all_approval_budget_signal_types_are_reason_codes(self) -> None:
+        proj = _make_projection()
+        signals = [
+            _make_signal(signal_type=SignalType.APPROVAL_DENIED, severity=Severity.HIGH),
+            _make_signal(
+                signal_type=SignalType.APPROVAL_REQUIRED_UNRESOLVED,
+                severity=Severity.MEDIUM,
+            ),
+            _make_signal(signal_type=SignalType.BUDGET_UNKNOWN, severity=Severity.MEDIUM),
+        ]
+        report = build_run_report(proj, signals)
+        codes = {reason.code for reason in report.outcome_reasons}
+        assert codes == {
+            "approval_denied",
+            "approval_required_unresolved",
+            "budget_unknown",
+        }
+
+
 class TestRenderRunReportJson:
     def test_renders_valid_json(self) -> None:
         proj = _make_projection()
@@ -262,6 +323,27 @@ class TestRenderRunReportMarkdown:
         md = render_run_report_markdown(report)
         assert "## Why Stopped" in md
         assert "lifecycle: failed" in md
+
+    def test_renders_native_outcome_and_outcome_reasons(self) -> None:
+        sig = _make_signal(
+            signal_type=SignalType.BUDGET_EXCEEDED,
+            severity=Severity.HIGH,
+            subject="budget",
+            evidence_refs=[_make_ref("e-budget")],
+        )
+        proj = _make_projection(lifecycle=Lifecycle.COMPLETED, outcome=Outcome.FAILED)
+        report = build_run_report(proj, [sig])
+        md = render_run_report_markdown(report)
+        assert "| Native Outcome | success |" in md
+        assert "## Outcome Reasons" in md
+        assert "budget_exceeded" in md
+        assert "e-budget" in md
+
+    def test_renders_none_when_no_outcome_reasons(self) -> None:
+        proj = _make_projection()
+        report = build_run_report(proj, [])
+        md = render_run_report_markdown(report)
+        assert "## Outcome Reasons" in md
 
     def test_renders_signal_table_when_signals_present(self) -> None:
         sig = _make_signal(
