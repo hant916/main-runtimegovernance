@@ -109,6 +109,43 @@ SHOULD omit the block or leave it empty (`{}`).
 All provenance fields are advisory. Validators MUST NOT reject a package
 because a provenance field is absent or uses an unrecognised value.
 
+## Governance Context
+
+A package MAY carry an optional `governance_context` block describing *what is
+being governed* as opaque references. It is **additive and never required**:
+existing producers that omit it remain fully valid, and validators MUST NOT
+reject a package because the block is absent.
+
+The block's shape is defined by the [Governance Context Contract
+v1](./governance-context-v1.md). In summary:
+
+| Field | Type | Required | Purpose |
+|---|---|---|---|
+| `principal_ref` | str | No | Actor/principal asserted by evidence. |
+| `workflow_ref` | str | No | Grouping of governed work; no execution semantics. |
+| `invocation_ref` | str | No | One governed invocation/request/action boundary. |
+| `policy_snapshot_ref` | str | No | Immutable policy/version/hash used for a decision, when known. |
+| `source_pointers` | list[str] | No | Evidence refs backing the asserted facts. |
+
+All refs are opaque strings; no global identity directory is required.
+Contradictory refs are preserved as inconsistency, not silently reconciled.
+The block MUST NOT make EverRun planner/coder/judge vocabulary mandatory.
+
+```json
+{
+  "schema_version": "1",
+  "run_id": "run-abc123",
+  "events": [],
+  "governance_context": {
+    "principal_ref": "user:alice",
+    "workflow_ref": "task:8032",
+    "invocation_ref": "inv:abc123",
+    "policy_snapshot_ref": "sha256:9f2c...",
+    "source_pointers": ["evt-001", "evt-014"]
+  }
+}
+```
+
 ## Event Naming Conventions
 
 Event types use **extensible dotted names** (e.g. `execution.started`,
