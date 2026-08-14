@@ -25,8 +25,11 @@ def _write_fake_bundle_files(bundle: Path) -> None:
     manifest = {
         "schema_version": "ailuros.evidence_bundle.v0",
         "producer": "clarify",
-        "runtime_integration": "ailuros",
+        "bundle_type": "governance-contract",
+        "runtime_integration": False,
         "bundle_id": "test-bundle-001",
+        "run_id": "test-run",
+        "created_at": "2026-06-17T00:00:00Z",
         "artifacts": [
             "ailuros.timeline.v0.json",
             "clarify-validation-result.json",
