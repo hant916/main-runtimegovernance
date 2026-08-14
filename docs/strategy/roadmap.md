@@ -17,7 +17,7 @@ radarCreation is the third industry scenario.
 
 ## Phase 0 - Core Stabilization (v0.1 - finalized)
 
-- [x] In-process runtime orchestration
+- [x] Governance runtime lifecycle (start, complete, tool wrap)
 - [x] Policy-gated tool calls with blocking decisions
 - [x] SQLite-backed run timeline
 - [x] Path validation
@@ -237,6 +237,23 @@ Do not build these in v1.5:
 
 These are vision-level capabilities, not v1.5 work. The immediate job is to tighten
 the first proof: deterministic validation of Clarify governance evidence.
+
+## Control-Context Boundary
+
+The current 8001-8030 path remains **evidence-first and post-run**: evidence is
+captured, stored, projected, and evaluated after the run. This boundary freeze does
+not add a write API or a live enforcement service. Future runtime decision APIs
+(v2.5+) may consume the same contracts — decision domains, projections, and evidence
+references — later, but they are a future control surface, not current scope
+(ADR-0005).
+
+The control-context fields `principal_ref`, `workflow_ref`, and `invocation_ref`
+are opaque provenance/control references. They do not imply user login, token
+issuance, a tenant directory, session resumption, or IAM.
+
+Ailuros owns the **governance runtime lifecycle** (start, complete, tool wrap/gate),
+not the model agent loop, subagents, schedulers, or coding execution workflow.
+EverRun and other harnesses remain execution-plane owners and independent products.
 
 ## Timeline Notes
 

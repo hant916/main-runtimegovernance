@@ -9,7 +9,7 @@ vertical integration built *on top of* Ailuros.
 
 **Ailuros** (`src/ailuros/`) is the governance runtime kernel. It owns:
 
-- In-process runtime orchestration (start, complete, tool wrapping).
+- Governance runtime lifecycle (start, complete, tool wrapping).
 - Policy evaluation and blocking decisions.
 - SQLite-backed run timeline storage.
 - Path validation against recorded events.
@@ -19,6 +19,16 @@ vertical integration built *on top of* Ailuros.
 
 Ailuros must remain application-agnostic. No browser, UI, domain-specific, or
 reference-application concept belongs in the core.
+
+Ailuros owns the **governance runtime lifecycle** only. It does **not** own the
+model agent loop, subagents, schedulers, or the coding execution workflow; those
+belong to the execution plane (EverRun or another harness). Ailuros provides
+governance/control-plane semantics plus optional enforcement points and remains
+an independent product; harnesses that consume it are execution-plane owners and
+independent products of their own (ADR-0005).
+
+The control-context fields `principal_ref`, `workflow_ref`, and `invocation_ref`
+are opaque provenance/control references, not auth, session, or IAM primitives.
 
 ## Three Proofs
 

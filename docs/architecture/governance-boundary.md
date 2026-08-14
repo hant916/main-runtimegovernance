@@ -7,13 +7,19 @@ or otherwise) built on top of it. Violations are coupling red lines.
 
 The Ailuros core owns:
 
-- Runtime lifecycle (start, complete, tool wrap).
+- Governance runtime lifecycle (start, complete, tool wrap).
 - Policy evaluation and blocking decisions.
 - Run timeline storage and retrieval.
 - Path validation.
 - CLI commands.
 - Policy file validation.
 - Adapter contract interfaces.
+
+Ailuros does **not** own the model agent loop, subagents, schedulers, or the
+coding execution workflow. Those belong to the execution plane (e.g. EverRun or
+another harness). Ailuros provides governance/control-plane semantics plus
+optional enforcement points; it is not an agent orchestrator. See
+ADR-0005 for the frozen control-context boundary.
 
 ## Forbidden Coupling
 
@@ -27,6 +33,16 @@ The following are **never** allowed in `src/ailuros/`:
 | Domain-specific entities | Refund request, order, radar track | Domain concepts belong in examples or proof paths |
 | HTTP write API | POST /govern, PUT /policy | Platformization is deferred to Phase 5 |
 | Auth / sessions | User token, session ID, login state | Out of scope for local runtime kernel |
+
+## Control-Context Identity References
+
+The fields `principal_ref`, `workflow_ref`, and `invocation_ref` are **opaque
+provenance/control references**. They record *who/what initiated and framed a
+governed run* for audit and control purposes only.
+
+They explicitly do **not** imply user login, token issuance, a tenant directory,
+session resumption, or IAM. They are not credentials and carry no authorization
+semantics on their own (ADR-0005).
 
 ## Allowed Crossings
 
