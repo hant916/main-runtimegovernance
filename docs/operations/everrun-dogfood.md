@@ -283,6 +283,38 @@ as known exclusions to set expectations for the dogfood scope.
 
 For the data flow context, see `docs/architecture/everrun-dogfood-data-flow.md`.
 
+### Framework Neutrality: Second-Producer Conformance
+
+"No Framework Left Behind" is a product claim, not just an EverRun feature.
+`tests/test_second_producer_conformance.py` and
+`fixtures/runtime-evidence/second-producer/` prove this with a second,
+non-EverRun producer (a generic MCP-style workflow fixture) that traverses
+the identical load/ingest/projection/signal/governed-outcome code path as an
+EverRun package, using the same `runtime-evidence-package-v1` contract. Core
+governance modules (`ailuros.projection`, `ailuros.signals`,
+`ailuros.execution_report`) contain no producer-identity branching; a static
+anti-regression test guards against reintroducing one.
+
+Only one adapter shape is exercised: the evidence-package (post-run, disk-based)
+handoff. A real external integration (LangGraph, OpenAI Agents SDK, an MCP
+server, etc.) that emits this contract remains deferred — this pack proves
+the contract is producer-neutral, not that additional producer integrations
+exist today.
+
+**Known limitation surfaced by this conformance test:** packages imported via
+`ingest_evidence_package()` are stored with a normalized
+`RuntimeEventType.EXTERNAL_EVIDENCE` wrapper; `build_execution_projection()`
+does not unwrap the original `payload["event_type"]` (e.g. `run_started`,
+`authority_evidence`) from that wrapper. As a result, `lifecycle`, `outcome`,
+`authority_records`, derived signals, and `governed_outcome` all resolve to
+`unknown` for any package ingested through this path today — for EverRun
+packages and the second-producer fixture equally. Raw evidence is preserved
+correctly (original `event_type` and `payload` survive in storage, ingestion
+is idempotent and conflict-safe), so no evidence is lost or misrepresented as
+clean; the gap is in derived projection, not raw evidence capture. This is a
+pre-existing pipeline gap, not a producer-specific one, and is out of scope
+for this pack.
+
 ---
 
 ## Product Acceptance Checklist

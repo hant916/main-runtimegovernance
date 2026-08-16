@@ -1,0 +1,63 @@
+{
+  "schema_version": "ailuros.timeline.v1",
+  "run_id": "run-second-producer-001",
+  "events": [
+    {
+      "event_id": "evt-sp-001",
+      "event_type": "run_started",
+      "timestamp": "2026-08-16T09:00:00+00:00",
+      "payload": {"workflow": "generic-mcp-tool-invocation"},
+      "metadata": {}
+    },
+    {
+      "event_id": "evt-sp-002",
+      "event_type": "authority_evidence",
+      "timestamp": "2026-08-16T09:00:05+00:00",
+      "payload": {
+        "action": "invoke",
+        "actor": "generic-mcp-agent",
+        "authority_source": "mcp_grant",
+        "observed_target": "mcp:resource-beta",
+        "requested_target": "mcp:resource-alpha",
+        "status": "violation"
+      },
+      "metadata": {}
+    },
+    {
+      "event_id": "evt-sp-003",
+      "event_type": "budget_evidence",
+      "timestamp": "2026-08-16T09:00:10+00:00",
+      "payload": {
+        "consumed": 40,
+        "limit": 100,
+        "status": "within_limit",
+        "subject": "tool-invocations",
+        "unit": "calls"
+      },
+      "metadata": {}
+    },
+    {
+      "event_id": "evt-sp-004",
+      "event_type": "mcp.tool.result_received",
+      "timestamp": "2026-08-16T09:00:15+00:00",
+      "payload": {"result_size": 12, "tool": "generic.search"},
+      "metadata": {
+        "note": "producer-specific event type not defined anywhere in src/ailuros core"
+      }
+    },
+    {
+      "event_id": "evt-sp-005",
+      "event_type": "project_validation",
+      "timestamp": "2026-08-16T09:00:20+00:00",
+      "payload": {"status": "passed"},
+      "metadata": {}
+    },
+    {
+      "event_id": "evt-sp-006",
+      "event_type": "run_completed",
+      "timestamp": "2026-08-16T09:00:25+00:00",
+      "payload": {"result": "completed"},
+      "metadata": {}
+    }
+  ]
+}

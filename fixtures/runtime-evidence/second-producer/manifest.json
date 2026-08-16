@@ -1,0 +1,28 @@
+{
+  "package_version": "1",
+  "source": "generic-mcp-workflow",
+  "target": "ailuros",
+  "governance_mode": "observe",
+  "schema_version": "ailuros.timeline.v1",
+  "run_id": "run-second-producer-001",
+  "generated_at": "2026-08-16T09:00:00+00:00",
+  "files": [
+    {"name": "manifest.json", "required": true},
+    {"name": "timeline.json", "required": true}
+  ],
+  "metadata": {
+    "agent_name": "generic-mcp-workflow",
+    "description": "Minimal second-producer fixture proving framework-neutral conformance using runtime-evidence-package-v1"
+  },
+  "provenance": {
+    "source_artifact": "generic-mcp-exporter",
+    "source_pointer": "workflow/run-second-producer-001",
+    "source_event_type": "workflow_started",
+    "metadata": {"framework": "generic-mcp"}
+  },
+  "pkg_metadata": {
+    "exporter_version": "1.0.0",
+    "source_digest": "sha256:second-producer-fixture",
+    "coverage": {"events": 6, "files": 2}
+  }
+}
