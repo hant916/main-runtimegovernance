@@ -41,8 +41,21 @@ def load_audit_package(path: Path) -> AuditPackage:
         decisions=decisions,
         evaluations=evaluations,
         regressions=regressions,
-        summary=(package_dir / "summary.md").read_text(encoding="utf-8"),
+        summary=_read_text_file(package_dir / "summary.md"),
     )
+
+
+def _read_text_file(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        raise AuditPackageLoadError(
+            [f"malformed text in {path.name}: invalid UTF-8"]
+        ) from exc
+    except OSError as exc:
+        raise AuditPackageLoadError(
+            [f"failed to read {path.name}: {exc.strerror or exc}"]
+        ) from exc
 
 
 def _read_json_file(path: Path) -> Any:

@@ -16,29 +16,37 @@ def validate_audit_package(package: AuditPackage) -> PackageValidationResult:
 
 
 def _collect_run_ids(package: AuditPackage) -> list[str]:
-    records: list[tuple[str, Any]] = [
-        ("manifest", package.manifest),
-        ("run", package.run),
-        ("timeline", package.timeline),
-        ("decisions", package.decisions),
-        ("evaluations", package.evaluations),
-        ("regressions", package.regressions),
-    ]
     values: list[str] = []
-    for _, record in records:
-        values.extend(_find_run_ids(record))
+    top_level_run_id = _top_level_run_id(package.manifest)
+    if top_level_run_id is not None:
+        values.append(top_level_run_id)
+    top_level_run_id = _top_level_run_id(package.run)
+    if top_level_run_id is not None:
+        values.append(top_level_run_id)
+    for records in (
+        package.timeline,
+        package.decisions,
+        package.evaluations,
+        package.regressions,
+    ):
+        values.extend(_record_list_run_ids(records))
     return values
 
 
-def _find_run_ids(value: Any) -> list[str]:
-    found: list[str] = []
+def _top_level_run_id(value: Any) -> str | None:
     if isinstance(value, dict):
         run_id = value.get("run_id")
         if isinstance(run_id, str) and run_id:
-            found.append(run_id)
-        for nested in value.values():
-            found.extend(_find_run_ids(nested))
-    elif isinstance(value, list):
-        for item in value:
-            found.extend(_find_run_ids(item))
-    return found
+            return run_id
+    return None
+
+
+def _record_list_run_ids(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    run_ids: list[str] = []
+    for item in value:
+        run_id = _top_level_run_id(item)
+        if run_id is not None:
+            run_ids.append(run_id)
+    return run_ids

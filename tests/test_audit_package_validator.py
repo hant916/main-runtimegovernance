@@ -95,6 +95,101 @@ def test_mismatched_run_id_fails(tmp_path: Path) -> None:
     assert result.reasons == ["mismatched run_id values: other-run, run-001"]
 
 
+def test_mismatched_timeline_run_id_fails(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg")
+    (pkg / "timeline.jsonl").write_text(
+        json.dumps({"event_id": "evt-1", "run_id": "other-run", "event_type": "run_started"}),
+        encoding="utf-8",
+    )
+
+    result = validate_audit_package_dir(pkg)
+
+    assert result.valid is False
+    assert result.decision == "FAIL"
+    assert result.reasons == ["mismatched run_id values: other-run, run-001"]
+
+
+def test_mismatched_evaluation_run_id_fails(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg")
+    (pkg / "evaluations.json").write_text(
+        json.dumps([{"run_id": "other-run"}]),
+        encoding="utf-8",
+    )
+
+    result = validate_audit_package_dir(pkg)
+
+    assert result.valid is False
+    assert result.decision == "FAIL"
+    assert result.reasons == ["mismatched run_id values: other-run, run-001"]
+
+
+def test_mismatched_regression_run_id_fails(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg")
+    (pkg / "regressions.json").write_text(
+        json.dumps([{"run_id": "other-run"}]),
+        encoding="utf-8",
+    )
+
+    result = validate_audit_package_dir(pkg)
+
+    assert result.valid is False
+    assert result.decision == "FAIL"
+    assert result.reasons == ["mismatched run_id values: other-run, run-001"]
+
+
+def test_nested_noncanonical_metadata_run_id_is_ignored(tmp_path: Path) -> None:
+    pkg = _write_package(
+        tmp_path / "pkg",
+        decisions=[
+            {
+                "run_id": "run-001",
+                "decision": "allow",
+                "metadata": {"run_id": "some-other-run"},
+            }
+        ],
+    )
+
+    result = validate_audit_package_dir(pkg)
+
+    assert result.valid is True
+    assert result.decision == "PASS"
+    assert result.reasons == []
+
+
+def test_nested_noncanonical_baseline_reference_run_id_is_ignored(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg")
+    (pkg / "evaluations.json").write_text(
+        json.dumps(
+            [
+                {
+                    "run_id": "run-001",
+                    "baseline": {"run_id": "baseline-run"},
+                    "reference": {"run_id": "reference-run"},
+                    "baseline_run_id": "another-baseline-run",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = validate_audit_package_dir(pkg)
+
+    assert result.valid is True
+    assert result.decision == "PASS"
+    assert result.reasons == []
+
+
+def test_invalid_utf8_summary_fails_deterministically(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg")
+    (pkg / "summary.md").write_bytes(b"\xff\xfe not valid utf-8")
+
+    result = validate_audit_package_dir(pkg)
+
+    assert result.valid is False
+    assert result.decision == "FAIL"
+    assert result.reasons == ["malformed text in summary.md: invalid UTF-8"]
+
+
 def test_block_decision_fails(tmp_path: Path) -> None:
     result = validate_audit_package_dir(
         _write_package(tmp_path / "pkg", decisions=[{"run_id": "run-001", "decision": "block"}])
@@ -148,3 +243,18 @@ def test_validate_package_cli_fails_for_blocking_decision(tmp_path: Path) -> Non
 
     assert result.exit_code != 0
     assert json.loads(result.output)["decision"] == "FAIL"
+
+
+def test_validate_package_cli_emits_json_for_invalid_summary_utf8(tmp_path: Path) -> None:
+    pkg = _write_package(tmp_path / "pkg")
+    (pkg / "summary.md").write_bytes(b"\xff\xfe not valid utf-8")
+
+    result = CliRunner().invoke(app, ["validate-package", str(pkg)])
+
+    assert result.exit_code != 0
+    payload = json.loads(result.output)
+    assert payload == {
+        "valid": False,
+        "decision": "FAIL",
+        "reasons": ["malformed text in summary.md: invalid UTF-8"],
+    }

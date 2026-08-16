@@ -1,0 +1,167 @@
+{
+  "schema": "impl-pack.v3.convergence",
+  "pack_id": "A-005R2-tighten-package-validator-errors",
+  "title": "Tighten Audit Package Validator Errors and Run ID Scope",
+  "status": "ready",
+  "repo": {
+    "name": "hant916/main-runtimegovernance",
+    "default_branch": "master",
+    "source_of_truth": [
+      "src/ailuros/audit_package.py",
+      "src/ailuros/cli.py",
+      "tests/test_audit_package_validator.py",
+      "README.md",
+      "docs/architecture/governance-boundary.md",
+      "docs/strategy/roadmap.md"
+    ]
+  },
+  "context": {
+    "product": "Ailuros",
+    "current_version": "0.3.0",
+    "previous_pack": "A-005R1-minimal-package-validator",
+    "previous_merge": "PR #1 Add minimal audit package validator and CLI",
+    "review_verdict": "ACCEPT with follow-up required",
+    "problem": "The first validator implementation is useful, but two areas need tightening before the package validator becomes a clean governance primitive: summary.md read errors are not converted into deterministic validation results, and run_id consistency uses recursive scanning that can falsely reject future packages containing referenced/baseline run IDs.",
+    "design_principles": [
+      "KISS / MVP first",
+      "Keep Ailuros core application-agnostic",
+      "Prefer deterministic validation over raw exceptions",
+      "Validate canonical package fields, not every nested value in the universe",
+      "Do not expand into runtime ingestion, HTTP APIs, dashboard, auth, or reference-app coupling"
+    ]
+  },
+  "task": {
+    "summary": "Make audit package validation error handling fully deterministic and narrow run_id consistency checks to canonical package fields.",
+    "user_story": "As an Ailuros user, when I validate a v0.3 audit package, all package read/parse failures are returned as structured JSON reasons, and run_id mismatch detection only checks canonical package fields so referenced run IDs do not create false failures.",
+    "non_goals": [
+      "Do not change the public decision values PASS, REVIEW_REQUIRED, FAIL.",
+      "Do not add HTTP API, dashboard, live runtime ingestion, runtime blocking, auth, or sessions.",
+      "Do not introduce Clarify, EverRun, radarCreation, browser, UI, or domain-specific concepts into src/ailuros.",
+      "Do not redesign the audit package format.",
+      "Do not weaken existing validation commands or remove existing tests."
+    ]
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/ailuros/audit_package.py",
+      "src/ailuros/cli.py",
+      "tests/test_audit_package_validator.py",
+      "README.md"
+    ],
+    "forbidden_paths": [
+      ".git/**",
+      ".venv/**",
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      ".tmp/**",
+      "docs/strategy/**",
+      "docs/architecture/**",
+      "docs/decisions/**"
+    ],
+    "forbidden_core_concepts": [
+      "browser",
+      "tab",
+      "window",
+      "DOM",
+      "content script",
+      "Clarify-specific model",
+      "EverRun-specific model",
+      "radarCreation-specific model",
+      "refund-specific core model",
+      "HTTP write API",
+      "auth/session"
+    ]
+  },
+  "implementation": {
+    "required_behavior": [
+      "Replace direct summary.md read_text usage in load_audit_package with a small deterministic text reader helper.",
+      "Convert summary.md UnicodeDecodeError, OSError, permission/read failures, and similar read failures into AuditPackageLoadError with stable reason text.",
+      "Ensure validate_audit_package_dir returns valid=false, decision=FAIL, and reasons for summary.md read failures instead of raw tracebacks.",
+      "Replace recursive run_id collection with canonical-location run_id collection.",
+      "Canonical run_id locations are: manifest.run_id, run.run_id, timeline[*].run_id when present, decisions[*].run_id when present, evaluations[*].run_id when present, regressions[*].run_id when present.",
+      "Do not inspect nested arbitrary run_id keys such as baseline_run_id, compared_run_id, referenced_run_id, metadata.run_id, or nested payload.run_id unless the repo already proves those are canonical package fields.",
+      "Preserve existing block/review/PASS decision behavior.",
+      "Preserve CLI JSON shape: valid, decision, reasons.",
+      "Keep normal CLI output machine-readable JSON."
+    ],
+    "suggested_changes": [
+      "Add _read_text_file(path: Path) -> str next to _read_json_file and _read_jsonl_file.",
+      "Add helper(s) such as _top_level_run_id(record: Any) -> list[str] and _record_list_run_ids(value: Any) -> list[str].",
+      "Delete or stop using recursive _find_run_ids for package consistency checks.",
+      "Add tests that prove nested non-canonical run_id fields do not fail validation.",
+      "Add tests that prove unreadable or invalidly encoded summary.md produces structured FAIL. If chmod-based unreadable tests are platform-fragile, prefer invalid UTF-8 bytes for deterministic coverage."
+    ],
+    "expected_error_examples": [
+      "failed to read summary.md: <stable reason>",
+      "malformed text in summary.md: invalid UTF-8"
+    ],
+    "decision_values": [
+      "PASS",
+      "REVIEW_REQUIRED",
+      "FAIL"
+    ]
+  },
+  "acceptance_criteria": [
+    "A package with invalid UTF-8 bytes in summary.md returns valid=false and decision=FAIL with a reason naming summary.md.",
+    "A package with a summary.md read failure does not produce a raw traceback in normal CLI usage.",
+    "A package with manifest.run_id and run.run_id mismatch still fails deterministically.",
+    "A package with timeline[*].run_id mismatch still fails deterministically.",
+    "A package with decisions[*].run_id mismatch still fails deterministically.",
+    "A package containing nested metadata/baseline/reference run_id values that differ from the canonical run_id still passes if canonical fields are consistent.",
+    "Existing block decision behavior still returns valid=true, decision=FAIL, and the blocking reason.",
+    "Existing review decision behavior still returns valid=true, decision=REVIEW_REQUIRED, and the review reason.",
+    "CLI still emits JSON with valid, decision, and reasons fields for PASS, REVIEW_REQUIRED, and FAIL results.",
+    "No reference-app or domain-specific concepts are introduced into src/ailuros."
+  ],
+  "validation": {
+    "commands": [
+      "python -m pytest tests/test_audit_package_validator.py -q",
+      "python scripts/check_release_v030.py",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q"
+    ],
+    "notes": [
+      "If full pytest still fails due to known unrelated baseline Clarify/release smoke tests, report the exact failing tests and explain why they are unrelated to this pack.",
+      "Do not mark full validation green unless python -m pytest tests -q actually passes. Engineering is not theatre."
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "summary.md read/encoding failures are converted into structured PackageValidationResult FAIL output through validate_audit_package_dir.",
+      "Normal CLI failure output remains valid JSON and does not expose raw Python tracebacks for package read errors.",
+      "run_id consistency checking is limited to canonical top-level package fields and list records, not recursive arbitrary nested keys.",
+      "Canonical mismatches still fail: manifest/run, timeline record, decisions record, evaluations record, regressions record.",
+      "Nested non-canonical run_id-like values do not cause false FAIL results.",
+      "Existing PASS, REVIEW_REQUIRED, and FAIL decision precedence remains unchanged.",
+      "Tests are added for summary.md invalid UTF-8 or read error and nested non-canonical run_id false-positive prevention.",
+      "No forbidden paths or reference-application concepts are modified/introduced.",
+      "All validation commands are run and results are reported honestly."
+    ],
+    "reject_if": [
+      "The fix catches broad exceptions and silently ignores broken package files.",
+      "The CLI emits non-JSON text for normal validation results.",
+      "The implementation continues to recursively scan every nested run_id key for consistency.",
+      "The implementation weakens canonical run_id mismatch detection.",
+      "The change introduces Clarify/EverRun/radarCreation/browser/UI/domain-specific coupling into src/ailuros.",
+      "The change expands scope into HTTP APIs, dashboard, live ingestion, runtime blocking, auth, sessions, or policy DSL.",
+      "Existing tests are deleted or loosened instead of adding targeted regression coverage.",
+      "Validation failures are hidden, skipped, or reported as success without evidence."
+    ]
+  },
+  "expected_output": {
+    "invalid_summary_example": {
+      "valid": false,
+      "decision": "FAIL",
+      "reasons": [
+        "malformed text in summary.md: invalid UTF-8"
+      ]
+    },
+    "nested_reference_run_id_example": {
+      "valid": true,
+      "decision": "PASS",
+      "reasons": []
+    }
+  }
+}

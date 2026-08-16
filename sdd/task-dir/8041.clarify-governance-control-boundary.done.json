@@ -1,0 +1,182 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "control-context-evidence-governance-v4",
+    "id": "8041.clarify-governance-control-boundary",
+    "sequence": 8041,
+    "slug": "clarify-governance-control-boundary",
+    "title": "Clarify Ailuros governance control boundary without platformizing the runtime",
+    "type": "documentation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Update canonical architecture/strategy wording so Ailuros owns governance lifecycle, policy/evidence interpretation and control decisions, while external harnesses own model/tool execution loops. Explicitly distinguish principal/workflow/invocation identity references from authentication or session state. Dependency: 8030.prove-second-producer-conformance.",
+    "why_now": "The current repo is already the correct governance runtime, but some older wording says 'runtime orchestration' and forbids auth/sessions broadly enough that future identity/control-context work could be misunderstood. The fix is semantic precision, not code deletion.",
+    "do_not_misread": [
+      "This repository is the canonical Ailuros governance runtime; do not apply cleanup assumptions from the legacy MCP Gateway repository.",
+      "Identity references are governance provenance, not login/authentication/session management.",
+      "Approval and budget in this batch are evidence-backed records/projections, not workflow/payment services.",
+      "Do not turn Ailuros into an agent executor or coding harness."
+    ],
+    "red_lines": [
+      "Documentation-only.",
+      "Do not delete or refactor runtime code.",
+      "Do not add auth/session/IAM or orchestration."
+    ]
+  },
+  "machine_core": {
+    "goal": "Freeze the current/future governance boundary before adding new control-context evidence fields.",
+    "red_lines": [
+      "Documentation-only.",
+      "Do not delete or refactor runtime code.",
+      "Do not add auth/session/IAM or orchestration."
+    ],
+    "invariants": [
+      "Depends on: 8030.prove-second-producer-conformance. Do not implement this pack against an incompatible predecessor state.",
+      "Ailuros remains framework/application neutral.",
+      "Existing tool-wrap policy gate remains a valid in-process enforcement point; it is not removed.",
+      "EverRun is a proof/integration, not a core dependency."
+    ],
+    "contracts": [
+      "Execution plane owns doing the work.",
+      "Ailuros owns governance facts, policy interpretation, evidence/provenance and governance decisions."
+    ],
+    "failure_semantics": [
+      "Missing governance-context evidence remains unknown/absent; it is never inferred as allowed, approved, within budget or clean.",
+      "Explicit denial/violation evidence is preserved with evidence refs.",
+      "Derived control-context state remains rebuildable from immutable evidence.",
+      "Producer-native values remain preserved alongside normalized projections."
+    ],
+    "complexity_budget": {
+      "max_new_files": 3,
+      "max_new_abstractions": 2,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": [
+        "IAM/RBAC platform",
+        "authentication/session system",
+        "agent orchestration",
+        "workflow engine",
+        "billing/payment system",
+        "message broker",
+        "new database technology",
+        "LLM-generated governance facts"
+      ]
+    },
+    "files": {
+      "allow": [
+        "docs/architecture/governance-boundary.md",
+        "docs/strategy/product-line-thesis.md",
+        "docs/strategy/roadmap.md",
+        "docs/decisions/ADR-0005-governance-control-context-boundary.md"
+      ],
+      "create": [
+        "docs/decisions/ADR-0005-governance-control-context-boundary.md"
+      ],
+      "forbid": [
+        ".everrun/**",
+        "*.log",
+        "**/*.log",
+        "runtime artifacts",
+        "runtime history",
+        "generated execution reports",
+        "large generated artifacts",
+        "lockfiles unless explicitly required",
+        "legacy MCP Gateway repositories/files"
+      ]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Clarify execution versus governance lifecycle",
+        "details": [
+          "Ailuros may start/complete governance runs and wrap/gate tool calls, but it does not own the model agent loop, subagents, scheduler or coding execution workflow.",
+          "Use 'governance runtime lifecycle' instead of wording that implies generic agent orchestration."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Clarify identity references",
+        "details": [
+          "Define principal_ref, workflow_ref and invocation_ref as opaque provenance/control references.",
+          "Explicitly state they do not imply user login, token issuance, tenant directory, session resumption or IAM."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Clarify current versus future control",
+        "details": [
+          "Current 8001-8030 path remains evidence-first/post-run.",
+          "Future runtime decision APIs may consume the same contracts later, but this pack does not add a write API or live enforcement service."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Record the ADR",
+        "details": [
+          "Ailuros is governance/control plane semantics plus optional enforcement points.",
+          "EverRun/other harnesses remain execution-plane owners and independent products."
+        ]
+      }
+    ],
+    "acceptance": [
+      "Docs identify main-runtimegovernance as canonical Ailuros core.",
+      "Governance lifecycle is distinct from model execution workflow.",
+      "Identity refs are explicitly distinct from auth/session systems.",
+      "No code/runtime capability is added or removed.",
+      "Existing evidence-first roadmap remains intact."
+    ],
+    "validate": [
+      "python scripts/check_release_v150.py"
+    ],
+    "judge": {
+      "must_check": [
+        "Dependency is satisfied: 8030.prove-second-producer-conformance.",
+        "The change is documentation/ADR only.",
+        "Existing v0.3/v1.5 runtime capabilities remain described truthfully.",
+        "No legacy MCP Gateway deletion plan is imported."
+      ],
+      "reject_if": [
+        "The docs say Ailuros should execute coding/model workflows.",
+        "Identity refs are redefined as authentication/login/session management.",
+        "The pack introduces live authorization APIs or platform infrastructure.",
+        "Validation fails.",
+        "Forbidden files are changed.",
+        "Unknown or missing evidence is treated as passed/approved/within-budget."
+      ]
+    },
+    "execution_policy": {
+      "max_attempts": 3,
+      "on_max_attempts": "stop_and_keep_todo"
+    },
+    "validation_notes": {
+      "validation_profile": "focused_custom",
+      "commands_are_profile_based": false,
+      "completion_needed": false,
+      "completion_reason": null
+    },
+    "evidence_matrix_requested_from_coder": true,
+    "expected_coder_final_response": [
+      "## Implementation Summary",
+      "### What changed",
+      "### Why this approach",
+      "### What was explicitly not changed",
+      "## Files modified",
+      "## Validation",
+      "## Evidence Matrix",
+      "| Requirement | Evidence |",
+      "|---|---|",
+      "## Known limitations",
+      "## Suggested next pack"
+    ]
+  }
+}

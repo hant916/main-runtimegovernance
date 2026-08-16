@@ -1,0 +1,176 @@
+{
+  "schema": "impl-pack.v3.convergence",
+  "pack_id": "A-005R2d-restore-canonical-record-run-id-checks",
+  "title": "Restore Canonical Record Run ID Checks Without Recursion",
+  "status": "ready",
+  "repo": {
+    "name": "hant916/main-runtimegovernance",
+    "default_branch": "master",
+    "target_pr": "PR #2 / head ref codex/task-dir-weqpb4",
+    "source_of_truth": [
+      "sdd/task-dir/A-005R2c-canonical-run-id-only.impl-pack.v3.json",
+      "src/ailuros/audit_package.py",
+      "tests/test_audit_package_validator.py"
+    ]
+  },
+  "context": {
+    "product": "Ailuros",
+    "current_version": "0.3.0",
+    "review_verdict": "REQUEST_CHANGES",
+    "current_bad_state": "The latest PR removed recursive run_id scanning but over-corrected by checking only manifest.json and run.json. It now misses canonical direct run_id mismatches in timeline.jsonl, decisions.json, evaluations.json, and regressions.json records.",
+    "required_balance": "Do not recursively scan nested values. Do check direct run_id on canonical package records."
+  },
+  "task": {
+    "summary": "Fix run_id consistency so it checks all canonical direct record locations without recursive nested scanning.",
+    "user_story": "As an Ailuros maintainer, I want package run_id validation to detect direct canonical record mismatches while ignoring nested non-canonical metadata/reference run IDs.",
+    "non_goals": [
+      "Do not touch summary.md read handling.",
+      "Do not touch JSON/JSONL parse aggregation.",
+      "Do not touch CLI behavior.",
+      "Do not touch audit package export formatting.",
+      "Do not add new architecture, docs, API, dashboard, auth, runtime blocking, or policy DSL work."
+    ]
+  },
+  "scope": {
+    "allowed_paths": [
+      "src/ailuros/audit_package.py",
+      "tests/test_audit_package_validator.py"
+    ],
+    "forbidden_paths": [
+      "src/ailuros/cli.py",
+      "README.md",
+      "docs/**",
+      ".git/**",
+      ".venv/**",
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      ".tmp/**"
+    ]
+  },
+  "implementation": {
+    "exact_required_behavior": [
+      "Keep _top_level_run_id(value: Any) -> str | None.",
+      "Add _record_list_run_ids(value: Any) -> list[str] that returns direct top-level run_id values from list items only when the item is a dict.",
+      "Update _run_id_reasons or its helper so present_run_ids includes manifest.run_id, run.run_id, timeline[*].run_id, decisions[*].run_id, evaluations[*].run_id, and regressions[*].run_id.",
+      "Do not inspect nested dictionaries inside those records.",
+      "Do not restore recursive _find_run_ids or equivalent recursive scanning.",
+      "Do not reduce validation to only manifest.json and run.json.",
+      "Keep missing run_id errors for manifest.json and run.json only. Timeline/decision/evaluation/regression run_id fields are optional, but if present they are canonical and must match."
+    ],
+    "reference_implementation": [
+      "def _record_list_run_ids(value: Any) -> list[str]:",
+      "    if not isinstance(value, list):",
+      "        return []",
+      "    run_ids: list[str] = []",
+      "    for item in value:",
+      "        run_id = _top_level_run_id(item)",
+      "        if run_id is not None:",
+      "            run_ids.append(run_id)",
+      "    return run_ids",
+      "",
+      "present_run_ids = {run_id for run_id in canonical_run_ids.values() if run_id is not None}",
+      "for records in (package.timeline, package.decisions, package.evaluations, package.regressions):",
+      "    present_run_ids.update(_record_list_run_ids(records))"
+    ],
+    "canonical_locations": [
+      "manifest.run_id required",
+      "run.run_id required",
+      "timeline[*].run_id optional but canonical if present",
+      "decisions[*].run_id optional but canonical if present",
+      "evaluations[*].run_id optional but canonical if present",
+      "regressions[*].run_id optional but canonical if present"
+    ],
+    "must_ignore": [
+      "metadata.run_id",
+      "payload.run_id",
+      "baseline.run_id",
+      "reference.run_id",
+      "details.run_id",
+      "previous.run_id",
+      "baseline_run_id",
+      "referenced_run_id",
+      "compared_run_id"
+    ]
+  },
+  "required_tests": [
+    {
+      "name": "test_direct_timeline_run_id_mismatch_fails",
+      "setup": "timeline.jsonl contains {run_id: other-run}",
+      "expected": "valid=false, decision=FAIL, reasons include mismatched run_id values: other-run, run-001"
+    },
+    {
+      "name": "test_direct_decision_run_id_mismatch_fails",
+      "setup": "decisions.json contains [{run_id: other-run, decision: allow}]",
+      "expected": "valid=false, decision=FAIL"
+    },
+    {
+      "name": "test_direct_evaluation_run_id_mismatch_fails",
+      "setup": "evaluations.json contains [{run_id: other-run}]",
+      "expected": "valid=false, decision=FAIL"
+    },
+    {
+      "name": "test_direct_regression_run_id_mismatch_fails",
+      "setup": "regressions.json contains [{run_id: other-run}]",
+      "expected": "valid=false, decision=FAIL"
+    },
+    {
+      "name": "test_nested_noncanonical_run_ids_are_ignored",
+      "setup": "decisions/evaluations/regressions records contain nested metadata.run_id, baseline.run_id, reference.run_id values different from run-001 but no direct mismatching run_id",
+      "expected": "valid=true, decision=PASS"
+    }
+  ],
+  "acceptance_criteria": [
+    "Direct canonical record-level run_id mismatches fail for timeline, decisions, evaluations, and regressions.",
+    "Nested non-canonical run_id-like values do not fail validation.",
+    "No recursive run_id scan function is used.",
+    "Validation is not limited to only manifest.json and run.json.",
+    "Existing summary.md and UTF-8 error tests continue to pass.",
+    "No forbidden paths are changed."
+  ],
+  "validation": {
+    "commands": [
+      "python -m pytest tests/test_audit_package_validator.py -q",
+      "python scripts/check_release_v030.py",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q"
+    ],
+    "notes": [
+      "Targeted validator tests must pass.",
+      "If full pytest fails due to known unrelated Clarify/release smoke baseline failures, report exact failing tests. Do not call it green."
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "present_run_ids includes manifest/run plus direct run_id from timeline, decisions, evaluations, and regressions records.",
+      "No recursive arbitrary nested run_id scanning remains in validation behavior.",
+      "Tests prove direct timeline/decision/evaluation/regression run_id mismatch fails.",
+      "Tests prove nested metadata/reference/baseline run_id values are ignored.",
+      "No unrelated file churn is introduced.",
+      "All validation commands are run and reported honestly."
+    ],
+    "reject_if": [
+      "Only manifest.json and run.json are checked for run_id consistency.",
+      "Any recursive nested run_id scanner is used for consistency validation.",
+      "Direct canonical record-level run_id mismatch is ignored.",
+      "Nested non-canonical run_id mismatch causes FAIL.",
+      "The patch touches forbidden paths or unrelated behavior.",
+      "Tests are loosened or deleted instead of adding focused coverage."
+    ]
+  },
+  "expected_output": {
+    "direct_decision_mismatch": {
+      "valid": false,
+      "decision": "FAIL",
+      "reasons": [
+        "mismatched run_id values: other-run, run-001"
+      ]
+    },
+    "nested_metadata_ignored": {
+      "valid": true,
+      "decision": "PASS",
+      "reasons": []
+    }
+  }
+}
