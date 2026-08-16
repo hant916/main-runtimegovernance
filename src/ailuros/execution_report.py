@@ -9,9 +9,11 @@ from ailuros.core.execution import (
     ChangeSummary,
     EvidenceRef,
     ExecutionProjection,
+    GovernedOutcome,
     Lifecycle,
     Outcome,
     RoleSummary,
+    Validation,
 )
 from ailuros.projection import derive_native_outcome
 from ailuros.signals import SignalType
@@ -27,10 +29,12 @@ class RunReport(BaseModel):
     lifecycle: str
     outcome: str
     native_outcome: str = ""
+    governed_outcome: str = ""
     validation: str
     scope: str
     why_stopped: str
     outcome_reasons: list[OutcomeReason] = Field(default_factory=list)
+    governed_outcome_reasons: list[OutcomeReason] = Field(default_factory=list)
     signal_summaries: list[SignalSummary] = Field(default_factory=list)
     decision_reasons: list[str] = Field(default_factory=list)
     changes: list[ChangeSummary] = Field(default_factory=list)
@@ -133,10 +137,109 @@ def _build_outcome_reasons(signals: list[GovernanceSignal]) -> list[OutcomeReaso
     return reasons
 
 
+_FAILED_SIGNAL_TYPES: frozenset[str] = frozenset(
+    {
+        SignalType.AUTHORITY_VIOLATION.value,
+        SignalType.APPROVAL_DENIED.value,
+        SignalType.BUDGET_EXCEEDED.value,
+        SignalType.SCOPE_VIOLATION.value,
+    }
+)
+
+_REVIEW_REQUIRED_SIGNAL_TYPES: frozenset[str] = frozenset(
+    {
+        SignalType.HUMAN_REVIEW_REQUIRED.value,
+        SignalType.APPROVAL_REQUIRED_UNRESOLVED.value,
+        SignalType.BUDGET_UNKNOWN.value,
+        SignalType.AUTHORITY_UNKNOWN.value,
+    }
+)
+
+_DEGRADED_SIGNAL_TYPES: frozenset[str] = frozenset(
+    {
+        SignalType.BACKEND_FALLBACK.value,
+        SignalType.BACKEND_UNAVAILABLE.value,
+        SignalType.CONTEXT_TOO_LARGE.value,
+        SignalType.CODER_SEMANTIC_FAILURE.value,
+        SignalType.EVIDENCE_INCONSISTENCY.value,
+        SignalType.FORBIDDEN_PATH_TOUCHED.value,
+        SignalType.REPEATED_VALIDATION_FAILURE.value,
+    }
+)
+
+
+def _signals_by_type(
+    signals: list[GovernanceSignal], types: frozenset[str]
+) -> list[GovernanceSignal]:
+    return [s for s in signals if s.type in types]
+
+
+def derive_governed_outcome(
+    projection: ExecutionProjection,
+    signals: list[GovernanceSignal],
+) -> tuple[GovernedOutcome, list[OutcomeReason]]:
+    failed_signals = _signals_by_type(signals, _FAILED_SIGNAL_TYPES)
+    if (
+        projection.outcome in {Outcome.FAILED, Outcome.BLOCKED}
+        or projection.validation == Validation.FAILED
+        or failed_signals
+    ):
+        reasons = [
+            OutcomeReason(code=s.type, evidence_refs=list(s.evidence_refs))
+            for s in failed_signals
+        ]
+        if not reasons:
+            reasons = [OutcomeReason(code=f"outcome/{projection.outcome.value}")]
+        return GovernedOutcome.FAILED, reasons
+
+    review_signals = _signals_by_type(signals, _REVIEW_REQUIRED_SIGNAL_TYPES)
+    if projection.outcome == Outcome.REVIEW_REQUIRED or review_signals:
+        reasons = [
+            OutcomeReason(code=s.type, evidence_refs=list(s.evidence_refs))
+            for s in review_signals
+        ]
+        if not reasons:
+            reasons = [OutcomeReason(code="outcome/review_required")]
+        return GovernedOutcome.REVIEW_REQUIRED, reasons
+
+    if (
+        projection.lifecycle not in {Lifecycle.COMPLETED, Lifecycle.FAILED}
+        or projection.outcome == Outcome.UNKNOWN
+    ):
+        return GovernedOutcome.UNKNOWN, [
+            OutcomeReason(code=f"lifecycle/{projection.lifecycle.value}")
+        ]
+
+    degraded_signals = _signals_by_type(signals, _DEGRADED_SIGNAL_TYPES)
+    validation_degraded = projection.validation in {
+        Validation.PARTIAL,
+        Validation.NOT_RUN,
+        Validation.UNKNOWN,
+    }
+    if degraded_signals or validation_degraded:
+        reasons = [
+            OutcomeReason(code=s.type, evidence_refs=list(s.evidence_refs))
+            for s in degraded_signals
+        ]
+        if not reasons:
+            reasons = [OutcomeReason(code=f"validation/{projection.validation.value}")]
+        return GovernedOutcome.DEGRADED_SUCCESS, reasons
+
+    if projection.outcome == Outcome.SUCCESS and projection.validation == Validation.PASSED:
+        return GovernedOutcome.CLEAN_SUCCESS, []
+
+    return GovernedOutcome.UNKNOWN, [
+        OutcomeReason(code=f"outcome/{projection.outcome.value}")
+    ]
+
+
 def build_run_report(
     projection: ExecutionProjection,
     signals: list[GovernanceSignal],
 ) -> RunReport:
+    governed_outcome, governed_outcome_reasons = derive_governed_outcome(
+        projection, signals
+    )
     return RunReport(
         run_id=projection.run_id,
         lifecycle=projection.lifecycle.value,
@@ -144,10 +247,12 @@ def build_run_report(
         native_outcome=derive_native_outcome(
             projection.lifecycle, projection.decisions
         ).value,
+        governed_outcome=governed_outcome.value,
         validation=projection.validation.value,
         scope=projection.scope.value,
         why_stopped=_derive_why_stopped(projection, signals),
         outcome_reasons=_build_outcome_reasons(signals),
+        governed_outcome_reasons=governed_outcome_reasons,
         signal_summaries=[
             SignalSummary(
                 signal_id=s.signal_id,
@@ -192,6 +297,7 @@ def render_run_report_markdown(
     lines.append(f"| Lifecycle | {report.lifecycle} |")
     lines.append(f"| Outcome | {report.outcome} |")
     lines.append(f"| Native Outcome | {report.native_outcome} |")
+    lines.append(f"| Governed Outcome | {report.governed_outcome} |")
     lines.append(f"| Validation | {report.validation} |")
     lines.append(f"| Scope | {report.scope} |")
     lines.append("")
@@ -205,6 +311,16 @@ def render_run_report_markdown(
     lines.append("")
     if report.outcome_reasons:
         for outcome_reason in report.outcome_reasons:
+            ref_ids = ", ".join(r.event_id for r in outcome_reason.evidence_refs) or "none"
+            lines.append(f"- `{outcome_reason.code}` ({ref_ids})")
+    else:
+        lines.append("None.")
+    lines.append("")
+
+    lines.append("## Governed Outcome Reasons")
+    lines.append("")
+    if report.governed_outcome_reasons:
+        for outcome_reason in report.governed_outcome_reasons:
             ref_ids = ", ".join(r.event_id for r in outcome_reason.evidence_refs) or "none"
             lines.append(f"- `{outcome_reason.code}` ({ref_ids})")
     else:

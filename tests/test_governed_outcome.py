@@ -1,214 +1,213 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from ailuros.core.execution import Outcome
-from ailuros.projection import build_execution_projection
+from ailuros.core.execution import (
+    DecisionSummary,
+    EvidenceRef,
+    ExecutionProjection,
+    GovernedOutcome,
+    Lifecycle,
+    Outcome,
+    Scope,
+    Validation,
+)
+from ailuros.execution_report import build_run_report, derive_governed_outcome
+from ailuros.models.common import Severity
+from ailuros.signals import GovernanceSignal, SignalType
 
 
-def _event(
-    event_type: str,
+def _make_projection(
     *,
-    event_id: str | None = None,
-    timestamp: datetime | None = None,
-    payload: dict | None = None,
-    step_id: str | None = None,
-) -> dict:
-    ts = timestamp or datetime.now(UTC)
-    eid = event_id or f"evt-{event_type}"
-    return {
-        "event_id": eid,
-        "event_type": event_type,
-        "timestamp": ts,
-        "payload": payload or {},
-        "step_id": step_id,
-    }
+    run_id: str = "run-1",
+    lifecycle: Lifecycle = Lifecycle.COMPLETED,
+    outcome: Outcome = Outcome.SUCCESS,
+    validation: Validation = Validation.PASSED,
+    scope: Scope = Scope.CLEAN,
+    decisions: list[DecisionSummary] | None = None,
+) -> ExecutionProjection:
+    now = datetime.now(UTC)
+    return ExecutionProjection(
+        run_id=run_id,
+        source="test",
+        schema_version="1.0.0",
+        lifecycle=lifecycle,
+        outcome=outcome,
+        validation=validation,
+        scope=scope,
+        started_at=now,
+        completed_at=now + timedelta(minutes=5),
+        decisions=decisions or [],
+    )
 
 
-def _approval_event(
-    event_id: str,
+def _make_signal(
     *,
-    subject: str = "release",
-    action: str | None = None,
-    required: bool | None = None,
-    decision: str | None = None,
-    approver_ref: str | None = None,
-) -> dict:
-    payload: dict = {"subject": subject}
-    if action is not None:
-        payload["action"] = action
-    if required is not None:
-        payload["required"] = required
-    if decision is not None:
-        payload["decision"] = decision
-    if approver_ref is not None:
-        payload["approver_ref"] = approver_ref
-    return _event("approval_evidence", event_id=event_id, payload=payload)
+    signal_type: SignalType,
+    run_id: str = "run-1",
+    severity: Severity = Severity.MEDIUM,
+    subject: str = "test",
+    evidence_refs: list[EvidenceRef] | None = None,
+) -> GovernanceSignal:
+    return GovernanceSignal.build(
+        run_id=run_id,
+        signal_type=signal_type,
+        severity=severity,
+        subject=subject,
+        details={},
+        evidence_refs=evidence_refs or [],
+    )
 
 
-def _budget_event(
-    event_id: str,
-    *,
-    subject: str = "budget",
-    unit: str = "tokens",
-    limit: float | int | None = None,
-    consumed: float | int | None = None,
-    remaining: float | int | None = None,
-    status: str | None = None,
-    required: bool | None = None,
-) -> dict:
-    payload: dict = {"subject": subject, "unit": unit}
-    if limit is not None:
-        payload["limit"] = limit
-    if consumed is not None:
-        payload["consumed"] = consumed
-    if remaining is not None:
-        payload["remaining"] = remaining
-    if status is not None:
-        payload["status"] = status
-    if required is not None:
-        payload["required"] = required
-    return _event("budget_evidence", event_id=event_id, payload=payload)
+# ── CLEAN_SUCCESS requires sufficient affirmative clean evidence ───────────
 
 
-def _native_success_events() -> list[dict]:
-    return [
-        _event("run_started", event_id="s"),
-        _event("run_completed", event_id="c"),
+def test_clean_completion_with_passed_validation_is_clean_success() -> None:
+    proj = _make_projection()
+    outcome, reasons = derive_governed_outcome(proj, [])
+    assert outcome == GovernedOutcome.CLEAN_SUCCESS
+    assert reasons == []
+
+
+def test_exit_success_with_no_terminal_validation_proof_is_not_clean_success() -> None:
+    proj = _make_projection(validation=Validation.NOT_RUN)
+    outcome, _ = derive_governed_outcome(proj, [])
+    assert outcome != GovernedOutcome.CLEAN_SUCCESS
+    assert outcome == GovernedOutcome.DEGRADED_SUCCESS
+
+
+# ── Partial validation + successful completion => DEGRADED_SUCCESS ─────────
+
+
+def test_partial_validation_with_success_is_degraded_success() -> None:
+    proj = _make_projection(validation=Validation.PARTIAL)
+    outcome, reasons = derive_governed_outcome(proj, [])
+    assert outcome == GovernedOutcome.DEGRADED_SUCCESS
+    assert reasons
+
+
+def test_nonblocking_fallback_signal_with_success_is_degraded_success() -> None:
+    proj = _make_projection()
+    signals = [_make_signal(signal_type=SignalType.BACKEND_FALLBACK)]
+    outcome, reasons = derive_governed_outcome(proj, signals)
+    assert outcome == GovernedOutcome.DEGRADED_SUCCESS
+    assert reasons[0].code == SignalType.BACKEND_FALLBACK.value
+
+
+# ── Required human review => REVIEW_REQUIRED, first-class ──────────────────
+
+
+def test_review_required_outcome_projects_review_required() -> None:
+    proj = _make_projection(outcome=Outcome.REVIEW_REQUIRED)
+    outcome, _ = derive_governed_outcome(proj, [])
+    assert outcome == GovernedOutcome.REVIEW_REQUIRED
+
+
+def test_human_review_signal_projects_review_required() -> None:
+    proj = _make_projection()
+    signals = [_make_signal(signal_type=SignalType.HUMAN_REVIEW_REQUIRED)]
+    outcome, _ = derive_governed_outcome(proj, signals)
+    assert outcome == GovernedOutcome.REVIEW_REQUIRED
+
+
+def test_authority_unknown_signal_projects_review_required() -> None:
+    proj = _make_projection()
+    signals = [_make_signal(signal_type=SignalType.AUTHORITY_UNKNOWN)]
+    outcome, _ = derive_governed_outcome(proj, signals)
+    assert outcome == GovernedOutcome.REVIEW_REQUIRED
+
+
+def test_review_required_cannot_be_overwritten_by_source_success() -> None:
+    proj = _make_projection(outcome=Outcome.REVIEW_REQUIRED, validation=Validation.PASSED)
+    outcome, _ = derive_governed_outcome(proj, [])
+    assert outcome == GovernedOutcome.REVIEW_REQUIRED
+
+
+# ── Authority violation / explicit failure => FAILED ────────────────────────
+
+
+def test_authority_violation_signal_projects_failed() -> None:
+    proj = _make_projection()
+    signals = [_make_signal(signal_type=SignalType.AUTHORITY_VIOLATION, severity=Severity.CRITICAL)]
+    outcome, reasons = derive_governed_outcome(proj, signals)
+    assert outcome == GovernedOutcome.FAILED
+    assert reasons[0].code == SignalType.AUTHORITY_VIOLATION.value
+
+
+def test_native_failed_outcome_projects_failed() -> None:
+    proj = _make_projection(lifecycle=Lifecycle.FAILED, outcome=Outcome.FAILED)
+    outcome, _ = derive_governed_outcome(proj, [])
+    assert outcome == GovernedOutcome.FAILED
+
+
+def test_authority_violation_cannot_produce_clean_or_degraded_success() -> None:
+    proj = _make_projection()
+    signals = [
+        _make_signal(signal_type=SignalType.AUTHORITY_VIOLATION, severity=Severity.CRITICAL),
+        _make_signal(signal_type=SignalType.BACKEND_FALLBACK),
     ]
+    outcome, _ = derive_governed_outcome(proj, signals)
+    assert outcome not in {GovernedOutcome.CLEAN_SUCCESS, GovernedOutcome.DEGRADED_SUCCESS}
+    assert outcome == GovernedOutcome.FAILED
 
 
-# ── T4 regression matrix: no evidence preserves existing behavior ────────
-
-
-def test_native_success_without_approval_budget_is_clean() -> None:
-    proj = build_execution_projection("run-1", "test", _native_success_events())
-    assert proj.outcome == Outcome.SUCCESS
-
-
-def test_native_failure_without_approval_budget_is_failed() -> None:
-    events = [
-        _event("run_started", event_id="s"),
-        _event("run_failed", event_id="f"),
+def test_failed_takes_precedence_over_review_required_signal() -> None:
+    proj = _make_projection()
+    signals = [
+        _make_signal(signal_type=SignalType.AUTHORITY_VIOLATION, severity=Severity.CRITICAL),
+        _make_signal(signal_type=SignalType.HUMAN_REVIEW_REQUIRED),
     ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.FAILED
+    outcome, _ = derive_governed_outcome(proj, signals)
+    assert outcome == GovernedOutcome.FAILED
 
 
-# ── Unresolved required approval => REVIEW_REQUIRED ──────────────────────
+# ── Missing terminal evidence => UNKNOWN, never CLEAN_SUCCESS ──────────────
 
 
-def test_native_success_with_unresolved_required_approval_is_review_required() -> None:
-    events = _native_success_events() + [
-        _approval_event("a", subject="release", required=True)
-    ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.REVIEW_REQUIRED
+def test_missing_terminal_evidence_projects_unknown() -> None:
+    proj = _make_projection(lifecycle=Lifecycle.RUNNING, outcome=Outcome.UNKNOWN)
+    outcome, _ = derive_governed_outcome(proj, [])
+    assert outcome == GovernedOutcome.UNKNOWN
+    assert outcome != GovernedOutcome.CLEAN_SUCCESS
 
 
-def test_resolved_required_approval_does_not_force_review() -> None:
-    events = _native_success_events() + [
-        _approval_event(
-            "a", subject="release", action="deploy", required=True, decision="approved"
+def test_unknown_outcome_with_completed_lifecycle_is_not_clean_success() -> None:
+    proj = _make_projection(outcome=Outcome.UNKNOWN)
+    outcome, _ = derive_governed_outcome(proj, [])
+    assert outcome != GovernedOutcome.CLEAN_SUCCESS
+
+
+# ── Determinism ──────────────────────────────────────────────────────────
+
+
+def test_governed_outcome_is_deterministic_for_identical_evidence() -> None:
+    proj = _make_projection()
+    signals = [_make_signal(signal_type=SignalType.BACKEND_FALLBACK)]
+    first, _ = derive_governed_outcome(proj, signals)
+    second, _ = derive_governed_outcome(proj, signals)
+    assert first == second
+
+
+# ── Native/source outcome remains visible alongside governed outcome ───────
+
+
+def test_run_report_exposes_native_and_governed_outcome_together() -> None:
+    proj = _make_projection()
+    signals = [_make_signal(signal_type=SignalType.BACKEND_FALLBACK)]
+    report = build_run_report(proj, signals)
+    assert report.outcome == Outcome.SUCCESS.value
+    assert report.governed_outcome == GovernedOutcome.DEGRADED_SUCCESS.value
+
+
+def test_run_report_governed_outcome_reasons_carry_evidence_refs() -> None:
+    proj = _make_projection()
+    signals = [
+        _make_signal(
+            signal_type=SignalType.AUTHORITY_VIOLATION,
+            severity=Severity.CRITICAL,
+            evidence_refs=[EvidenceRef(event_id="evt-1")],
         )
     ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.SUCCESS
-
-
-def test_unresolved_approval_does_not_override_native_failure() -> None:
-    events = [
-        _event("run_started", event_id="s"),
-        _event("run_failed", event_id="f"),
-        _approval_event("a", subject="release", required=True),
-    ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.FAILED
-
-
-# ── Explicit budget exceeded => FAILED ───────────────────────────────────
-
-
-def test_native_success_with_explicit_budget_exceeded_is_failed() -> None:
-    events = _native_success_events() + [_budget_event("b", status="exceeded")]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.FAILED
-
-
-def test_native_success_with_budget_consumed_over_limit_is_failed() -> None:
-    events = _native_success_events() + [_budget_event("b", limit=100, consumed=150)]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.FAILED
-
-
-def test_budget_within_limit_does_not_block() -> None:
-    events = _native_success_events() + [_budget_event("b", limit=100, consumed=40)]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.SUCCESS
-
-
-# ── Required budget evaluation with unknown result => not clean ──────────
-
-
-def test_native_success_with_unknown_required_budget_is_not_clean() -> None:
-    events = _native_success_events() + [_budget_event("b", required=True)]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome != Outcome.SUCCESS
-    assert proj.outcome == Outcome.REVIEW_REQUIRED
-
-
-def test_unknown_budget_not_required_does_not_block() -> None:
-    events = _native_success_events() + [_budget_event("b")]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.SUCCESS
-
-
-# ── Approval denied with observed protected action => FAILED ─────────────
-
-
-def test_approval_denied_with_observed_action_is_failed() -> None:
-    events = _native_success_events() + [
-        _approval_event("a", subject="release", action="deploy", decision="denied")
-    ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.FAILED
-
-
-def test_approval_denied_without_observed_action_is_not_blocking() -> None:
-    events = _native_success_events() + [
-        _approval_event("a", subject="release", decision="denied")
-    ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.SUCCESS
-
-
-# ── Existing precedence preserved ────────────────────────────────────────
-
-
-def test_block_decision_still_blocked() -> None:
-    events = _native_success_events() + [
-        _event("governance_decision", event_id="g", payload={"decision": "block"})
-    ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.BLOCKED
-
-
-def test_block_decision_not_lowered_by_unresolved_approval() -> None:
-    events = _native_success_events() + [
-        _event("governance_decision", event_id="g", payload={"decision": "block"}),
-        _approval_event("a", subject="release", required=True),
-    ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.BLOCKED
-
-
-def test_require_review_decision_still_review_required() -> None:
-    events = _native_success_events() + [
-        _event(
-            "governance_decision",
-            event_id="g",
-            payload={"decision": "require_review"},
-        )
-    ]
-    proj = build_execution_projection("run-1", "test", events)
-    assert proj.outcome == Outcome.REVIEW_REQUIRED
+    report = build_run_report(proj, signals)
+    assert report.governed_outcome == GovernedOutcome.FAILED.value
+    assert report.governed_outcome_reasons[0].evidence_refs[0].event_id == "evt-1"

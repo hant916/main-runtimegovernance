@@ -24,6 +24,14 @@ class Outcome(StrEnum):
     UNKNOWN = "unknown"
 
 
+class GovernedOutcome(StrEnum):
+    CLEAN_SUCCESS = "clean_success"
+    DEGRADED_SUCCESS = "degraded_success"
+    REVIEW_REQUIRED = "review_required"
+    FAILED = "failed"
+    UNKNOWN = "unknown"
+
+
 class Validation(StrEnum):
     PASSED = "passed"
     FAILED = "failed"
