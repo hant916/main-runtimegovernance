@@ -127,6 +127,26 @@ class BudgetRecord(BaseModel):
     source: dict[str, Any] = Field(default_factory=dict)
 
 
+class AuthorityState(StrEnum):
+    AUTHORIZED = "authorized"
+    VIOLATION = "violation"
+    UNKNOWN = "unknown"
+
+
+class AuthorityRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    actor: str
+    action: str | None = None
+    observed_target: str | None = None
+    requested_target: str | None = None
+    authority_source: str | None = None
+    state: AuthorityState
+    required: bool | None = None
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+    source: dict[str, Any] = Field(default_factory=dict)
+
+
 class ExecutionProjection(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -149,6 +169,7 @@ class ExecutionProjection(BaseModel):
     governance_context: GovernanceContext | None = None
     approval_records: list[ApprovalRecord] = Field(default_factory=list)
     budget_records: list[BudgetRecord] = Field(default_factory=list)
+    authority_records: list[AuthorityRecord] = Field(default_factory=list)
     version: int = 1
 
     @field_validator("started_at", "completed_at")

@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 from ailuros.core.execution import (
     ApprovalRecord,
     ApprovalState,
+    AuthorityRecord,
+    AuthorityState,
     BudgetRecord,
     ChangeSummary,
     DecisionSummary,
@@ -147,6 +149,27 @@ _APPROVAL_EVENT_TYPES: frozenset[str] = frozenset({"approval_evidence"})
 
 _BUDGET_EVENT_TYPES: frozenset[str] = frozenset({"budget_evidence"})
 
+_AUTHORITY_EVENT_TYPES: frozenset[str] = frozenset({"authority_evidence"})
+
+_AUTHORITY_VIOLATION_STATUSES: frozenset[str] = frozenset(
+    {"violation", "violated", "denied", "out_of_scope", "unauthorized"}
+)
+
+_AUTHORITY_AUTHORIZED_STATUSES: frozenset[str] = frozenset(
+    {"authorized", "granted", "allowed", "in_scope"}
+)
+
+
+def _normalize_authority_state(status: str | None) -> AuthorityState:
+    if status is None:
+        return AuthorityState.UNKNOWN
+    lowered = status.strip().lower()
+    if lowered in _AUTHORITY_VIOLATION_STATUSES:
+        return AuthorityState.VIOLATION
+    if lowered in _AUTHORITY_AUTHORIZED_STATUSES:
+        return AuthorityState.AUTHORIZED
+    return AuthorityState.UNKNOWN
+
 _APPROVED_DECISIONS: frozenset[str] = frozenset(
     {"approved", "approve", "granted"}
 )
@@ -208,6 +231,14 @@ def _approval_denied_observed_action(record: ApprovalRecord) -> bool:
     return record.state == ApprovalState.DENIED and record.action is not None
 
 
+def _authority_violation(record: AuthorityRecord) -> bool:
+    return record.state == AuthorityState.VIOLATION
+
+
+def _authority_unknown_required(record: AuthorityRecord) -> bool:
+    return record.required is True and record.state == AuthorityState.UNKNOWN
+
+
 def _approval_unresolved_required(records: list[ApprovalRecord]) -> bool:
     resolved_subject_actions = {
         (r.subject, r.action)
@@ -248,16 +279,21 @@ def _governed_outcome(
     outcome: Outcome,
     approval_records: list[ApprovalRecord],
     budget_records: list[BudgetRecord],
+    authority_records: list[AuthorityRecord],
 ) -> Outcome:
     if any(_budget_exceeded(record) for record in budget_records):
         return Outcome.FAILED
     if any(_approval_denied_observed_action(record) for record in approval_records):
+        return Outcome.FAILED
+    if any(_authority_violation(record) for record in authority_records):
         return Outcome.FAILED
     if outcome in {Outcome.BLOCKED, Outcome.FAILED}:
         return outcome
     if _approval_unresolved_required(approval_records):
         return Outcome.REVIEW_REQUIRED
     if any(_budget_unknown_required(record) for record in budget_records):
+        return Outcome.REVIEW_REQUIRED
+    if any(_authority_unknown_required(record) for record in authority_records):
         return Outcome.REVIEW_REQUIRED
     if outcome == Outcome.REVIEW_REQUIRED:
         return outcome
@@ -288,6 +324,7 @@ def build_execution_projection(
     change_descriptions: list[str] = []
     approval_records: list[ApprovalRecord] = []
     budget_records: list[BudgetRecord] = []
+    authority_records: list[AuthorityRecord] = []
 
     for event in events:
         event_type: str = event.get("event_type", "")
@@ -417,6 +454,46 @@ def build_execution_projection(
                 )
             evidence_refs.append(EvidenceRef(event_id=event_id))
 
+        elif event_type in _AUTHORITY_EVENT_TYPES:
+            actor = payload.get("actor")
+            if isinstance(actor, str) and actor:
+                action = payload.get("action")
+                observed_target = payload.get("observed_target")
+                requested_target = payload.get("requested_target")
+                authority_source = payload.get("authority_source")
+                required = payload.get("required")
+                status = payload.get("status")
+                authority_records.append(
+                    AuthorityRecord(
+                        actor=actor,
+                        action=action if isinstance(action, str) and action else None,
+                        observed_target=(
+                            observed_target
+                            if isinstance(observed_target, str) and observed_target
+                            else None
+                        ),
+                        requested_target=(
+                            requested_target
+                            if isinstance(requested_target, str) and requested_target
+                            else None
+                        ),
+                        authority_source=(
+                            authority_source
+                            if isinstance(authority_source, str) and authority_source
+                            else None
+                        ),
+                        state=_normalize_authority_state(
+                            status if isinstance(status, str) and status else None
+                        ),
+                        required=required if isinstance(required, bool) else None,
+                        evidence_refs=[EvidenceRef(event_id=event_id)]
+                        if event_id
+                        else [],
+                        source={"event_id": event_id, "event_type": event_type},
+                    )
+                )
+            evidence_refs.append(EvidenceRef(event_id=event_id))
+
     validation = _resolve_validation(validation_presence)
     governance_context = _project_governance_context(events)
 
@@ -428,7 +505,7 @@ def build_execution_projection(
         scope = Scope.UNKNOWN
 
     outcome = derive_native_outcome(lifecycle, decisions)
-    outcome = _governed_outcome(outcome, approval_records, budget_records)
+    outcome = _governed_outcome(outcome, approval_records, budget_records, authority_records)
 
     if started_at is None:
         started_at = datetime.now(UTC)
@@ -453,6 +530,7 @@ def build_execution_projection(
         governance_context=governance_context,
         approval_records=approval_records,
         budget_records=budget_records,
+        authority_records=authority_records,
     )
 
 

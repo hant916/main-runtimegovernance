@@ -11,6 +11,8 @@ from ailuros._compat import StrEnum
 from ailuros.core.execution import (
     ApprovalRecord,
     ApprovalState,
+    AuthorityRecord,
+    AuthorityState,
     BudgetRecord,
     DecisionSummary,
     EvidenceRef,
@@ -36,6 +38,8 @@ class SignalType(StrEnum):
     APPROVAL_DENIED = "approval_denied"
     BUDGET_EXCEEDED = "budget_exceeded"
     BUDGET_UNKNOWN = "budget_unknown"
+    AUTHORITY_VIOLATION = "authority_violation"
+    AUTHORITY_UNKNOWN = "authority_unknown"
 
 
 RULE_VERSION = "1.0.0"
@@ -515,6 +519,57 @@ def _budget_unknown_rule(
     return signals
 
 
+def _authority_details(record: AuthorityRecord) -> dict[str, Any]:
+    return {
+        "actor": record.actor,
+        "action": record.action,
+        "observed_target": record.observed_target,
+        "requested_target": record.requested_target,
+        "authority_source": record.authority_source,
+        "state": record.state.value,
+    }
+
+
+def _authority_violation_rule(
+    projection: ExecutionProjection,
+) -> list[GovernanceSignal]:
+    records = [
+        r for r in projection.authority_records if r.state == AuthorityState.VIOLATION
+    ]
+    return [
+        GovernanceSignal.build(
+            run_id=projection.run_id,
+            signal_type=SignalType.AUTHORITY_VIOLATION,
+            severity=Severity.CRITICAL,
+            subject="authority",
+            details=_authority_details(r),
+            evidence_refs=list(r.evidence_refs),
+        )
+        for r in records
+    ]
+
+
+def _authority_unknown_rule(
+    projection: ExecutionProjection,
+) -> list[GovernanceSignal]:
+    records = [
+        r
+        for r in projection.authority_records
+        if r.required is True and r.state == AuthorityState.UNKNOWN
+    ]
+    return [
+        GovernanceSignal.build(
+            run_id=projection.run_id,
+            signal_type=SignalType.AUTHORITY_UNKNOWN,
+            severity=Severity.MEDIUM,
+            subject="authority",
+            details=_authority_details(r),
+            evidence_refs=list(r.evidence_refs),
+        )
+        for r in records
+    ]
+
+
 _RULES: list[Callable[[ExecutionProjection], list[GovernanceSignal]]] = [
     _validation_failure_rule,
     _repeated_validation_failure_rule,
@@ -530,6 +585,8 @@ _RULES: list[Callable[[ExecutionProjection], list[GovernanceSignal]]] = [
     _approval_denied_rule,
     _budget_exceeded_rule,
     _budget_unknown_rule,
+    _authority_violation_rule,
+    _authority_unknown_rule,
 ]
 
 
