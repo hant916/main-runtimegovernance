@@ -1,0 +1,181 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "control-context-evidence-governance-v4",
+    "id": "8044.project-approval-evidence",
+    "sequence": 8044,
+    "slug": "project-approval-evidence",
+    "title": "Add evidence-backed approval records without building an approval workflow service",
+    "type": "runtime_governance"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Represent explicit approval requirements and outcomes as source-neutral projection records with subject, approver/principal ref when supplied, decision/native value, timestamp and evidence refs. Emit bounded approval governance signals; do not create queues, users or workflow APIs. Dependency: 8043.project-governance-context-refs.",
+    "why_now": "Approval is a core accountability fact ('who approved it?'), but the current phase should observe and evaluate approval evidence before Ailuros owns live approval workflow.",
+    "do_not_misread": [
+      "This repository is the canonical Ailuros governance runtime; do not apply cleanup assumptions from the legacy MCP Gateway repository.",
+      "Identity references are governance provenance, not login/authentication/session management.",
+      "Approval and budget in this batch are evidence-backed records/projections, not workflow/payment services.",
+      "Do not turn Ailuros into an agent executor or coding harness."
+    ],
+    "red_lines": [
+      "No live approval API.",
+      "No queue/notification/user service."
+    ]
+  },
+  "machine_core": {
+    "goal": "Add deterministic post-run approval evidence projection and signals.",
+    "red_lines": [
+      "No live approval API.",
+      "No queue/notification/user service."
+    ],
+    "invariants": [
+      "Depends on: 8043.project-governance-context-refs. Do not implement this pack against an incompatible predecessor state.",
+      "Approval is distinct from authority and distinct from identity.",
+      "Approval evidence may reference principal/invocation/policy context but does not create them."
+    ],
+    "contracts": [
+      "ApprovalRecord is a post-run governance fact, not a live task object."
+    ],
+    "failure_semantics": [
+      "Missing governance-context evidence remains unknown/absent; it is never inferred as allowed, approved, within budget or clean.",
+      "Explicit denial/violation evidence is preserved with evidence refs.",
+      "Derived control-context state remains rebuildable from immutable evidence.",
+      "Producer-native values remain preserved alongside normalized projections."
+    ],
+    "complexity_budget": {
+      "max_new_files": 3,
+      "max_new_abstractions": 2,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": [
+        "IAM/RBAC platform",
+        "authentication/session system",
+        "agent orchestration",
+        "workflow engine",
+        "billing/payment system",
+        "message broker",
+        "new database technology",
+        "LLM-generated governance facts"
+      ]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/core/execution.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "tests/test_approval_governance.py"
+      ],
+      "create": [
+        "tests/test_approval_governance.py"
+      ],
+      "forbid": [
+        ".everrun/**",
+        "*.log",
+        "**/*.log",
+        "runtime artifacts",
+        "runtime history",
+        "generated execution reports",
+        "large generated artifacts",
+        "lockfiles unless explicitly required",
+        "legacy MCP Gateway repositories/files"
+      ]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Define minimal ApprovalRecord",
+        "details": [
+          "subject/action, required flag when explicit, approval status/native decision, optional approver_ref, timestamp, evidence_refs/source metadata.",
+          "Keep producer-native decision value; do not force all systems into one approval enum beyond the minimal normalized state."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Project explicit approval evidence",
+        "details": [
+          "Create records only from explicit normalized approval/review evidence.",
+          "Missing approval data remains unknown/absent; successful execution is not proof of approval."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Emit narrow approval signals",
+        "details": [
+          "approval_required_unresolved only when evidence says approval was required and no resolving approval/denial is present.",
+          "approval_denied only from explicit denial/rejection evidence.",
+          "Every signal carries evidence refs."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Prove no workflow service creep",
+        "details": [
+          "Tests require no HTTP writes, queues, identity directory, notification system or human task service.",
+          "Reference producers use the same generic record path."
+        ]
+      }
+    ],
+    "acceptance": [
+      "Approval records are deterministic, source-neutral and evidence-linked.",
+      "Successful execution does not imply approval.",
+      "Explicit unresolved requirement and denial produce distinct signals.",
+      "No approval workflow/service/platform is introduced."
+    ],
+    "validate": [
+      "python -m pytest tests/test_approval_governance.py tests/test_governance_signals.py tests/test_authority_governance.py -q",
+      "python -m ruff check src/ailuros/core/execution.py src/ailuros/projection.py src/ailuros/signals.py tests/test_approval_governance.py",
+      "python -m mypy src"
+    ],
+    "judge": {
+      "must_check": [
+        "Dependency is satisfied: 8043.project-governance-context-refs.",
+        "Approval facts are observed/projection facts only.",
+        "Every signal is evidence-linked.",
+        "No human-task/notification/write API appears."
+      ],
+      "reject_if": [
+        "Approval is inferred from execution success.",
+        "An approval queue/workflow engine or user directory is added.",
+        "A source-specific approval branch is introduced.",
+        "Missing approval evidence becomes approved.",
+        "Validation fails.",
+        "Forbidden files are changed.",
+        "Unknown or missing evidence is treated as passed/approved/within-budget."
+      ]
+    },
+    "execution_policy": {
+      "max_attempts": 3,
+      "on_max_attempts": "stop_and_keep_todo"
+    },
+    "validation_notes": {
+      "validation_profile": "focused_custom",
+      "commands_are_profile_based": false,
+      "completion_needed": false,
+      "completion_reason": null
+    },
+    "evidence_matrix_requested_from_coder": true,
+    "expected_coder_final_response": [
+      "## Implementation Summary",
+      "### What changed",
+      "### Why this approach",
+      "### What was explicitly not changed",
+      "## Files modified",
+      "## Validation",
+      "## Evidence Matrix",
+      "| Requirement | Evidence |",
+      "|---|---|",
+      "## Known limitations",
+      "## Suggested next pack"
+    ]
+  }
+}
