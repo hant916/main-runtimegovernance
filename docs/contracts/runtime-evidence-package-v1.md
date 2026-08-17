@@ -111,25 +111,33 @@ because a provenance field is absent or uses an unrecognised value.
 
 ## Governance Context
 
-A package MAY carry an optional `governance_context` block describing *what is
-being governed* as opaque references. It is **additive and never required**:
-existing producers that omit it remain fully valid, and validators MUST NOT
-reject a package because the block is absent.
+A package or event MAY carry an optional `governance_context` block describing
+*what is being governed* as opaque references. It is **additive and never
+required**: existing producers that omit it remain fully valid, and validators
+MUST NOT reject a package because the block is absent.
 
 The block's shape is defined by the [Governance Context Contract
-v1](./governance-context-v1.md). In summary:
+v1](./governance-context-v1.md). It contains a `facts` list; every fact carries
+its own evidence refs. A context may appear at either of these locations:
+
+- `timeline.governance_context` for package-wide context.
+- `events[*].payload.governance_context` for context asserted by one event.
+
+Both locations are optional. Event context does not override or reconcile
+package-wide context; all asserted facts remain available as evidence.
+
+Each fact has the following shape:
 
 | Field | Type | Required | Purpose |
 |---|---|---|---|
-| `principal_ref` | str | No | Actor/principal asserted by evidence. |
-| `workflow_ref` | str | No | Grouping of governed work; no execution semantics. |
-| `invocation_ref` | str | No | One governed invocation/request/action boundary. |
-| `policy_snapshot_ref` | str | No | Immutable policy/version/hash used for a decision, when known. |
-| `source_pointers` | list[str] | No | Evidence refs backing the asserted facts. |
+| `field` | str | Yes | `principal_ref`, `workflow_ref`, `invocation_ref`, or `policy_snapshot_ref`. |
+| `value` | str | Yes | The asserted opaque ref. |
+| `evidence_refs` | list[str] | Yes | One or more evidence refs backing this fact. |
 
-All refs are opaque strings; no global identity directory is required.
-Contradictory refs are preserved as inconsistency, not silently reconciled.
-The block MUST NOT make EverRun planner/coder/judge vocabulary mandatory.
+All refs and evidence refs are opaque strings; no global identity directory is
+required. Contradictory values are preserved as separately evidenced facts and
+treated as inconsistency, not silently reconciled. The block MUST NOT make
+EverRun planner/coder/judge vocabulary mandatory.
 
 ```json
 {
@@ -137,11 +145,18 @@ The block MUST NOT make EverRun planner/coder/judge vocabulary mandatory.
   "run_id": "run-abc123",
   "events": [],
   "governance_context": {
-    "principal_ref": "user:alice",
-    "workflow_ref": "task:8032",
-    "invocation_ref": "inv:abc123",
-    "policy_snapshot_ref": "sha256:9f2c...",
-    "source_pointers": ["evt-001", "evt-014"]
+    "facts": [
+      {
+        "field": "principal_ref",
+        "value": "user:alice",
+        "evidence_refs": ["evt-001"]
+      },
+      {
+        "field": "policy_snapshot_ref",
+        "value": "sha256:9f2c...",
+        "evidence_refs": ["evt-014"]
+      }
+    ]
   }
 }
 ```

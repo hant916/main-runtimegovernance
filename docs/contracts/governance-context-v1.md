@@ -18,9 +18,10 @@ The governance context is the shared vocabulary producers use to say:
 - **under which** policy snapshot a decision was made, when known
   (`policy_snapshot_ref`).
 
-Every fact in the context retains a source pointer to the evidence that
-asserted it. This contract defines **references**, not identities: all refs are
-opaque strings and no global identity directory is required.
+Every normalized fact in the context retains evidence references to the
+evidence that asserted it. This contract defines **references**, not
+identities: all refs are opaque strings and no global identity directory is
+required.
 
 ## Reference Model
 
@@ -42,6 +43,38 @@ None of these refs are required. A producer that cannot assert a given
 dimension MUST omit it rather than fabricate a placeholder. Ref presence and
 meaning are scoped to the producing source; two different sources MAY use
 overlapping ref strings with unrelated meanings.
+
+## Normalized Fact Representation
+
+A `governance_context` is a collection of normalized facts. Each fact has the
+following shape:
+
+| Field | Type | Required | Purpose |
+|---|---|---|---|
+| `field` | str | Yes | One of `principal_ref`, `workflow_ref`, `invocation_ref`, or `policy_snapshot_ref`. |
+| `value` | str | Yes | The opaque ref asserted for `field`. |
+| `evidence_refs` | list[str] | Yes | One or more producer-native pointers to the evidence that asserted this fact. |
+
+`evidence_refs` are opaque strings. They MAY be event IDs, source pointers,
+artifact locators, digests, or other producer-native evidence references. A
+producer MUST retain at least one evidence ref for every normalized fact.
+
+```json
+{
+  "facts": [
+    {
+      "field": "principal_ref",
+      "value": "user:alice",
+      "evidence_refs": ["evt-001"]
+    },
+    {
+      "field": "workflow_ref",
+      "value": "task:8032",
+      "evidence_refs": ["evt-014"]
+    }
+  ]
+}
+```
 
 ### Ref Scope and Stability
 
@@ -73,24 +106,32 @@ It is optional and advisory:
 
 Every normalized governance-context fact is **evidence-backed**:
 
-1. **Source pointers required**: each fact MUST retain a source pointer or
-   evidence reference (e.g. an event ID, `source_pointer`, or digest) that
-   identifies the evidence from which the fact was derived.
+1. **Source pointers required**: each fact MUST retain one or more
+   `evidence_refs` that identify the evidence from which the fact was derived.
 2. **Contradictions preserved**: when two or more evidence refs assert
    conflicting values for the same dimension, the conflict is preserved as an
-   **inconsistency**, not silently reconciled. A consumer MUST surface both refs
-   and their asserted values rather than choosing a winner.
+   **inconsistency**, not silently reconciled. Producers represent this by
+   retaining separate facts with the same `field`, their respective `value`,
+   and their respective `evidence_refs`; a consumer MUST surface them rather
+   than choosing a winner.
 3. **No silent reconciliation**: merging, deduplication, or "latest wins"
    behaviour is out of scope. Any reconciliation is a downstream decision that
    must itself be evidence-backed.
 
 ```json
 {
-  "principal_ref": "user:alice",
-  "workflow_ref": "task:8032",
-  "invocation_ref": "inv:abc123",
-  "policy_snapshot_ref": "sha256:9f2c...",
-  "source_pointers": ["evt-001", "evt-014"]
+  "facts": [
+    {
+      "field": "principal_ref",
+      "value": "user:alice",
+      "evidence_refs": ["evt-001"]
+    },
+    {
+      "field": "principal_ref",
+      "value": "service:build-bot",
+      "evidence_refs": ["evt-014"]
+    }
+  ]
 }
 ```
 
@@ -100,8 +141,8 @@ Every normalized governance-context fact is **evidence-backed**:
    global directory, registry, or resolution semantics.
 2. **Optional, never fabricated**: producers omit refs they cannot assert; no
    placeholder values are required.
-3. **Evidence-backed**: every normalized fact carries at least one source
-   pointer/evidence ref.
+3. **Evidence-backed**: every normalized fact carries at least one
+   `evidence_refs` entry.
 4. **Contradictions are data**: conflicting refs are preserved as
    inconsistencies, never silently merged.
 5. **No execution semantics**: `workflow_ref` and `invocation_ref` do not define
