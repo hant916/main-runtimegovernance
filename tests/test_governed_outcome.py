@@ -48,13 +48,14 @@ def _make_signal(
     severity: Severity = Severity.MEDIUM,
     subject: str = "test",
     evidence_refs: list[EvidenceRef] | None = None,
+    details: dict[str, object] | None = None,
 ) -> GovernanceSignal:
     return GovernanceSignal.build(
         run_id=run_id,
         signal_type=signal_type,
         severity=severity,
         subject=subject,
-        details={},
+        details=details or {},
         evidence_refs=evidence_refs or [],
     )
 
@@ -117,6 +118,33 @@ def test_authority_unknown_signal_projects_review_required() -> None:
     assert outcome == GovernedOutcome.REVIEW_REQUIRED
 
 
+def test_unresolved_required_approval_projects_review_required() -> None:
+    proj = _make_projection()
+    ref = EvidenceRef(event_id="evt-approval-required")
+    signals = [
+        _make_signal(
+            signal_type=SignalType.APPROVAL_REQUIRED_UNRESOLVED,
+            evidence_refs=[ref],
+        )
+    ]
+
+    outcome, reasons = derive_governed_outcome(proj, signals)
+
+    assert outcome == GovernedOutcome.REVIEW_REQUIRED
+    assert reasons[0].code == SignalType.APPROVAL_REQUIRED_UNRESOLVED.value
+    assert reasons[0].evidence_refs == [ref]
+
+
+def test_required_unknown_budget_cannot_be_clean_success() -> None:
+    proj = _make_projection()
+    signals = [_make_signal(signal_type=SignalType.BUDGET_UNKNOWN)]
+
+    outcome, _ = derive_governed_outcome(proj, signals)
+
+    assert outcome == GovernedOutcome.REVIEW_REQUIRED
+    assert outcome != GovernedOutcome.CLEAN_SUCCESS
+
+
 def test_review_required_cannot_be_overwritten_by_source_success() -> None:
     proj = _make_projection(outcome=Outcome.REVIEW_REQUIRED, validation=Validation.PASSED)
     outcome, _ = derive_governed_outcome(proj, [])
@@ -132,6 +160,52 @@ def test_authority_violation_signal_projects_failed() -> None:
     outcome, reasons = derive_governed_outcome(proj, signals)
     assert outcome == GovernedOutcome.FAILED
     assert reasons[0].code == SignalType.AUTHORITY_VIOLATION.value
+
+
+def test_budget_exceeded_signal_projects_failed_with_evidence() -> None:
+    proj = _make_projection()
+    ref = EvidenceRef(event_id="evt-budget-exceeded")
+    signals = [
+        _make_signal(
+            signal_type=SignalType.BUDGET_EXCEEDED,
+            severity=Severity.HIGH,
+            evidence_refs=[ref],
+        )
+    ]
+
+    outcome, reasons = derive_governed_outcome(proj, signals)
+
+    assert outcome == GovernedOutcome.FAILED
+    assert outcome not in {
+        GovernedOutcome.CLEAN_SUCCESS,
+        GovernedOutcome.DEGRADED_SUCCESS,
+    }
+    assert reasons[0].code == SignalType.BUDGET_EXCEEDED.value
+    assert reasons[0].evidence_refs == [ref]
+
+
+def test_approval_denied_with_observed_action_projects_failed() -> None:
+    proj = _make_projection()
+    signals = [
+        _make_signal(
+            signal_type=SignalType.APPROVAL_DENIED,
+            severity=Severity.HIGH,
+            details={"action": "deploy"},
+        )
+    ]
+
+    outcome, _ = derive_governed_outcome(proj, signals)
+
+    assert outcome == GovernedOutcome.FAILED
+
+
+def test_approval_denial_without_observed_action_is_not_blocking() -> None:
+    proj = _make_projection()
+    signals = [_make_signal(signal_type=SignalType.APPROVAL_DENIED, severity=Severity.HIGH)]
+
+    outcome, _ = derive_governed_outcome(proj, signals)
+
+    assert outcome == GovernedOutcome.CLEAN_SUCCESS
 
 
 def test_native_failed_outcome_projects_failed() -> None:

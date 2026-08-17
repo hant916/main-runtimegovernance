@@ -174,11 +174,23 @@ def _signals_by_type(
     return [s for s in signals if s.type in types]
 
 
+def _is_blocking_failure_signal(signal: GovernanceSignal) -> bool:
+    if signal.type not in _FAILED_SIGNAL_TYPES:
+        return False
+    if signal.type != SignalType.APPROVAL_DENIED.value:
+        return True
+    return isinstance(signal.details.get("action"), str) and bool(
+        signal.details["action"]
+    )
+
+
 def derive_governed_outcome(
     projection: ExecutionProjection,
     signals: list[GovernanceSignal],
 ) -> tuple[GovernedOutcome, list[OutcomeReason]]:
-    failed_signals = _signals_by_type(signals, _FAILED_SIGNAL_TYPES)
+    failed_signals = [
+        signal for signal in signals if _is_blocking_failure_signal(signal)
+    ]
     if (
         projection.outcome in {Outcome.FAILED, Outcome.BLOCKED}
         or projection.validation == Validation.FAILED
