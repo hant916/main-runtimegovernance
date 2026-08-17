@@ -339,6 +339,19 @@ def test_budget_unknown_when_required_and_insufficient() -> None:
     assert unknown[0].evidence_refs == [ref]
 
 
+@pytest.mark.parametrize("values", [{"limit": 100.0}, {"consumed": 40.0}])
+def test_budget_unknown_when_required_with_partial_values(
+    values: dict[str, float],
+) -> None:
+    proj = _projection(
+        budget_records=[
+            _record(subject="run-budget", unit="tokens", required=True, **values),
+        ]
+    )
+    signals = derive_signals(proj)
+    assert any(s.type == SignalType.BUDGET_UNKNOWN.value for s in signals)
+
+
 def test_no_unknown_when_not_required() -> None:
     proj = _projection(
         budget_records=[

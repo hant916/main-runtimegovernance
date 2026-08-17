@@ -220,11 +220,8 @@ def _budget_unknown_required(record: BudgetRecord) -> bool:
     if record.required is not True:
         return False
     status_lowered = record.status.strip().lower()
-    return (
-        record.limit is None
-        and record.consumed is None
-        and status_lowered in _BUDGET_UNKNOWN_STATUSES
-    )
+    values_are_sufficient = record.limit is not None and record.consumed is not None
+    return not values_are_sufficient and status_lowered in _BUDGET_UNKNOWN_STATUSES
 
 
 def _approval_denied_observed_action(record: ApprovalRecord) -> bool:

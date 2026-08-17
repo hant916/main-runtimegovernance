@@ -499,11 +499,8 @@ def _budget_unknown_rule(
         if record.required is not True:
             continue
         status_lowered = record.status.strip().lower()
-        insufficient = (
-            record.limit is None
-            and record.consumed is None
-            and status_lowered in _BUDGET_UNKNOWN_STATUSES
-        )
+        values_are_sufficient = record.limit is not None and record.consumed is not None
+        insufficient = not values_are_sufficient and status_lowered in _BUDGET_UNKNOWN_STATUSES
         if not insufficient:
             continue
         signals.append(
