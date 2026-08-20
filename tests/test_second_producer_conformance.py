@@ -101,6 +101,11 @@ def test_second_producer_projection_uses_shared_pipeline(tmp_path: Path) -> None
     assert proj.run_id == "run-second-producer-001"
     assert proj.source == "rebuild"
     assert proj.event_count == 6
+    assert proj.lifecycle.value == "completed"
+    assert proj.validation.value == "passed"
+    assert proj.outcome.value == "failed"
+    assert len(proj.authority_records) == 1
+    assert proj.authority_records[0].state.value == "violation"
 
     report = build_run_report(proj, derived_signals)
     assert report.run_id == "run-second-producer-001"

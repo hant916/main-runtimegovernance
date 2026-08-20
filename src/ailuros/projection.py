@@ -42,6 +42,28 @@ _VALIDATION_AGGREGATION_PRIORITY: dict[str, int] = {
 _AUDIT_DECISIONS: frozenset[str] = frozenset({"pass", "warn", "fail"})
 
 
+def _normalize_external_evidence_event(event: dict[str, Any]) -> dict[str, Any]:
+    """Return a projection-only view of a valid external evidence wrapper."""
+    if event.get("event_type") != "external_evidence":
+        return event
+
+    wrapper = event.get("payload")
+    if not isinstance(wrapper, dict):
+        return event
+
+    event_type = wrapper.get("event_type")
+    payload = wrapper.get("payload")
+    if not isinstance(event_type, str) or not event_type or not isinstance(payload, dict):
+        return event
+
+    normalized = event.copy()
+    normalized["event_type"] = event_type
+    normalized["payload"] = payload
+    metadata = wrapper.get("metadata")
+    normalized["metadata"] = metadata if isinstance(metadata, dict) else {}
+    return normalized
+
+
 def _project_decision_domain(payload: dict[str, Any], decision: str) -> str:
     if payload.get("tool_name"):
         return "runtime_action"
@@ -304,6 +326,7 @@ def build_execution_projection(
     *,
     schema_version: str = "1.0",
 ) -> ExecutionProjection:
+    projection_events = [_normalize_external_evidence_event(event) for event in events]
     started_at: datetime | None = None
     completed_at: datetime | None = None
     lifecycle = Lifecycle.UNKNOWN
@@ -323,7 +346,7 @@ def build_execution_projection(
     budget_records: list[BudgetRecord] = []
     authority_records: list[AuthorityRecord] = []
 
-    for event in events:
+    for event in projection_events:
         event_type: str = event.get("event_type", "")
         event_id: str = event.get("event_id", "")
         timestamp: datetime | None = event.get("timestamp")
@@ -492,7 +515,7 @@ def build_execution_projection(
             evidence_refs.append(EvidenceRef(event_id=event_id))
 
     validation = _resolve_validation(validation_presence)
-    governance_context = _project_governance_context(events)
+    governance_context = _project_governance_context(projection_events)
 
     if scope_violated:
         scope = Scope.VIOLATED

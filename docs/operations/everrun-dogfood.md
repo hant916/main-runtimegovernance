@@ -317,19 +317,13 @@ server, etc.) that emits this contract remains deferred — this pack proves
 the contract is producer-neutral, not that additional producer integrations
 exist today.
 
-**Known limitation surfaced by this conformance test:** packages imported via
-`ingest_evidence_package()` are stored with a normalized
-`RuntimeEventType.EXTERNAL_EVIDENCE` wrapper; `build_execution_projection()`
-does not unwrap the original `payload["event_type"]` (e.g. `run_started`,
-`authority_evidence`) from that wrapper. As a result, `lifecycle`, `outcome`,
-`authority_records`, derived signals, and `governed_outcome` all resolve to
-`unknown` for any package ingested through this path today — for EverRun
-packages and the second-producer fixture equally. Raw evidence is preserved
-correctly (original `event_type` and `payload` survive in storage, ingestion
-is idempotent and conflict-safe), so no evidence is lost or misrepresented as
-clean; the gap is in derived projection, not raw evidence capture. This is a
-pre-existing pipeline gap, not a producer-specific one, and is out of scope
-for this pack.
+Imported packages are stored as `RuntimeEventType.EXTERNAL_EVIDENCE` wrappers.
+At the projection boundary, `build_execution_projection()` reads the embedded
+original `event_type`, object `payload`, and metadata through a copied event
+view. This restores lifecycle and governance projection for EverRun and
+second-producer packages without changing raw evidence, ingestion idempotency,
+or conflict detection. Malformed wrappers remain unprojected rather than being
+inferred as canonical governance events.
 
 ---
 

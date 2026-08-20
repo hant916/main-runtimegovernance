@@ -9,6 +9,7 @@ from ailuros.adapters.evidence_package import (
     ingest_evidence_package,
     load_evidence_package,
 )
+from ailuros.projection import build_execution_projection, rebuild_projections_and_signals
 from ailuros.storage.sqlite_storage import SQLiteStorage
 
 HERE = Path(__file__).resolve().parent
@@ -98,6 +99,49 @@ def test_import_preserves_run_metadata(tmp_path):
     assert stored_run.metadata.get("imported_from_package") is True
     assert stored_run.metadata.get("source") == "sample-agent-v1"
     assert stored_run.metadata.get("schema_version") == "ailuros.timeline.v1"
+
+
+def test_imported_events_project_semantics_without_mutating_raw_wrappers(tmp_path):
+    pkg_path = _copy_and_load_fixture(tmp_path)
+    storage = _new_storage(tmp_path)
+    package = load_evidence_package(pkg_path)
+
+    ingest_evidence_package(storage, package)
+    projection, _ = rebuild_projections_and_signals(storage, package.run_id)
+
+    assert projection.lifecycle.value == "completed"
+    assert projection.outcome.value == "success"
+
+    events = storage.list_events(package.run_id)
+    assert all(event.event_type.value == "external_evidence" for event in events)
+    assert events[0].payload == {
+        "event_type": "run_started",
+        "payload": {"input": "test v1 input"},
+        "metadata": {},
+    }
+
+
+def test_malformed_external_evidence_wrappers_do_not_project_canonical_events():
+    projection = build_execution_projection(
+        run_id="run-malformed-wrapper-001",
+        source="test",
+        events=[
+            {
+                "event_id": "evt-malformed-payload",
+                "event_type": "external_evidence",
+                "payload": {"event_type": "run_completed", "payload": []},
+            },
+            {
+                "event_id": "evt-missing-event-type",
+                "event_type": "external_evidence",
+                "payload": {"payload": {}},
+            },
+        ],
+    )
+
+    assert projection.lifecycle.value == "unknown"
+    assert projection.outcome.value == "unknown"
+    assert projection.event_count == 2
 
 
 def test_import_result_includes_source_digest(tmp_path):
