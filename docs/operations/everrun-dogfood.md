@@ -31,6 +31,22 @@ Package loading and ingestion live in:
 | Ingest | `ingest_evidence_package()` | `ailuros.adapters.evidence_package.ingest` |
 | Validate contract | `validate_evidence_package_contract()` | `ailuros.adapters.evidence_package.validator` |
 
+### Historical Baseline Procedure
+
+For a bounded historical dogfood baseline, use the fixed selection and result
+format in `docs/dogfood/everrun-history-baseline.md`. Record stable run IDs,
+native controller facts, the Ailuros-derived result, the separately stated human
+expectation, and an evidence reference only. Do not commit `.everrun/history`,
+raw runtime artifacts, logs, or generated reports.
+
+Controller history is not itself an evidence package. Do not import it directly
+or transform missing facts into a clean result. Until a lossless,
+privacy-screened `runtime-evidence-package-v1` export exists, record the
+Ailuros judgment as `unknown` / not evaluated and classify it as an expected
+unknown when the input is insufficient. This procedure is post-run documentation
+only; it does not change ingestion, projection, governance decisions, or
+runtime control semantics.
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:
