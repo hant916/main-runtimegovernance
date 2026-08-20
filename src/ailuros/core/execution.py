@@ -46,6 +46,22 @@ class Scope(StrEnum):
     UNKNOWN = "unknown"
 
 
+class CoverageState(StrEnum):
+    EVALUATED = "evaluated"
+    UNKNOWN = "unknown"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class GovernanceCoverage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    authority: CoverageState = CoverageState.UNKNOWN
+    approval: CoverageState = CoverageState.UNKNOWN
+    budget: CoverageState = CoverageState.UNKNOWN
+    validation: CoverageState = CoverageState.UNKNOWN
+    scope: CoverageState = CoverageState.UNKNOWN
+
+
 class EvidenceRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -178,6 +194,7 @@ class ExecutionProjection(BaseModel):
     approval_records: list[ApprovalRecord] = Field(default_factory=list)
     budget_records: list[BudgetRecord] = Field(default_factory=list)
     authority_records: list[AuthorityRecord] = Field(default_factory=list)
+    governance_coverage: GovernanceCoverage = Field(default_factory=GovernanceCoverage)
     version: int = 1
 
     @field_validator("started_at", "completed_at")

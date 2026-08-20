@@ -9,6 +9,7 @@ from ailuros.core.execution import (
     ChangeSummary,
     EvidenceRef,
     ExecutionProjection,
+    GovernanceCoverage,
     GovernedOutcome,
     Lifecycle,
     Outcome,
@@ -32,6 +33,7 @@ class RunReport(BaseModel):
     governed_outcome: str = ""
     validation: str
     scope: str
+    governance_coverage: GovernanceCoverage = Field(default_factory=GovernanceCoverage)
     why_stopped: str
     outcome_reasons: list[OutcomeReason] = Field(default_factory=list)
     governed_outcome_reasons: list[OutcomeReason] = Field(default_factory=list)
@@ -262,6 +264,7 @@ def build_run_report(
         governed_outcome=governed_outcome.value,
         validation=projection.validation.value,
         scope=projection.scope.value,
+        governance_coverage=projection.governance_coverage,
         why_stopped=_derive_why_stopped(projection, signals),
         outcome_reasons=_build_outcome_reasons(signals),
         governed_outcome_reasons=governed_outcome_reasons,
@@ -312,6 +315,16 @@ def render_run_report_markdown(
     lines.append(f"| Governed Outcome | {report.governed_outcome} |")
     lines.append(f"| Validation | {report.validation} |")
     lines.append(f"| Scope | {report.scope} |")
+    lines.append("")
+
+    lines.append("## Governance Coverage")
+    lines.append("")
+    lines.append("| Dimension | Coverage |")
+    lines.append("|---|---|")
+    for dimension in ("authority", "approval", "budget", "validation", "scope"):
+        lines.append(
+            f"| {dimension} | {getattr(report.governance_coverage, dimension).value} |"
+        )
     lines.append("")
 
     lines.append("## Why Stopped")

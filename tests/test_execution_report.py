@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from ailuros.core.execution import (
     ChangeSummary,
+    CoverageState,
     DecisionSummary,
     EvidenceRef,
     ExecutionProjection,
@@ -22,6 +23,7 @@ from ailuros.execution_report import (
     render_run_report_markdown,
 )
 from ailuros.models.common import Severity
+from ailuros.projection import build_execution_projection
 from ailuros.signals import GovernanceSignal, SignalType
 
 
@@ -85,6 +87,20 @@ def _make_ref(
     pointer: str | None = None,
 ) -> EvidenceRef:
     return EvidenceRef(event_id=event_id, artifact=artifact, pointer=pointer)
+
+
+def _projection_event(
+    event_id: str,
+    event_type: str,
+    timestamp: datetime,
+    payload: dict,
+) -> dict:
+    return {
+        "event_id": event_id,
+        "event_type": event_type,
+        "timestamp": timestamp,
+        "payload": payload,
+    }
 
 
 class TestBuildRunReport:
@@ -218,6 +234,92 @@ class TestBuildRunReport:
         assert len(report.roles) == 1
         assert report.roles[0].name == "planner"
 
+    def test_absent_evidence_keeps_coverage_unknown_without_signals(self) -> None:
+        now = datetime.now(UTC)
+        projection = build_execution_projection(
+            "run-coverage-unknown",
+            "test",
+            [
+                _projection_event("start", "run_started", now, {}),
+                _projection_event("end", "run_completed", now, {}),
+            ],
+        )
+        report = build_run_report(projection, [])
+        assert report.governance_coverage.model_dump() == {
+            "authority": "unknown",
+            "approval": "unknown",
+            "budget": "unknown",
+            "validation": "unknown",
+            "scope": "unknown",
+        }
+
+    def test_present_governance_evidence_marks_coverage_evaluated(self) -> None:
+        now = datetime.now(UTC)
+        projection = build_execution_projection(
+            "run-coverage-evaluated",
+            "test",
+            [
+                _projection_event(
+                    "approval",
+                    "approval_evidence",
+                    now,
+                    {"subject": "deploy", "decision": "approved"},
+                ),
+                _projection_event(
+                    "budget",
+                    "budget_evidence",
+                    now,
+                    {"subject": "deploy", "unit": "tokens", "limit": 10, "consumed": 5},
+                ),
+                _projection_event(
+                    "authority",
+                    "authority_evidence",
+                    now,
+                    {"actor": "agent", "status": "authorized"},
+                ),
+                _projection_event(
+                    "validation", "project_validation", now, {"status": "passed"}
+                ),
+                _projection_event("scope", "project_scope", now, {"status": "clean"}),
+            ],
+        )
+        report = build_run_report(projection, [])
+        coverage_values = set(report.governance_coverage.model_dump().values())
+        assert coverage_values == {CoverageState.EVALUATED.value}
+
+    def test_required_false_evidence_marks_supported_dimensions_not_applicable(self) -> None:
+        now = datetime.now(UTC)
+        projection = build_execution_projection(
+            "run-coverage-not-applicable",
+            "test",
+            [
+                _projection_event(
+                    "approval",
+                    "approval_evidence",
+                    now,
+                    {"subject": "deploy", "required": False},
+                ),
+                _projection_event(
+                    "budget",
+                    "budget_evidence",
+                    now,
+                    {"subject": "deploy", "unit": "tokens", "required": False},
+                ),
+                _projection_event(
+                    "authority",
+                    "authority_evidence",
+                    now,
+                    {"actor": "agent", "required": False},
+                ),
+            ],
+        )
+        report = build_run_report(projection, [])
+        assert report.governance_coverage.authority == CoverageState.NOT_APPLICABLE
+        assert report.governance_coverage.approval == CoverageState.NOT_APPLICABLE
+        assert report.governance_coverage.budget == CoverageState.NOT_APPLICABLE
+        assert report.governance_coverage.validation == CoverageState.UNKNOWN
+        assert report.governance_coverage.scope == CoverageState.UNKNOWN
+
 
 class TestOutcomeReasons:
     def test_native_outcome_derived_from_lifecycle(self) -> None:
@@ -338,6 +440,12 @@ class TestRenderRunReportMarkdown:
         assert "## Outcome Reasons" in md
         assert "budget_exceeded" in md
         assert "e-budget" in md
+
+    def test_renders_governance_coverage(self) -> None:
+        report = build_run_report(_make_projection(), [])
+        md = render_run_report_markdown(report)
+        assert "## Governance Coverage" in md
+        assert "| authority | unknown |" in md
 
     def test_renders_none_when_no_outcome_reasons(self) -> None:
         proj = _make_projection()

@@ -10,11 +10,13 @@ from ailuros.core.execution import (
     AuthorityState,
     BudgetRecord,
     ChangeSummary,
+    CoverageState,
     DecisionSummary,
     EvidenceRef,
     ExecutionProjection,
     GovernanceContext,
     GovernanceContextConflict,
+    GovernanceCoverage,
     Lifecycle,
     Outcome,
     RoleSummary,
@@ -272,6 +274,40 @@ def _approval_unresolved_required(records: list[ApprovalRecord]) -> bool:
     )
 
 
+def _record_coverage(
+    records: list[ApprovalRecord] | list[BudgetRecord] | list[AuthorityRecord],
+) -> CoverageState:
+    if not records:
+        return CoverageState.UNKNOWN
+    if all(record.required is False for record in records):
+        return CoverageState.NOT_APPLICABLE
+    return CoverageState.EVALUATED
+
+
+def _derive_governance_coverage(
+    approval_records: list[ApprovalRecord],
+    budget_records: list[BudgetRecord],
+    authority_records: list[AuthorityRecord],
+    validation: Validation,
+    scope: Scope,
+) -> GovernanceCoverage:
+    return GovernanceCoverage(
+        authority=_record_coverage(authority_records),
+        approval=_record_coverage(approval_records),
+        budget=_record_coverage(budget_records),
+        validation=(
+            CoverageState.EVALUATED
+            if validation != Validation.UNKNOWN
+            else CoverageState.UNKNOWN
+        ),
+        scope=(
+            CoverageState.EVALUATED
+            if scope != Scope.UNKNOWN
+            else CoverageState.UNKNOWN
+        ),
+    )
+
+
 def derive_native_outcome(
     lifecycle: Lifecycle,
     decisions: list[DecisionSummary],
@@ -526,6 +562,13 @@ def build_execution_projection(
 
     outcome = derive_native_outcome(lifecycle, decisions)
     outcome = _governed_outcome(outcome, approval_records, budget_records, authority_records)
+    governance_coverage = _derive_governance_coverage(
+        approval_records,
+        budget_records,
+        authority_records,
+        validation,
+        scope,
+    )
 
     if started_at is None:
         started_at = datetime.now(UTC)
@@ -551,6 +594,7 @@ def build_execution_projection(
         approval_records=approval_records,
         budget_records=budget_records,
         authority_records=authority_records,
+        governance_coverage=governance_coverage,
     )
 
 
