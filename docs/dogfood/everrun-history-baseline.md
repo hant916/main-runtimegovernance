@@ -49,16 +49,69 @@ canonical evidence package, no Ailuros governance decision exists to compare
 with the human expectation. The zero counts for true/false positives and
 negatives must not be read as validation of the production rules.
 
+## 8051 convergence re-run and acceptance record
+
+This re-run preserves the fixed ten-run selection and the human expectations
+above. It was assessed after 8048 (external-evidence projection normalization)
+and 8050 (governance regression delta) without changing historical inputs.
+
+The production package path has a strict input gate: each selected controller
+record remains controller history, not a canonical package with `manifest.json`
+and `timeline.json`. Consequently no selected record can enter
+load/ingest/rebuild/report without an out-of-scope history transformation. The
+post-fix result is therefore still `unknown` / not evaluated for every row. This
+is the documented expected-unknown result, not a pipeline failure, BLOCKED
+state, HUMAN_REVIEW state, or promotion to clean.
+
+| Sample | Before | Post-8048/8050 classification | Convergence status | Evidence-backed reason |
+|---|---|---|---|---|
+| `0002.validate-evidence-package-contract` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `0004.add-markdown-audit-report-demo` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `run-20260511-192006` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `0005H.copy-clarify-canonical-sample-handoff` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `run-20260521-233756` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `run-20260525-121225` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `run-20260604-172320` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `run-20260510-224338` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `0001.load-canonical-evidence-package` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+| `0001.validate-clarify-evidence-bundle` | Expected unknown | Expected unknown | Expected unknown | No canonical package exists for the selected controller record. |
+
+There were no prior false negatives, false positives, or pipeline failures in
+the 8047 baseline, so none can change classification in this comparison. The
+8050 governance delta is not applicable: it compares two built
+`ExecutionProjection` objects, and no projection may be built from these
+non-package inputs. 8048 fixes projection of valid wrapped package events; it
+does not supply or infer the missing package for a controller-history record.
+
+| Finding status | Count | Record |
+|---|---:|---|
+| Fixed | 0 | No historical classification changed. |
+| Still open | 0 | No previously evaluated governance finding exists in this sample. |
+| Expected unknown | 10 | All selected inputs remain non-importable controller history. |
+| Newly discovered | 0 | The re-run introduced no new gap. |
+
+### Acceptance and next batch
+
+The 8051 dogfood batch is **accepted for this bounded historical baseline**:
+the post-fix behavior preserves all ten expected-unknown judgments, makes no
+unknown-to-clean promotion, and introduces no non-capability BLOCKED or
+HUMAN_REVIEW path. It is not an end-to-end acceptance of package
+load/ingest/rebuild/report for these runs, because the required canonical
+handoff is absent.
+
+The sole candidate for a future pack remains the existing P0 gap: a lossless,
+privacy-screened export of selected controller history to
+`runtime-evidence-package-v1`, followed by a separately scoped real package
+rerun. No implementation is made by this record.
+
 ## Evidence limitations
 
 - The historical controller records provide terminal decisions, validation and
   scope facts when present, but are not the Ailuros evidence-package handoff.
 - No history was transformed or backfilled to make absent fields look clean.
-- The current post-run ingestion path also has a documented limitation: wrapped
-  package event types are not yet unwrapped during projection, which can leave
-  lifecycle, outcome, and signals `unknown`; see the known limitation in
-  `docs/operations/everrun-dogfood.md` and its conformance coverage in
-  `tests/test_second_producer_conformance.py`.
+- 8048 normalizes valid wrapped package event types at the projection boundary;
+  this historical baseline cannot exercise that fix because it contains no
+  canonical packages.
 - An expected judgment is based only on the cited native controller result. If a
   future sample lacks that result, its expected judgment must be marked
   **insufficient evidence** rather than inferred.

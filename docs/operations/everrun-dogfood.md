@@ -47,6 +47,22 @@ unknown when the input is insufficient. This procedure is post-run documentation
 only; it does not change ingestion, projection, governance decisions, or
 runtime control semantics.
 
+### Historical Baseline Convergence (8051)
+
+The 8051 re-run of the fixed ten-run baseline confirms the same input boundary
+after external-evidence projection normalization (8048) and the governance
+regression delta read model (8050). When a selected history record has no
+canonical package, do not invoke package load, ingest, rebuild, or report on
+the history directory. Record `unknown` / not evaluated as an expected unknown
+instead; this is neither a pipeline failure nor a new BLOCKED or HUMAN_REVIEW
+path.
+
+`compare_governance_projections()` is applicable only after both baseline and
+current inputs have produced `ExecutionProjection` objects. It cannot turn a
+non-package historical input into a projection or a clean result. The detailed
+ten-row comparison and bounded acceptance decision are recorded in
+`docs/dogfood/everrun-history-baseline.md`.
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:
