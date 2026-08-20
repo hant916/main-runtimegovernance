@@ -237,6 +237,26 @@ Produces a deterministic per-run governance report:
 7. **Roles** — runtime roles detected
 8. **Evidence Index** — event_id → artifact/pointer links
 
+### Optional Repeated-Run Governance Delta
+
+For repeated EverRun dogfood runs, operators may compare two already-built
+`ExecutionProjection` objects with the source-neutral read model:
+
+```python
+from ailuros.regression import compare_governance_projections
+
+delta = compare_governance_projections(baseline_projection, current_projection)
+for dimension in delta.dimensions:
+    print(dimension.dimension, dimension.transition)
+```
+
+The delta reports native and governed outcomes, validation, scope,
+authority/approval/budget facts, and their coverage. It labels unknown inputs
+as `unknown` and semantic changes without an ordering as `incomparable`; it
+does not infer a risk score. This is a post-run comparison aid only: it does
+not write evidence, modify a projection, block a release, or create a new
+runtime control or review path.
+
 ### Problem Aggregation
 
 `aggregate_problems()` in `ailuros.problems` groups signals by `(type, subject)`
