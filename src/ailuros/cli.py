@@ -374,9 +374,11 @@ def evidence_audit(
     if out is not None:
         out.write_text(rendered, encoding="utf-8")
         typer.echo(str(out))
-        return
+    else:
+        typer.echo(rendered)
 
-    typer.echo(rendered)
+    if not result.ok:
+        raise typer.Exit(1)
 
 
 @app.command("import-evidence-package")

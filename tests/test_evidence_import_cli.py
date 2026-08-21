@@ -12,6 +12,7 @@ from ailuros.storage.sqlite_storage import SQLiteStorage
 HERE = Path(__file__).resolve().parent
 FIXTURES = HERE / "fixtures" / "evidence_package"
 VALID_V1 = FIXTURES / "valid-v1"
+SECOND_PRODUCER = HERE.parent / "fixtures" / "runtime-evidence" / "second-producer"
 
 
 def _new_db(tmp_path: Path) -> Path:
@@ -98,6 +99,17 @@ class TestEvidenceImportCli:
         assert result.exit_code != 0
         data = json.loads(result.stdout)
         assert data["status"] == "invalid"
+
+    def test_invalid_contract_reports_actionable_diagnostic(self, tmp_path):
+        db = _new_db(tmp_path)
+        pkg_dir = SECOND_PRODUCER / "invalid" / "duplicate-event-id"
+
+        result = _invoke(db, pkg_dir)
+        data = json.loads(result.stdout)
+
+        assert result.exit_code != 0
+        assert data["status"] == "invalid"
+        assert "event[1] (event_id 'evt-sp-001') duplicates event_id" in data["detail"]
 
     def test_invalid_bad_json(self, tmp_path):
         db = _new_db(tmp_path)

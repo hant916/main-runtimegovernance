@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ailuros.adapters.evidence_package.validator import validate_evidence_package_contract
 from ailuros.core.evidence import EvidenceEvent, EvidencePackage
 
 
@@ -35,6 +36,11 @@ def load_evidence_package(package_dir: str | Path) -> EvidencePackage:
 
     manifest = _load_json(manifest_path)
     raw_events = _load_json(timeline_path)
+
+    validation = validate_evidence_package_contract(pkg_path, strict=False)
+    if not validation.ok:
+        detail = "; ".join(validation.errors)
+        raise ValueError(f"Evidence package contract invalid: {detail}")
 
     events_data = raw_events if isinstance(raw_events, list) else raw_events.get("events", [])
     events = [EvidenceEvent(**ev) for ev in events_data]

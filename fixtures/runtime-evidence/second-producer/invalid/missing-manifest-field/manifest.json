@@ -1,0 +1,8 @@
+{
+  "package_version": "1",
+  "source": "generic-mcp-workflow",
+  "schema_version": "ailuros.timeline.v1",
+  "run_id": "run-second-producer-missing-field",
+  "generated_at": "2026-08-16T09:00:00+00:00",
+  "files": [{"name": "manifest.json", "required": true}, {"name": "timeline.json", "required": true}]
+}

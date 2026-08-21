@@ -14,14 +14,19 @@ from __future__ import annotations
 import inspect
 from pathlib import Path
 
+import pytest
+from typer.testing import CliRunner
+
 from ailuros import execution_report, projection
 from ailuros import signals as signals_module
 from ailuros.adapters.evidence_package import (
     ImportStatus,
+    audit_evidence_package,
     ingest_evidence_package,
     load_evidence_package,
     validate_evidence_package_contract,
 )
+from ailuros.cli import app
 from ailuros.execution_report import build_run_report
 from ailuros.projection import build_execution_projection, rebuild_projections_and_signals
 from ailuros.storage.sqlite_storage import SQLiteStorage
@@ -29,6 +34,7 @@ from ailuros.storage.sqlite_storage import SQLiteStorage
 HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
 SECOND_PRODUCER = REPO_ROOT / "fixtures" / "runtime-evidence" / "second-producer"
+INVALID_FIXTURES = SECOND_PRODUCER / "invalid"
 FIRST_PRODUCER = HERE / "fixtures" / "evidence_package" / "valid-v1"
 
 
@@ -54,11 +60,49 @@ def test_second_producer_fixture_exists_and_uses_v1_contract() -> None:
     assert result.schema_version == "ailuros.timeline.v1"
     assert result.events_count == 6
 
+    audit = audit_evidence_package(SECOND_PRODUCER)
+    assert audit.ok is True
+
 
 def test_second_producer_source_name_is_distinct_from_everrun() -> None:
     result = validate_evidence_package_contract(SECOND_PRODUCER)
     assert result.source != "everrun"
     assert "everrun" not in result.source.lower()
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "diagnostic"),
+    [
+        ("missing-timeline", "required file missing: timeline.json"),
+        ("missing-manifest-field", "manifest field missing or empty: governance_mode"),
+        ("malformed-timestamp", "event[0] (event_id 'evt-sp-001') has invalid timestamp"),
+        ("duplicate-event-id", "event[1] (event_id 'evt-sp-001') duplicates event_id"),
+        ("malformed-payload", "event[0] (event_id 'evt-sp-001') payload must be an object"),
+    ],
+)
+def test_second_producer_invalid_fixtures_have_actionable_diagnostics(
+    fixture_name: str,
+    diagnostic: str,
+) -> None:
+    result = validate_evidence_package_contract(INVALID_FIXTURES / fixture_name)
+
+    assert result.ok is False
+    assert any(diagnostic in error for error in result.errors)
+
+
+def test_loader_rejects_non_conformant_second_producer_package() -> None:
+    with pytest.raises(ValueError, match="duplicates event_id"):
+        load_evidence_package(INVALID_FIXTURES / "duplicate-event-id")
+
+
+def test_evidence_audit_returns_nonzero_with_actionable_contract_error() -> None:
+    result = CliRunner().invoke(
+        app,
+        ["evidence-audit", str(INVALID_FIXTURES / "malformed-payload")],
+    )
+
+    assert result.exit_code != 0
+    assert "event[0] (event_id 'evt-sp-001') payload must be an object" in result.stdout
 
 
 def test_second_producer_loads_and_imports_through_shared_path(tmp_path: Path) -> None:

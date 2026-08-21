@@ -1,0 +1,5 @@
+{
+  "schema_version": "ailuros.timeline.v1",
+  "run_id": "run-second-producer-bad-payload",
+  "events": [{"event_id": "evt-sp-001", "event_type": "run_started", "timestamp": "2026-08-16T09:00:00+00:00", "payload": []}]
+}

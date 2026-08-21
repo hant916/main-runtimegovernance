@@ -30,13 +30,13 @@ def _load_json(path: Path) -> Any:
 
 
 def _parse_timestamp(value: Any) -> bool:
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str) or not value.strip():
         return False
     try:
-        datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value)
     except ValueError:
         return False
-    return True
+    return parsed.tzinfo is not None and parsed.tzinfo.utcoffset(parsed) is not None
 
 
 def _check_path_traversal(value: str) -> bool:
@@ -50,25 +50,6 @@ def _check_path_traversal(value: str) -> bool:
     if ".." in parts:
         return True
     return False
-
-
-def _validate_v1_identity_and_uniqueness(
-    timeline: dict[str, Any],
-    errors: list[str],
-) -> None:
-    events = timeline.get("events")
-    if not isinstance(events, list):
-        return
-    seen_ids: set[str] = set()
-    for _i, event in enumerate(events):
-        if not isinstance(event, dict):
-            continue
-        event_id = event.get("event_id")
-        if not isinstance(event_id, str) or not event_id:
-            continue
-        if event_id in seen_ids:
-            errors.append(f"duplicate event_id in timeline: {event_id}")
-        seen_ids.add(event_id)
 
 
 def _validate_v1_provenance_safety(
@@ -166,11 +147,14 @@ def _validate_manifest(
 ) -> None:
     for field in _REQUIRED_MANIFEST_FIELDS:
         value = manifest.get(field)
-        if not isinstance(value, str) or not value:
+        if not isinstance(value, str) or not value.strip():
             errors.append(f"manifest field missing or empty: {field}")
 
     if not _parse_timestamp(manifest.get("generated_at")):
-        errors.append("manifest 'generated_at' is not a parseable timestamp")
+        errors.append(
+            "manifest 'generated_at' must be a complete timezone-aware "
+            "ISO-8601 timestamp"
+        )
 
     # 'target' is optional; validate type only when present.
     if "target" in manifest and not isinstance(manifest["target"], str):
@@ -209,28 +193,57 @@ def _validate_timeline(
         errors.append("timeline 'events' must not be empty")
         return 0
 
+    seen_ids: set[str] = set()
     for index, event in enumerate(events):
         if not isinstance(event, dict):
             errors.append(f"event[{index}] must be an object")
             continue
 
+        event_id = event.get("event_id")
+        if not isinstance(event_id, str) or not event_id.strip():
+            errors.append(f"event[{index}] missing event_id")
+            event_ref = f"event[{index}]"
+        else:
+            event_ref = f"event[{index}] (event_id '{event_id}')"
+            if event_id in seen_ids:
+                errors.append(
+                    f"{event_ref} duplicates event_id in timeline: "
+                    f"duplicate event_id '{event_id}'"
+                )
+            seen_ids.add(event_id)
+
         event_type = event.get("event_type")
-        if not isinstance(event_type, str) or not event_type:
-            errors.append(f"event[{index}] missing event_type")
+        if not isinstance(event_type, str) or not event_type.strip():
+            errors.append(f"{event_ref} missing event_type")
         elif event_type not in _KNOWN_EVENT_TYPES:
-            warnings.append(f"event[{index}] has unknown event_type: {event_type}")
+            warnings.append(f"{event_ref} has unknown event_type: {event_type}")
 
         if not _parse_timestamp(event.get("timestamp")):
-            errors.append(f"event[{index}] has invalid timestamp")
+            errors.append(
+                f"{event_ref} has invalid timestamp; expected a complete "
+                "timezone-aware ISO-8601 value"
+            )
+
+        if not isinstance(event.get("payload"), dict):
+            errors.append(f"{event_ref} payload must be an object")
 
     return len(events)
 
 
-def validate_evidence_package_contract(package_dir: str | Path) -> ValidationResult:
+def validate_evidence_package_contract(
+    package_dir: str | Path,
+    *,
+    strict: bool = True,
+) -> ValidationResult:
     """Validate the manifest + timeline contract of a canonical evidence package.
 
     Returns a generic :class:`ValidationResult`. This does not make any
     governance decision; it only reports structural validity.
+
+    ``strict`` controls whether declared pkg_metadata.coverage counts are
+    cross-checked against actual content. Importers keep this ``False`` so a
+    batch can aggregate declared coverage even when a manifest's numbers are
+    ahead of (or behind) the shipped timeline; contract audits keep it ``True``.
     """
     pkg_path = Path(package_dir)
     errors: list[str] = []
@@ -267,9 +280,9 @@ def validate_evidence_package_contract(package_dir: str | Path) -> ValidationRes
     events_count = _validate_timeline(timeline, manifest, errors, warnings)
 
     if manifest.get("schema_version") == _V1_SCHEMA and isinstance(timeline, dict):
-        _validate_v1_identity_and_uniqueness(timeline, errors)
         _validate_v1_provenance_safety(manifest, errors)
-        _validate_v1_counts(manifest, events_count, errors)
+        if strict:
+            _validate_v1_counts(manifest, events_count, errors)
 
     return ValidationResult(
         ok=not errors,
