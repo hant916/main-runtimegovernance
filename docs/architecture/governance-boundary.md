@@ -3,6 +3,12 @@
 This document defines the boundary between Ailuros core and any application (reference
 or otherwise) built on top of it. Violations are coupling red lines.
 
+For the precise canonical contract covering governed-execution semantics, `scope_ref`,
+external boundary surfaces, the product ownership matrix, and temporal invariants, see
+[governed-execution-scope-v1.md](../contracts/governed-execution-scope-v1.md).
+That contract is the authoritative source for what Ailuros owns and does not own at
+the execution boundary. ADR-0005 boundaries are preserved in both documents.
+
 ## Core Domain (`src/ailuros/`)
 
 The Ailuros core owns:
