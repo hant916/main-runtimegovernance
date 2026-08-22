@@ -1,3 +1,10 @@
+from ailuros.regression.governance_delta import (
+    GovernanceDimension,
+    GovernanceDimensionDelta,
+    GovernanceRegressionDelta,
+    GovernanceTransition,
+    compare_governance_projections,
+)
 from ailuros.regression.models import (
     EvidenceTimelineDiff,
     EvidenceTimelineRegressionResult,
@@ -17,4 +24,9 @@ __all__ = [
     "RegressionService",
     "RegressionTimelineResult",
     "replay_timeline",
+    "GovernanceDimension",
+    "GovernanceDimensionDelta",
+    "GovernanceRegressionDelta",
+    "GovernanceTransition",
+    "compare_governance_projections",
 ]
