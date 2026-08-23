@@ -38,6 +38,16 @@ class EvidenceEvent(BaseModel):
     timestamp: datetime
     payload: dict[str, Any] = {}
     metadata: dict[str, Any] = {}
+    scope_ref: str | None = None
+
+    @field_validator("scope_ref", mode="before")
+    @classmethod
+    def require_scope_ref_string(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        raise ValueError("scope_ref must be a string or None")
 
     @field_validator("event_id")
     @classmethod

@@ -159,3 +159,139 @@ def test_import_result_includes_source_digest(tmp_path):
 
     stored_run = storage.get_run("run-digest-001")
     assert stored_run.metadata.get("imported_from_package") is True
+
+
+def test_imported_scoped_event_scope_survives_ingest_and_projection(tmp_path):
+    from datetime import UTC, datetime
+
+    from ailuros.core.evidence import EvidenceEvent, EvidencePackage
+
+    storage = _new_storage(tmp_path)
+    package = EvidencePackage(
+        source="test-source",
+        schema_version="ailuros.timeline.v1",
+        run_id="run-scoped-001",
+        events=[
+            EvidenceEvent(
+                event_id="evt-scoped-1",
+                event_type="run_started",
+                timestamp=datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC),
+                payload={"input": "scoped input"},
+                scope_ref="scope-abc",
+            ),
+            EvidenceEvent(
+                event_id="evt-scoped-2",
+                event_type="run_completed",
+                timestamp=datetime(2025, 1, 15, 10, 1, 0, tzinfo=UTC),
+                payload={"result": "completed"},
+                scope_ref="scope-abc",
+            ),
+        ],
+    )
+
+    result = ingest_evidence_package(storage, package)
+    assert result.status == ImportStatus.CREATED
+
+    projection, _ = rebuild_projections_and_signals(storage, package.run_id)
+    assert projection.scope_ref == "scope-abc"
+    assert projection.run_id == "run-scoped-001"
+
+    events = storage.list_events(package.run_id)
+    assert all(e.event_type.value == "external_evidence" for e in events)
+    assert events[0].payload["scope_ref"] == "scope-abc"
+    assert events[0].payload["payload"] == {"input": "scoped input"}
+
+
+def test_imported_unscoped_event_keeps_raw_wrapper_without_scope(tmp_path):
+    from datetime import UTC, datetime
+
+    from ailuros.core.evidence import EvidenceEvent, EvidencePackage
+
+    storage = _new_storage(tmp_path)
+    package = EvidencePackage(
+        source="test-source",
+        schema_version="ailuros.timeline.v1",
+        run_id="run-unscoped-001",
+        events=[
+            EvidenceEvent(
+                event_id="evt-unscoped-1",
+                event_type="run_started",
+                timestamp=datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC),
+                payload={"input": "plain input"},
+            ),
+            EvidenceEvent(
+                event_id="evt-unscoped-2",
+                event_type="run_completed",
+                timestamp=datetime(2025, 1, 15, 10, 1, 0, tzinfo=UTC),
+                payload={"result": "completed"},
+            ),
+        ],
+    )
+
+    ingest_evidence_package(storage, package)
+    events = storage.list_events(package.run_id)
+    assert "scope_ref" not in events[0].payload
+
+    projection, _ = rebuild_projections_and_signals(storage, package.run_id)
+    assert projection.scope_ref is None
+
+
+def test_imported_scoped_event_reimport_is_idempotent(tmp_path):
+    from datetime import UTC, datetime
+
+    from ailuros.core.evidence import EvidenceEvent, EvidencePackage
+
+    storage = _new_storage(tmp_path)
+    package = EvidencePackage(
+        source="test-source",
+        schema_version="ailuros.timeline.v1",
+        run_id="run-scoped-reimport-001",
+        events=[
+            EvidenceEvent(
+                event_id="evt-scoped-re-1",
+                event_type="run_started",
+                timestamp=datetime(2025, 1, 15, 10, 0, 0, tzinfo=UTC),
+                payload={"input": "scoped input"},
+                scope_ref="scope-re-1",
+            ),
+            EvidenceEvent(
+                event_id="evt-scoped-re-2",
+                event_type="run_completed",
+                timestamp=datetime(2025, 1, 15, 10, 1, 0, tzinfo=UTC),
+                payload={"result": "completed"},
+                scope_ref="scope-re-1",
+            ),
+        ],
+    )
+
+    first = ingest_evidence_package(storage, package)
+    assert first.status == ImportStatus.CREATED
+
+    second = ingest_evidence_package(storage, package)
+    assert second.status == ImportStatus.ALREADY_PRESENT
+    assert second.events_skipped == 2
+
+    events = storage.list_events(package.run_id)
+    assert len(events) == 2
+    assert events[0].payload["scope_ref"] == "scope-re-1"
+
+
+def test_imported_scoped_timeline_loads_and_ingests(tmp_path):
+    import json
+
+    from ailuros.adapters.evidence_package import load_evidence_package
+
+    pkg_path = _copy_and_load_fixture(tmp_path)
+    timeline = json.loads((pkg_path / "timeline.json").read_text(encoding="utf-8"))
+    timeline["events"][0]["scope_ref"] = "scope-timeline-1"
+    (pkg_path / "timeline.json").write_text(json.dumps(timeline), encoding="utf-8")
+
+    storage = _new_storage(tmp_path)
+    package = load_evidence_package(pkg_path)
+    assert package.events[0].scope_ref == "scope-timeline-1"
+
+    result = ingest_evidence_package(storage, package)
+    assert result.status == ImportStatus.CREATED
+
+    projection, _ = rebuild_projections_and_signals(storage, package.run_id)
+    assert projection.scope_ref == "scope-timeline-1"

@@ -447,3 +447,114 @@ def test_malformed_event_scope_ref_does_not_invent_identity() -> None:
     proj = build_execution_projection("run-1", "test", events)
     assert proj.scope_ref is None
     assert proj.decisions[0].scope_ref is None
+
+
+# ── imported external_evidence wrapper scope propagation ────────────────
+
+
+def _external_wrapper(
+    inner_event_type: str,
+    *,
+    event_id: str,
+    payload: dict | None = None,
+    scope_ref: str | None = None,
+    wrapper_scope_ref: str | None = None,
+) -> dict:
+    wrapper_payload: dict = {
+        "event_type": inner_event_type,
+        "payload": payload or {},
+        "metadata": {},
+    }
+    if wrapper_scope_ref is not None:
+        wrapper_payload["scope_ref"] = wrapper_scope_ref
+    event = {
+        "event_id": event_id,
+        "event_type": "external_evidence",
+        "timestamp": datetime.now(UTC),
+        "payload": wrapper_payload,
+    }
+    if scope_ref is not None:
+        event["scope_ref"] = scope_ref
+    return event
+
+
+def test_external_wrapper_scoped_event_projects_scope() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _external_wrapper(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+            wrapper_scope_ref="scope-wrapper-2",
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref == "scope-wrapper-2"
+    assert proj.decisions[0].scope_ref == "scope-wrapper-2"
+
+
+def test_external_wrapper_unscoped_projects_no_scope() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _external_wrapper(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref is None
+    assert proj.decisions[0].scope_ref is None
+
+
+def test_external_wrapper_malformed_scope_is_ignored() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        {
+            "event_id": "e2",
+            "event_type": "external_evidence",
+            "timestamp": datetime.now(UTC),
+            "payload": {
+                "event_type": "governance_decision",
+                "payload": {"decision": "block", "tool_name": "bash"},
+                "metadata": {},
+                "scope_ref": ["scope-bad"],  # type: ignore[dict-item]
+            },
+        },
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref is None
+    assert proj.decisions[0].scope_ref is None
+
+
+def test_external_wrapper_does_not_invent_scope_from_payload() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _external_wrapper(
+            "run_started",
+            event_id="e2",
+            payload={"scope_ref": "payload-scope", "input": "x"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref is None
+
+
+def test_native_scoped_event_still_projects_without_wrapper() -> None:
+    events = [
+        _event("run_started", event_id="e1", scope_ref="native-scope"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+            scope_ref="native-scope",
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref == "native-scope"
+    assert proj.decisions[0].scope_ref == "native-scope"

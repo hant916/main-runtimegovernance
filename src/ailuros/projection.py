@@ -63,6 +63,9 @@ def _normalize_external_evidence_event(event: dict[str, Any]) -> dict[str, Any]:
     normalized["payload"] = payload
     metadata = wrapper.get("metadata")
     normalized["metadata"] = metadata if isinstance(metadata, dict) else {}
+    scope_ref = wrapper.get("scope_ref")
+    if isinstance(scope_ref, str) and scope_ref:
+        normalized["scope_ref"] = scope_ref
     return normalized
 
 

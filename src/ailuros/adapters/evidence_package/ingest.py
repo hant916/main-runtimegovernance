@@ -72,17 +72,22 @@ def _package_event_to_runtime(
     run_id: str,
     step_id: str | None = None,
 ) -> RuntimeEvent:
+    payload: dict[str, Any] = {
+        "event_type": event.event_type,
+        "payload": event.payload,
+        "metadata": event.metadata,
+    }
+    scope_ref = event.scope_ref
+    if isinstance(scope_ref, str) and scope_ref:
+        payload["scope_ref"] = scope_ref
     return RuntimeEvent(
         event_id=event.event_id,
         run_id=run_id,
         step_id=step_id,
         event_type=RuntimeEventType.EXTERNAL_EVIDENCE,
         timestamp=event.timestamp,
-        payload={
-            "event_type": event.event_type,
-            "payload": event.payload,
-            "metadata": event.metadata,
-        },
+        payload=payload,
+        scope_ref=scope_ref if isinstance(scope_ref, str) and scope_ref else None,
     )
 
 
