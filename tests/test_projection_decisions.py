@@ -13,16 +13,20 @@ def _event(
     timestamp: datetime | None = None,
     payload: dict | None = None,
     step_id: str | None = None,
+    scope_ref: str | None = None,
 ) -> dict:
     ts = timestamp or datetime.now(UTC)
     eid = event_id or f"evt-{event_type}"
-    return {
+    event = {
         "event_id": eid,
         "event_type": event_type,
         "timestamp": ts,
         "payload": payload or {},
         "step_id": step_id,
     }
+    if scope_ref is not None:
+        event["scope_ref"] = scope_ref
+    return event
 
 
 # ── T1: Recognize explicit domains ─────────────────────────────────────
@@ -351,3 +355,95 @@ def test_decision_summary_default_projected_domain() -> None:
 
     d = DecisionSummary(domain="test", decision="allow")
     assert d.projected_domain == "source_preserved_unknown"
+
+
+# ── scope_ref propagation ───────────────────────────────────────────────
+
+
+def test_unscoped_decision_events_yield_none_scope_ref() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref is None
+    assert proj.decisions[0].scope_ref is None
+
+
+def test_scoped_decision_summary_preserved() -> None:
+    from ailuros.core.execution import DecisionSummary
+
+    d = DecisionSummary(
+        domain="security", decision="block", scope_ref="scope-abc"
+    )
+    assert d.scope_ref == "scope-abc"
+
+
+def test_scoped_execution_projection_preserved() -> None:
+    from ailuros.core.execution import ExecutionProjection, Lifecycle, Scope, Validation
+
+    now = datetime.now(UTC)
+    proj = ExecutionProjection(
+        run_id="run-1",
+        source="test",
+        schema_version="1.0",
+        lifecycle=Lifecycle.RUNNING,
+        outcome=Outcome.UNKNOWN,
+        validation=Validation.NOT_RUN,
+        scope=Scope.UNKNOWN,
+        started_at=now,
+        scope_ref="scope-run-1",
+    )
+    assert proj.scope_ref == "scope-run-1"
+
+
+def test_scoped_decision_event_propagates_scope_ref() -> None:
+    events = [
+        _event("run_started", event_id="e1", scope_ref="scope-run-1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+            scope_ref="scope-decision-2",
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref == "scope-run-1"
+    assert proj.decisions[0].scope_ref == "scope-decision-2"
+
+
+def test_unscoped_decision_event_does_not_inherit_run_scope() -> None:
+    events = [
+        _event("run_started", event_id="e1", scope_ref="scope-run-1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref == "scope-run-1"
+    assert proj.decisions[0].scope_ref is None
+
+
+def test_malformed_event_scope_ref_does_not_invent_identity() -> None:
+    events = [
+        _event("run_started", event_id="e1", scope_ref=42),  # type: ignore[arg-type]
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={"decision": "block", "tool_name": "bash"},
+            scope_ref=["scope-decision-2"],  # type: ignore[arg-type]
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref is None
+    assert proj.decisions[0].scope_ref is None

@@ -381,6 +381,7 @@ def build_execution_projection(
     approval_records: list[ApprovalRecord] = []
     budget_records: list[BudgetRecord] = []
     authority_records: list[AuthorityRecord] = []
+    scope_ref: str | None = None
 
     for event in projection_events:
         event_type: str = event.get("event_type", "")
@@ -388,6 +389,12 @@ def build_execution_projection(
         timestamp: datetime | None = event.get("timestamp")
         payload: dict[str, Any] = event.get("payload", {})
         step_id: str | None = event.get("step_id")
+
+        event_scope_ref = event.get("scope_ref")
+        if not isinstance(event_scope_ref, str) or not event_scope_ref:
+            event_scope_ref = None
+        if scope_ref is None and event_scope_ref is not None:
+            scope_ref = event_scope_ref
 
         if step_id:
             step_ids.add(step_id)
@@ -418,6 +425,7 @@ def build_execution_projection(
                     domain=domain,
                     decision=decision_type,
                     projected_domain=projected_domain,
+                    scope_ref=event_scope_ref,
                 )
             )
             evidence_refs.append(EvidenceRef(event_id=event_id))
@@ -583,6 +591,7 @@ def build_execution_projection(
         scope=scope,
         started_at=started_at,
         completed_at=completed_at,
+        scope_ref=scope_ref,
         step_count=len(step_ids),
         decision_count=decision_count,
         event_count=len(events),
@@ -615,6 +624,7 @@ def rebuild_projections_and_signals(
             "timestamp": e.timestamp,
             "payload": e.payload,
             "step_id": e.step_id,
+            "scope_ref": e.scope_ref,
         }
         for e in events
     ]

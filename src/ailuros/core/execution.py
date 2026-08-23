@@ -88,6 +88,16 @@ class DecisionSummary(BaseModel):
     domain: str
     decision: str
     projected_domain: str = "source_preserved_unknown"
+    scope_ref: str | None = None
+
+    @field_validator("scope_ref", mode="before")
+    @classmethod
+    def require_scope_ref_string(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        raise ValueError("scope_ref must be a string or None")
 
 
 class GovernanceContextConflict(BaseModel):
@@ -183,6 +193,7 @@ class ExecutionProjection(BaseModel):
     scope: Scope
     started_at: datetime
     completed_at: datetime | None = None
+    scope_ref: str | None = None
     step_count: int = 0
     decision_count: int = 0
     event_count: int = 0
@@ -196,6 +207,15 @@ class ExecutionProjection(BaseModel):
     authority_records: list[AuthorityRecord] = Field(default_factory=list)
     governance_coverage: GovernanceCoverage = Field(default_factory=GovernanceCoverage)
     version: int = 1
+
+    @field_validator("scope_ref", mode="before")
+    @classmethod
+    def require_scope_ref_string(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        raise ValueError("scope_ref must be a string or None")
 
     @field_validator("started_at", "completed_at")
     @classmethod

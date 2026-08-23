@@ -16,6 +16,7 @@ from ailuros.core.execution import (
     Scope,
     Validation,
 )
+from ailuros.models.event import RuntimeEvent, RuntimeEventType
 
 
 def test_lifecycle_enum_values() -> None:
@@ -106,6 +107,25 @@ def test_decision_summary_extra_forbidden() -> None:
         DecisionSummary(domain="security", decision="block", extra="bad")
 
 
+def test_decision_summary_scope_ref_default_none() -> None:
+    dec = DecisionSummary(domain="security", decision="block")
+    assert dec.scope_ref is None
+
+
+def test_decision_summary_scope_ref_preserved() -> None:
+    dec = DecisionSummary(
+        domain="security", decision="block", scope_ref="scope-abc"
+    )
+    assert dec.scope_ref == "scope-abc"
+
+
+def test_decision_summary_scope_ref_malformed_rejected() -> None:
+    with pytest.raises(ValidationError):
+        DecisionSummary(domain="security", decision="block", scope_ref=42)
+    with pytest.raises(ValidationError):
+        DecisionSummary(domain="security", decision="block", scope_ref=["scope-abc"])
+
+
 def test_execution_projection_minimal_construction() -> None:
     now = datetime.now(UTC)
     proj = ExecutionProjection(
@@ -185,6 +205,85 @@ def test_execution_projection_extra_forbidden() -> None:
             scope=Scope.UNKNOWN,
             started_at=now,
             extra_field="bad",
+        )
+
+
+def test_execution_projection_scope_ref_default_none() -> None:
+    now = datetime.now(UTC)
+    proj = ExecutionProjection(
+        run_id="run-1",
+        source="test",
+        schema_version="1.0",
+        lifecycle=Lifecycle.RUNNING,
+        outcome=Outcome.UNKNOWN,
+        validation=Validation.NOT_RUN,
+        scope=Scope.UNKNOWN,
+        started_at=now,
+    )
+    assert proj.scope_ref is None
+
+
+def test_execution_projection_scope_ref_preserved() -> None:
+    now = datetime.now(UTC)
+    proj = ExecutionProjection(
+        run_id="run-1",
+        source="test",
+        schema_version="1.0",
+        lifecycle=Lifecycle.RUNNING,
+        outcome=Outcome.UNKNOWN,
+        validation=Validation.NOT_RUN,
+        scope=Scope.UNKNOWN,
+        started_at=now,
+        scope_ref="scope-run-1",
+    )
+    assert proj.scope_ref == "scope-run-1"
+
+
+def test_execution_projection_scope_ref_malformed_rejected() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValidationError):
+        ExecutionProjection(
+            run_id="run-1",
+            source="test",
+            schema_version="1.0",
+            lifecycle=Lifecycle.RUNNING,
+            outcome=Outcome.UNKNOWN,
+            validation=Validation.NOT_RUN,
+            scope=Scope.UNKNOWN,
+            started_at=now,
+            scope_ref={"nested": "value"},
+        )
+
+
+def test_runtime_event_scope_ref_default_none() -> None:
+    event = RuntimeEvent(
+        event_id="evt-1",
+        run_id="run-1",
+        event_type=RuntimeEventType.RUN_STARTED,
+        timestamp=datetime.now(UTC),
+    )
+    assert event.scope_ref is None
+
+
+def test_runtime_event_scope_ref_preserved() -> None:
+    event = RuntimeEvent(
+        event_id="evt-1",
+        run_id="run-1",
+        event_type=RuntimeEventType.RUN_STARTED,
+        timestamp=datetime.now(UTC),
+        scope_ref="scope-evt-1",
+    )
+    assert event.scope_ref == "scope-evt-1"
+
+
+def test_runtime_event_scope_ref_malformed_rejected() -> None:
+    with pytest.raises(ValidationError):
+        RuntimeEvent(
+            event_id="evt-1",
+            run_id="run-1",
+            event_type=RuntimeEventType.RUN_STARTED,
+            timestamp=datetime.now(UTC),
+            scope_ref=["scope-evt-1"],
         )
 
 
