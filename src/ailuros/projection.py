@@ -225,6 +225,18 @@ def _as_number(value: Any) -> float | None:
     return None
 
 
+def _project_record_scope_ref(
+    event_scope_ref: str | None,
+    payload: dict[str, Any],
+) -> str | None:
+    payload_scope = payload.get("scope_ref")
+    if isinstance(payload_scope, str) and payload_scope:
+        return payload_scope
+    if isinstance(event_scope_ref, str) and event_scope_ref:
+        return event_scope_ref
+    return None
+
+
 _BUDGET_EXCEEDED_STATUSES: frozenset[str] = frozenset(
     {"exceeded", "exceed", "over_limit", "overlimit", "exhausted", "breached"}
 )
@@ -485,6 +497,9 @@ def build_execution_projection(
                             if isinstance(approver_ref, str) and approver_ref
                             else None
                         ),
+                        scope_ref=_project_record_scope_ref(
+                            event_scope_ref, payload
+                        ),
                         timestamp=timestamp or datetime.now(UTC),
                         evidence_refs=[EvidenceRef(event_id=event_id)]
                         if event_id
@@ -498,15 +513,14 @@ def build_execution_projection(
             subject = payload.get("subject")
             unit = payload.get("unit")
             if isinstance(subject, str) and subject and isinstance(unit, str) and unit:
-                scope_ref = payload.get("scope_ref")
                 status = payload.get("status")
                 required = payload.get("required")
                 budget_records.append(
                     BudgetRecord(
                         subject=subject,
                         unit=unit,
-                        scope_ref=(
-                            scope_ref if isinstance(scope_ref, str) and scope_ref else None
+                        scope_ref=_project_record_scope_ref(
+                            event_scope_ref, payload
                         ),
                         limit=_as_number(payload.get("limit")),
                         consumed=_as_number(payload.get("consumed")),
@@ -548,6 +562,9 @@ def build_execution_projection(
                             authority_source
                             if isinstance(authority_source, str) and authority_source
                             else None
+                        ),
+                        scope_ref=_project_record_scope_ref(
+                            event_scope_ref, payload
                         ),
                         state=_normalize_authority_state(
                             status if isinstance(status, str) and status else None

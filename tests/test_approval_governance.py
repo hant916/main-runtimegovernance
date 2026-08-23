@@ -26,16 +26,20 @@ def _event(
     timestamp: datetime | None = None,
     payload: dict | None = None,
     step_id: str | None = None,
+    scope_ref: str | None = None,
 ) -> dict:
     ts = timestamp or datetime.now(UTC)
     eid = event_id or f"evt-{event_type}"
-    return {
+    event = {
         "event_id": eid,
         "event_type": event_type,
         "timestamp": ts,
         "payload": payload or {},
         "step_id": step_id,
     }
+    if scope_ref is not None:
+        event["scope_ref"] = scope_ref
+    return event
 
 
 def _approval_event(
@@ -46,6 +50,7 @@ def _approval_event(
     required: bool | None = None,
     decision: str | None = None,
     approver_ref: str | None = None,
+    scope_ref: object | None = None,
 ) -> dict:
     payload: dict = {"subject": subject}
     if action is not None:
@@ -56,6 +61,8 @@ def _approval_event(
         payload["decision"] = decision
     if approver_ref is not None:
         payload["approver_ref"] = approver_ref
+    if scope_ref is not None:
+        payload["scope_ref"] = scope_ref
     return _event("approval_evidence", event_id=event_id, payload=payload)
 
 
@@ -67,6 +74,7 @@ def _record(
     decision: str | None = None,
     state: ApprovalState = ApprovalState.UNKNOWN,
     approver_ref: str | None = None,
+    scope_ref: str | None = None,
     evidence_refs: list[EvidenceRef] | None = None,
 ) -> ApprovalRecord:
     return ApprovalRecord(
@@ -76,6 +84,7 @@ def _record(
         decision=decision,
         state=state,
         approver_ref=approver_ref,
+        scope_ref=scope_ref,
         timestamp=datetime.now(UTC),
         evidence_refs=evidence_refs or [],
     )
@@ -291,6 +300,51 @@ def test_approval_event_appears_in_evidence_refs() -> None:
     assert "e1" in ref_ids
     record_ref_ids = {r.event_id for r in proj.approval_records[0].evidence_refs}
     assert "e1" in record_ref_ids
+
+
+# ── T1/T2: ApprovalRecord optional scope_ref, projected from explicit evidence ──
+
+
+def test_approval_record_scope_ref_default_none() -> None:
+    record = _record(subject="release")
+    assert record.scope_ref is None
+
+
+def test_approval_record_scope_ref_preserved() -> None:
+    record = _record(subject="release", state=ApprovalState.APPROVED, scope_ref="scope-a")
+    assert record.scope_ref == "scope-a"
+
+
+def test_approval_record_scope_ref_malformed_rejected() -> None:
+    with pytest.raises(ValidationError):
+        _record(subject="release", scope_ref=42)  # type: ignore[arg-type]
+
+
+def test_approval_evidence_event_projects_explicit_payload_scope() -> None:
+    events = [
+        _approval_event("e1", subject="release", decision="approved", scope_ref="scope-a"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.approval_records[0].scope_ref == "scope-a"
+
+
+def test_approval_record_does_not_inherit_run_scope() -> None:
+    events = [
+        _event("run_started", event_id="s", scope_ref="scope-run-1"),
+        _approval_event("e1", subject="release", decision="approved"),
+        _event("run_completed", event_id="c", scope_ref="scope-run-1"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref == "scope-run-1"
+    assert proj.approval_records[0].scope_ref is None
+
+
+def test_approval_record_scope_not_inferred_from_malformed() -> None:
+    events = [
+        _approval_event("e1", subject="release", decision="approved", scope_ref=["scope-bad"]),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.approval_records[0].scope_ref is None
 
 
 # ── T3: Emit narrow approval signals ────────────────────────────────────

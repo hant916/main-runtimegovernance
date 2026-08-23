@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from ailuros.core.execution import AuthorityState, Outcome
+from ailuros.core.execution import AuthorityRecord, AuthorityState, Outcome
 from ailuros.projection import build_execution_projection
 from ailuros.signals import SignalType, derive_signals
 
@@ -14,16 +14,20 @@ def _event(
     timestamp: datetime | None = None,
     payload: dict | None = None,
     step_id: str | None = None,
+    scope_ref: str | None = None,
 ) -> dict:
     ts = timestamp or datetime.now(UTC)
     eid = event_id or f"evt-{event_type}"
-    return {
+    event = {
         "event_id": eid,
         "event_type": event_type,
         "timestamp": ts,
         "payload": payload or {},
         "step_id": step_id,
     }
+    if scope_ref is not None:
+        event["scope_ref"] = scope_ref
+    return event
 
 
 def _authority_event(
@@ -36,6 +40,7 @@ def _authority_event(
     authority_source: str | None = None,
     status: str | None = None,
     required: bool | None = None,
+    scope_ref: object | None = None,
 ) -> dict:
     payload: dict = {"actor": actor}
     if action is not None:
@@ -50,6 +55,8 @@ def _authority_event(
         payload["status"] = status
     if required is not None:
         payload["required"] = required
+    if scope_ref is not None:
+        payload["scope_ref"] = scope_ref
     return _event("authority_evidence", event_id=event_id, payload=payload)
 
 
@@ -197,3 +204,59 @@ def test_requested_and_observed_target_are_distinct_fields() -> None:
     assert record.requested_target == "repo:project-a"
     assert record.observed_target == "repo:project-b"
     assert record.requested_target != record.observed_target
+
+
+# ── T1/T2: AuthorityRecord optional scope_ref, projected from explicit evidence ──
+
+
+def test_authority_record_scope_ref_default_none() -> None:
+    record = AuthorityRecord(actor="agent-1", state=AuthorityState.UNKNOWN)
+    assert record.scope_ref is None
+
+
+def test_authority_record_scope_ref_preserved() -> None:
+    record = AuthorityRecord(
+        actor="agent-1",
+        state=AuthorityState.AUTHORIZED,
+        scope_ref="scope-a",
+    )
+    assert record.scope_ref == "scope-a"
+
+
+def test_authority_record_scope_ref_malformed_rejected() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        AuthorityRecord(
+            actor="agent-1",
+            state=AuthorityState.UNKNOWN,
+            scope_ref=42,
+        )
+
+
+def test_authority_evidence_event_projects_explicit_payload_scope() -> None:
+    events = _native_success_events() + [
+        _authority_event("a", actor="agent-1", status="authorized", scope_ref="scope-a")
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.authority_records[0].scope_ref == "scope-a"
+
+
+def test_authority_record_does_not_inherit_run_scope() -> None:
+    events = [
+        _event("run_started", event_id="s", scope_ref="scope-run-1"),
+        _authority_event("a", actor="agent-1", status="authorized"),
+        _event("run_completed", event_id="c", scope_ref="scope-run-1"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref == "scope-run-1"
+    assert proj.authority_records[0].scope_ref is None
+
+
+def test_authority_record_scope_not_inferred_from_malformed() -> None:
+    events = _native_success_events() + [
+        _authority_event("a", actor="agent-1", status="authorized", scope_ref=["scope-bad"]),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.authority_records[0].scope_ref is None

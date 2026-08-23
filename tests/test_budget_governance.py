@@ -25,16 +25,20 @@ def _event(
     timestamp: datetime | None = None,
     payload: dict | None = None,
     step_id: str | None = None,
+    scope_ref: str | None = None,
 ) -> dict:
     ts = timestamp or datetime.now(UTC)
     eid = event_id or f"evt-{event_type}"
-    return {
+    event = {
         "event_id": eid,
         "event_type": event_type,
         "timestamp": ts,
         "payload": payload or {},
         "step_id": step_id,
     }
+    if scope_ref is not None:
+        event["scope_ref"] = scope_ref
+    return event
 
 
 def _budget_event(
@@ -261,6 +265,39 @@ def test_budget_limit_is_not_estimated_when_absent() -> None:
     proj = build_execution_projection("run-1", "test", events)
     assert proj.budget_records[0].limit is None
     assert proj.budget_records[0].consumed == 40.0
+
+
+# ── T2: BudgetRecord scope_ref projected only from explicit evidence ─────────
+
+
+def test_budget_evidence_event_projects_explicit_payload_scope() -> None:
+    events = [
+        _budget_event(
+            "e1", subject="run-budget", unit="tokens", scope_ref="scope-a", limit=10,
+        ),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.budget_records[0].scope_ref == "scope-a"
+
+
+def test_budget_evidence_event_projects_explicit_event_scope() -> None:
+    events = [
+        _budget_event("e1", subject="run-budget", unit="tokens", limit=10),
+    ]
+    events[0]["scope_ref"] = "scope-evt-1"
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.budget_records[0].scope_ref == "scope-evt-1"
+
+
+def test_budget_record_does_not_inherit_run_scope() -> None:
+    events = [
+        _event("run_started", event_id="s", scope_ref="scope-run-1"),
+        _budget_event("e1", subject="run-budget", unit="tokens", limit=10),
+        _event("run_completed", event_id="c", scope_ref="scope-run-1"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope_ref == "scope-run-1"
+    assert proj.budget_records[0].scope_ref is None
 
 
 # ── T3: Emit bounded budget signals ──────────────────────────────────────

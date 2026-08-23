@@ -134,9 +134,19 @@ class ApprovalRecord(BaseModel):
     decision: str | None = None
     state: ApprovalState
     approver_ref: str | None = None
+    scope_ref: str | None = None
     timestamp: datetime
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
     source: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("scope_ref", mode="before")
+    @classmethod
+    def require_scope_ref_string(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        raise ValueError("scope_ref must be a string or None")
 
     @field_validator("timestamp")
     @classmethod
@@ -175,10 +185,20 @@ class AuthorityRecord(BaseModel):
     observed_target: str | None = None
     requested_target: str | None = None
     authority_source: str | None = None
+    scope_ref: str | None = None
     state: AuthorityState
     required: bool | None = None
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
     source: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("scope_ref", mode="before")
+    @classmethod
+    def require_scope_ref_string(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        raise ValueError("scope_ref must be a string or None")
 
 
 class ExecutionProjection(BaseModel):
