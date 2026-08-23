@@ -227,6 +227,10 @@ def _validate_timeline(
         if not isinstance(event.get("payload"), dict):
             errors.append(f"{event_ref} payload must be an object")
 
+        scope_ref = event.get("scope_ref")
+        if scope_ref is not None and not isinstance(scope_ref, str):
+            errors.append(f"{event_ref} scope_ref must be a string when present")
+
     return len(events)
 
 

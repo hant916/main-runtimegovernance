@@ -7,6 +7,7 @@
       "event_type": "run_started",
       "timestamp": "2026-08-16T09:00:00+00:00",
       "payload": {"workflow": "generic-mcp-tool-invocation"},
+      "scope_ref": "scope-mcp-sp-001",
       "metadata": {}
     },
     {
@@ -21,6 +22,7 @@
         "requested_target": "mcp:resource-alpha",
         "status": "violation"
       },
+      "scope_ref": "scope-mcp-sp-001",
       "metadata": {}
     },
     {
@@ -50,6 +52,7 @@
       "event_type": "project_validation",
       "timestamp": "2026-08-16T09:00:20+00:00",
       "payload": {"status": "passed"},
+      "scope_ref": "scope-mcp-sp-001",
       "metadata": {}
     },
     {

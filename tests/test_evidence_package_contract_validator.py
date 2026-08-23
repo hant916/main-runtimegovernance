@@ -131,3 +131,25 @@ def test_required_missing_file_fails(tmp_path):
     result = validate_evidence_package_contract(pkg)
     assert result.ok is False
     assert any("required file missing: summary.json" in e for e in result.errors)
+
+
+def test_malformed_scope_ref_is_error(tmp_path):
+    pkg = _copy_valid(tmp_path)
+    timeline = json.loads((pkg / "timeline.json").read_text(encoding="utf-8"))
+    timeline["events"][0]["scope_ref"] = 42
+    _write_json(pkg / "timeline.json", timeline)
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is False
+    assert any("scope_ref must be a string" in e for e in result.errors)
+
+
+def test_valid_string_scope_ref_passes(tmp_path):
+    pkg = _copy_valid(tmp_path)
+    timeline = json.loads((pkg / "timeline.json").read_text(encoding="utf-8"))
+    timeline["events"][0]["scope_ref"] = "scope-ok"
+    _write_json(pkg / "timeline.json", timeline)
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True
+    assert result.errors == []

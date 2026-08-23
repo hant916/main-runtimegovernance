@@ -12,6 +12,7 @@ producer-identity branching anywhere in src/ailuros.
 from __future__ import annotations
 
 import inspect
+import json
 from pathlib import Path
 
 import pytest
@@ -36,6 +37,8 @@ REPO_ROOT = HERE.parent
 SECOND_PRODUCER = REPO_ROOT / "fixtures" / "runtime-evidence" / "second-producer"
 INVALID_FIXTURES = SECOND_PRODUCER / "invalid"
 FIRST_PRODUCER = HERE / "fixtures" / "evidence_package" / "valid-v1"
+
+SCOPE_REF = "scope-mcp-sp-001"
 
 
 def _new_storage(tmp_path: Path) -> SQLiteStorage:
@@ -78,6 +81,7 @@ def test_second_producer_source_name_is_distinct_from_everrun() -> None:
         ("malformed-timestamp", "event[0] (event_id 'evt-sp-001') has invalid timestamp"),
         ("duplicate-event-id", "event[1] (event_id 'evt-sp-001') duplicates event_id"),
         ("malformed-payload", "event[0] (event_id 'evt-sp-001') payload must be an object"),
+        ("malformed-scope", "event[0] (event_id 'evt-sp-001') scope_ref must be a string"),
     ],
 )
 def test_second_producer_invalid_fixtures_have_actionable_diagnostics(
@@ -225,6 +229,149 @@ def test_second_producer_events_are_not_silently_treated_as_clean(tmp_path: Path
     assert "authority_evidence" in raw_event_types
     assert "run_started" in raw_event_types
     assert "run_completed" in raw_event_types
+
+
+# ── T1: scope/provenance survive the canonical pipeline ────────────────────
+
+
+def test_second_producer_scoped_evidence_scope_survives_canonical_pipeline(
+    tmp_path: Path,
+) -> None:
+    """The second-producer fixture ships explicit scoped evidence. Its scope_ref
+    must survive load -> ingest -> projection exactly as authored, proving scope
+    is a package-authored fact and not derived from the producer name."""
+    package = load_evidence_package(SECOND_PRODUCER)
+    scoped = [e for e in package.events if e.scope_ref is not None]
+    assert scoped, "second-producer fixture must ship explicit scoped evidence"
+    assert {e.scope_ref for e in scoped} == {SCOPE_REF}
+
+    storage = _new_storage(tmp_path)
+    ingest_evidence_package(storage, package)
+
+    stored = storage.list_events(package.run_id)
+    scoped_stored = [e for e in stored if e.payload.get("scope_ref") is not None]
+    assert scoped_stored
+    assert {e.payload["scope_ref"] for e in scoped_stored} == {SCOPE_REF}
+
+    proj, _ = rebuild_projections_and_signals(storage, package.run_id)
+    assert proj.scope_ref == SCOPE_REF
+
+
+def test_second_producer_provenance_survives_contract_and_ingest(
+    tmp_path: Path,
+) -> None:
+    """Manifest provenance is package-authored evidence: the contract validator
+    must read it (safety checks) and the load/ingest path must leave it intact as
+    raw evidence, with the source it identifies carried into the stored run."""
+    manifest_raw = json.loads(
+        (SECOND_PRODUCER / "manifest.json").read_text(encoding="utf-8")
+    )
+    provenance = manifest_raw["provenance"]
+    assert provenance["source_artifact"] == "generic-mcp-exporter"
+
+    result = validate_evidence_package_contract(SECOND_PRODUCER)
+    assert result.ok is True
+    assert not any("provenance" in error for error in result.errors)
+
+    package = load_evidence_package(SECOND_PRODUCER)
+    storage = _new_storage(tmp_path)
+    ingest_evidence_package(storage, package)
+
+    stored_run = storage.get_run(package.run_id)
+    assert stored_run.metadata.get("source") == "generic-mcp-workflow"
+
+    manifest_after = json.loads(
+        (SECOND_PRODUCER / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert manifest_after["provenance"] == provenance
+
+
+# ── T2: unsupported event type / missing governance constraints ─────────────
+
+
+def test_second_producer_unsupported_event_type_is_warning_not_error() -> None:
+    """mcp.tool.result_received is outside the canonical event vocabulary. The
+    contract validator must preserve it as a warning, never reject the package,
+    and never reinterpret it as a governance fact."""
+    result = validate_evidence_package_contract(SECOND_PRODUCER)
+    assert result.ok is True
+    assert result.errors == []
+    assert any("unknown event_type: mcp.tool.result_received" in w for w in result.warnings)
+
+
+def test_missing_governance_constraints_are_not_inferred_as_clean() -> None:
+    """A second-producer run whose events carry producer-native completion labels
+    but no authority/budget/approval/validation constraint evidence must not be
+    reported as a clean governed outcome: missing constraints yield UNKNOWN
+    coverage, no manufactured records, and no clean_success claim."""
+    package = load_evidence_package(SECOND_PRODUCER)
+    unconstrained = [
+        {
+            "event_id": ev.event_id,
+            "event_type": ev.event_type,
+            "timestamp": ev.timestamp,
+            "payload": ev.payload,
+            "scope_ref": ev.scope_ref,
+        }
+        for ev in package.events
+        if ev.event_type
+        not in {
+            "authority_evidence",
+            "budget_evidence",
+            "approval_evidence",
+            "project_validation",
+        }
+    ]
+
+    proj = build_execution_projection(
+        run_id="run-second-producer-nogov",
+        source="generic-mcp-workflow",
+        events=unconstrained,
+        schema_version="ailuros.timeline.v1",
+    )
+
+    assert proj.lifecycle.value == "completed"
+    assert proj.approval_records == []
+    assert proj.authority_records == []
+    assert proj.budget_records == []
+    assert proj.governance_coverage.authority.value == "unknown"
+    assert proj.governance_coverage.approval.value == "unknown"
+    assert proj.governance_coverage.budget.value == "unknown"
+
+    report = build_run_report(proj, [])
+    assert report.governed_outcome != "clean_success"
+
+
+# ── T3: producer-native labels do not create governance facts ───────────────
+
+
+def test_producer_native_success_labels_do_not_create_governance_facts(
+    tmp_path: Path,
+) -> None:
+    """The fixture carries producer-native success/accept labels: project_validation
+    status 'passed', budget_evidence status 'within_limit', run_completed result
+    'completed', and an mcp.tool.result_received accept event. None of these may
+    manufacture authorized, approved, or clean governance facts on their own."""
+    package = load_evidence_package(SECOND_PRODUCER)
+    storage = _new_storage(tmp_path)
+    ingest_evidence_package(storage, package)
+
+    stored = storage.list_events(package.run_id)
+    raw = {e.payload["event_type"]: e.payload["payload"] for e in stored}
+    assert raw["project_validation"]["status"] == "passed"
+    assert raw["budget_evidence"]["status"] == "within_limit"
+    assert raw["run_completed"]["result"] == "completed"
+
+    proj, signals = rebuild_projections_and_signals(storage, package.run_id)
+
+    assert proj.approval_records == []
+    assert all(r.state.value != "authorized" for r in proj.authority_records)
+    assert all(r.state.value != "approved" for r in proj.approval_records)
+    assert proj.outcome.value == "failed"
+
+    report = build_run_report(proj, signals)
+    assert report.governed_outcome == "failed"
+    assert report.governed_outcome != "clean_success"
 
 
 # ── T4: anti-regression — no source-name branching anywhere in core ────────

@@ -240,3 +240,23 @@ def test_execute_tool_passes_all_arguments():
     )
     adapter.execute_tool(fn, context)
     fn.assert_called_once_with(a=1, b=2)
+
+
+def test_adapter_accept_label_does_not_create_governance_facts():
+    """A producer-native ALLOWED accept label must not itself be treated as an
+    authority authorization, approval, or clean-state governance fact: the
+    adapter only echoes the decision it was given and manufactures no such state."""
+    runtime = _make_runtime(
+        _make_decision(GovernanceDecisionType.ALLOW, reason="adapter non-inference check")
+    )
+    adapter = LocalCallableAdapter(runtime)
+    context = AdapterContext(run_id="r-accept", tool_name="test.accept", arguments={})
+    result = adapter.execute_tool(lambda: "ok", context)
+
+    assert result.status == AdapterDecisionStatus.ALLOWED
+    assert result.decision.decision == GovernanceDecisionType.ALLOW
+    dumped = result.model_dump(mode="json")
+    assert set(dumped) == {"status", "decision", "reason", "result"}
+    assert "authorized" not in dumped
+    assert "approved" not in dumped
+    assert "clean" not in dumped
