@@ -14,6 +14,7 @@ from ailuros.core.execution import (
     Lifecycle,
     Outcome,
     RoleSummary,
+    ScopeOutcome,
     Validation,
 )
 from ailuros.projection import derive_native_outcome
@@ -31,9 +32,11 @@ class RunReport(BaseModel):
     outcome: str
     native_outcome: str = ""
     governed_outcome: str = ""
+    aggregate_governed_outcome: str = ""
     validation: str
     scope: str
     governance_coverage: GovernanceCoverage = Field(default_factory=GovernanceCoverage)
+    scope_outcomes: list[ScopeOutcome] = Field(default_factory=list)
     why_stopped: str
     outcome_reasons: list[OutcomeReason] = Field(default_factory=list)
     governed_outcome_reasons: list[OutcomeReason] = Field(default_factory=list)
@@ -186,65 +189,165 @@ def _is_blocking_failure_signal(signal: GovernanceSignal) -> bool:
     )
 
 
-def derive_governed_outcome(
-    projection: ExecutionProjection,
+def _classify_governed_outcome(
+    outcome: Outcome,
+    validation: Validation,
+    lifecycle: Lifecycle,
     signals: list[GovernanceSignal],
-) -> tuple[GovernedOutcome, list[OutcomeReason]]:
+) -> GovernedOutcome:
     failed_signals = [
         signal for signal in signals if _is_blocking_failure_signal(signal)
     ]
     if (
-        projection.outcome in {Outcome.FAILED, Outcome.BLOCKED}
-        or projection.validation == Validation.FAILED
+        outcome in {Outcome.FAILED, Outcome.BLOCKED}
+        or validation == Validation.FAILED
         or failed_signals
     ):
+        return GovernedOutcome.FAILED
+
+    review_signals = _signals_by_type(signals, _REVIEW_REQUIRED_SIGNAL_TYPES)
+    if outcome == Outcome.REVIEW_REQUIRED or review_signals:
+        return GovernedOutcome.REVIEW_REQUIRED
+
+    if (
+        lifecycle not in {Lifecycle.COMPLETED, Lifecycle.FAILED}
+        or outcome == Outcome.UNKNOWN
+    ):
+        return GovernedOutcome.UNKNOWN
+
+    degraded_signals = _signals_by_type(signals, _DEGRADED_SIGNAL_TYPES)
+    validation_degraded = validation in {
+        Validation.PARTIAL,
+        Validation.NOT_RUN,
+        Validation.UNKNOWN,
+    }
+    if degraded_signals or validation_degraded:
+        return GovernedOutcome.DEGRADED_SUCCESS
+
+    if outcome == Outcome.SUCCESS and validation == Validation.PASSED:
+        return GovernedOutcome.CLEAN_SUCCESS
+
+    return GovernedOutcome.UNKNOWN
+
+
+def _governed_outcome_reasons(
+    governed: GovernedOutcome,
+    projection: ExecutionProjection,
+    signals: list[GovernanceSignal],
+) -> list[OutcomeReason]:
+    if governed == GovernedOutcome.FAILED:
+        failed_signals = [
+            signal for signal in signals if _is_blocking_failure_signal(signal)
+        ]
         reasons = [
             OutcomeReason(code=s.type, evidence_refs=list(s.evidence_refs))
             for s in failed_signals
         ]
         if not reasons:
             reasons = [OutcomeReason(code=f"outcome/{projection.outcome.value}")]
-        return GovernedOutcome.FAILED, reasons
+        return reasons
 
-    review_signals = _signals_by_type(signals, _REVIEW_REQUIRED_SIGNAL_TYPES)
-    if projection.outcome == Outcome.REVIEW_REQUIRED or review_signals:
+    if governed == GovernedOutcome.REVIEW_REQUIRED:
+        review_signals = _signals_by_type(signals, _REVIEW_REQUIRED_SIGNAL_TYPES)
         reasons = [
             OutcomeReason(code=s.type, evidence_refs=list(s.evidence_refs))
             for s in review_signals
         ]
         if not reasons:
             reasons = [OutcomeReason(code="outcome/review_required")]
-        return GovernedOutcome.REVIEW_REQUIRED, reasons
+        return reasons
 
-    if (
-        projection.lifecycle not in {Lifecycle.COMPLETED, Lifecycle.FAILED}
-        or projection.outcome == Outcome.UNKNOWN
-    ):
-        return GovernedOutcome.UNKNOWN, [
-            OutcomeReason(code=f"lifecycle/{projection.lifecycle.value}")
-        ]
+    if governed == GovernedOutcome.UNKNOWN:
+        if projection.lifecycle not in {Lifecycle.COMPLETED, Lifecycle.FAILED}:
+            return [OutcomeReason(code=f"lifecycle/{projection.lifecycle.value}")]
+        if projection.outcome == Outcome.UNKNOWN:
+            return [OutcomeReason(code=f"lifecycle/{projection.lifecycle.value}")]
+        return [OutcomeReason(code=f"outcome/{projection.outcome.value}")]
 
-    degraded_signals = _signals_by_type(signals, _DEGRADED_SIGNAL_TYPES)
-    validation_degraded = projection.validation in {
-        Validation.PARTIAL,
-        Validation.NOT_RUN,
-        Validation.UNKNOWN,
-    }
-    if degraded_signals or validation_degraded:
+    if governed == GovernedOutcome.DEGRADED_SUCCESS:
+        degraded_signals = _signals_by_type(signals, _DEGRADED_SIGNAL_TYPES)
         reasons = [
             OutcomeReason(code=s.type, evidence_refs=list(s.evidence_refs))
             for s in degraded_signals
         ]
         if not reasons:
             reasons = [OutcomeReason(code=f"validation/{projection.validation.value}")]
-        return GovernedOutcome.DEGRADED_SUCCESS, reasons
+        return reasons
 
-    if projection.outcome == Outcome.SUCCESS and projection.validation == Validation.PASSED:
-        return GovernedOutcome.CLEAN_SUCCESS, []
+    return []
 
-    return GovernedOutcome.UNKNOWN, [
-        OutcomeReason(code=f"outcome/{projection.outcome.value}")
-    ]
+
+def derive_governed_outcome(
+    projection: ExecutionProjection,
+    signals: list[GovernanceSignal],
+) -> tuple[GovernedOutcome, list[OutcomeReason]]:
+    governed = _classify_governed_outcome(
+        projection.outcome,
+        projection.validation,
+        projection.lifecycle,
+        signals,
+    )
+    return governed, _governed_outcome_reasons(governed, projection, signals)
+
+
+_GOVERNED_OUTCOME_PRECEDENCE: dict[GovernedOutcome, int] = {
+    GovernedOutcome.FAILED: 4,
+    GovernedOutcome.REVIEW_REQUIRED: 3,
+    GovernedOutcome.UNKNOWN: 2,
+    GovernedOutcome.DEGRADED_SUCCESS: 1,
+    GovernedOutcome.CLEAN_SUCCESS: 0,
+}
+
+
+def aggregate_governed_outcomes(
+    scoped_outcomes: list[ScopeOutcome],
+) -> GovernedOutcome:
+    """Aggregate per-scope governed outcomes deterministically.
+
+    Precedence is conservative: any FAILED scope dominates, then
+    REVIEW_REQUIRED, then UNKNOWN. An UNKNOWN scope therefore prevents any
+    clean or degraded success claim (incomplete coverage is never inferred
+    as clean). An empty list aggregates to UNKNOWN.
+    """
+    if not scoped_outcomes:
+        return GovernedOutcome.UNKNOWN
+    return max(
+        (entry.outcome for entry in scoped_outcomes),
+        key=lambda outcome: _GOVERNED_OUTCOME_PRECEDENCE[outcome],
+    )
+
+
+def derive_scope_outcomes(
+    projection: ExecutionProjection,
+    signals: list[GovernanceSignal],
+) -> list[ScopeOutcome]:
+    """Derive one governed outcome per scope from scope-attributed signals.
+
+    Scopes are taken from the canonical scope-aware governance fact
+    ``GovernanceSignal.scope_ref``. A scope that carried no signals is not
+    represented and therefore can never contribute clean success. Run-level
+    projection facts bound every scope so run-level failures are never
+    masked by an otherwise clean scope.
+    """
+    by_scope: dict[str | None, list[GovernanceSignal]] = {}
+    for signal in signals:
+        by_scope.setdefault(signal.scope_ref, []).append(signal)
+
+    results: list[ScopeOutcome] = []
+    for scope_ref in sorted(by_scope, key=lambda ref: (ref is None, ref or "")):
+        scoped_signals = by_scope[scope_ref]
+        results.append(
+            ScopeOutcome(
+                scope_ref=scope_ref,
+                outcome=_classify_governed_outcome(
+                    projection.outcome,
+                    projection.validation,
+                    projection.lifecycle,
+                    scoped_signals,
+                ),
+            )
+        )
+    return results
 
 
 def build_run_report(
@@ -254,6 +357,12 @@ def build_run_report(
     governed_outcome, governed_outcome_reasons = derive_governed_outcome(
         projection, signals
     )
+    scope_outcomes = derive_scope_outcomes(projection, signals)
+    aggregate_governed_outcome = (
+        aggregate_governed_outcomes(scope_outcomes)
+        if scope_outcomes
+        else governed_outcome
+    )
     return RunReport(
         run_id=projection.run_id,
         lifecycle=projection.lifecycle.value,
@@ -262,9 +371,11 @@ def build_run_report(
             projection.lifecycle, projection.decisions
         ).value,
         governed_outcome=governed_outcome.value,
+        aggregate_governed_outcome=aggregate_governed_outcome.value,
         validation=projection.validation.value,
         scope=projection.scope.value,
         governance_coverage=projection.governance_coverage,
+        scope_outcomes=scope_outcomes,
         why_stopped=_derive_why_stopped(projection, signals),
         outcome_reasons=_build_outcome_reasons(signals),
         governed_outcome_reasons=governed_outcome_reasons,
@@ -313,6 +424,7 @@ def render_run_report_markdown(
     lines.append(f"| Outcome | {report.outcome} |")
     lines.append(f"| Native Outcome | {report.native_outcome} |")
     lines.append(f"| Governed Outcome | {report.governed_outcome} |")
+    lines.append(f"| Aggregate Governed Outcome | {report.aggregate_governed_outcome} |")
     lines.append(f"| Validation | {report.validation} |")
     lines.append(f"| Scope | {report.scope} |")
     lines.append("")
@@ -325,6 +437,18 @@ def render_run_report_markdown(
         lines.append(
             f"| {dimension} | {getattr(report.governance_coverage, dimension).value} |"
         )
+    lines.append("")
+
+    lines.append("## Scope Outcomes")
+    lines.append("")
+    if report.scope_outcomes:
+        lines.append("| Scope | Governed Outcome |")
+        lines.append("|---|---|")
+        for scope_outcome in report.scope_outcomes:
+            scope_label = scope_outcome.scope_ref or "unscoped"
+            lines.append(f"| {scope_label} | {scope_outcome.outcome.value} |")
+    else:
+        lines.append("None.")
     lines.append("")
 
     lines.append("## Why Stopped")

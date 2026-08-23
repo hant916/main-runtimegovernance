@@ -32,6 +32,22 @@ class GovernedOutcome(StrEnum):
     UNKNOWN = "unknown"
 
 
+class ScopeOutcome(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    scope_ref: str | None = None
+    outcome: GovernedOutcome
+
+    @field_validator("scope_ref", mode="before")
+    @classmethod
+    def require_scope_ref_string(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        raise ValueError("scope_ref must be a string or None")
+
+
 class Validation(StrEnum):
     PASSED = "passed"
     FAILED = "failed"

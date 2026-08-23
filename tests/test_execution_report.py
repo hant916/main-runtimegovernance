@@ -320,6 +320,48 @@ class TestBuildRunReport:
         assert report.governance_coverage.validation == CoverageState.UNKNOWN
         assert report.governance_coverage.scope == CoverageState.UNKNOWN
 
+    def test_mixed_scope_signals_expose_scope_outcomes_and_aggregate(self) -> None:
+        now = datetime.now(UTC)
+        projection = build_execution_projection(
+            "run-mixed-scope",
+            "test",
+            [
+                _projection_event("start", "run_started", now, {}),
+                _projection_event("end", "run_completed", now, {}),
+            ],
+        )
+        signals = [
+            _make_signal(
+                signal_type=SignalType.BUDGET_EXCEEDED,
+                severity=Severity.HIGH,
+                subject="budget",
+                evidence_refs=[_make_ref("e1")],
+            ),
+            _make_signal(
+                signal_type=SignalType.BACKEND_FALLBACK,
+                severity=Severity.MEDIUM,
+                subject="backend",
+                evidence_refs=[_make_ref("e2")],
+            ),
+        ]
+        signals[0].scope_ref = "scope-a"
+        signals[1].scope_ref = "scope-b"
+        report = build_run_report(projection, signals)
+        assert report.aggregate_governed_outcome == "failed"
+        assert len(report.scope_outcomes) == 2
+        by_scope = {entry.scope_ref: entry.outcome.value for entry in report.scope_outcomes}
+        assert by_scope == {
+            "scope-a": "failed",
+            "scope-b": "degraded_success",
+        }
+
+    def test_clean_single_scope_report_aggregate_matches_governed_outcome(self) -> None:
+        proj = _make_projection()
+        report = build_run_report(proj, [])
+        assert report.governed_outcome == "clean_success"
+        assert report.aggregate_governed_outcome == "clean_success"
+        assert report.scope_outcomes == []
+
 
 class TestOutcomeReasons:
     def test_native_outcome_derived_from_lifecycle(self) -> None:
@@ -446,6 +488,21 @@ class TestRenderRunReportMarkdown:
         md = render_run_report_markdown(report)
         assert "## Governance Coverage" in md
         assert "| authority | unknown |" in md
+
+    def test_renders_scope_outcomes_section(self) -> None:
+        sig = _make_signal(signal_type=SignalType.BACKEND_FALLBACK, severity=Severity.MEDIUM)
+        sig.scope_ref = "scope-a"
+        report = build_run_report(_make_projection(), [sig])
+        md = render_run_report_markdown(report)
+        assert "## Scope Outcomes" in md
+        assert "scope-a" in md
+        assert "degraded_success" in md
+
+    def test_renders_none_when_no_scope_outcomes(self) -> None:
+        report = build_run_report(_make_projection(), [])
+        md = render_run_report_markdown(report)
+        assert "## Scope Outcomes" in md
+        assert "None." in md
 
     def test_renders_none_when_no_outcome_reasons(self) -> None:
         proj = _make_projection()
