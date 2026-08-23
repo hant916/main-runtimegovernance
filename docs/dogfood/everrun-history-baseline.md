@@ -270,3 +270,231 @@ Remaining gaps are seeded as candidate future packs (not implemented here):
 3. **P2 — Emit `run_completed`/terminal lifecycle events in the export.**
    Evidence: the real sample projects lifecycle `running` and outcome
    `unknown` solely because no terminal event exists in the export.
+
+## 8065 direct raw acceptance record
+
+This pack re-tests the **raw** EverRun `evidence/` output directly through the
+Ailuros production package path with no wrapper, no normalizer, and no event
+rewriting. 8064 proved boundary logic only through a faithful conformant copy;
+the missing proof is direct producer-to-consumer conformance.
+
+### T1: Newest post-fix EverRun evidence located
+
+| Fact | Value |
+|---|---|
+| Repo | `main-runtimegovernance` (this repo) |
+| run_id | `run-20260824-002422` |
+| Evidence path | `.everrun/history/run-20260824-002422/evidence/` (raw exporter output; not copied into this repo) |
+| manifest.generated_at | `2026-08-23T22:42:58.213149+00:00` |
+| manifest.schema_version / exporter_version | `ailuros.timeline.v1` / `1.0` |
+| manifest.files | present (array of entries with `path`; entries have **no `name`** field) |
+| timeline shape | object with `events`, `run_id`, `schema_version` |
+| evidence_count | 21 (`coverage`: recognized 7, source_preserved_unknown 14) |
+
+This is the newest raw EverRun `evidence/` output in `.everrun/history/`
+(`run-20260824-004751` is newer but produced no `evidence/` directory).
+Compared with the 8064-era export (`run-20260823-033016`, `schema_version`
+`"1.0"`, flat-array timeline, no `files` array), the exporter conformance work
+has fixed the timeline shape and schema version, but the manifest `files`
+entries still do not satisfy the contract.
+
+### T2: Direct package audit result
+
+`python -m ailuros evidence-audit .everrun/history/run-20260824-002422/evidence --format json`
+
+| Field | Value |
+|---|---|
+| ok | false |
+| decision | fail |
+| errors | `manifest 'files' entry missing 'name'` (x2) |
+| events_count | 21 |
+| warnings | 17 unknown-event_type warnings (`project_scope`, `project_validation`, `projection.*`, `backend.*`, `planner.decision`, `role.run_summary`, `runtime.run_config`, ...) |
+| rules_evaluated | 2 |
+| exit | 1 |
+
+The raw producer output still does **not** satisfy the `ailuros.timeline.v1`
+contract: each `manifest.files` entry must carry a `name`, but the exporter
+emits `path` only. Timeline shape and schema version are now conformant.
+
+### T3: Direct import and rebuild result
+
+`python -m ailuros --db <disposable sqlite> import-evidence-package <evidence>`
+→ `{"status": "invalid", "detail": "Evidence package contract invalid: manifest 'files' entry missing 'name'; manifest 'files' entry missing 'name'"}`, exit 1.
+
+`python -m ailuros --db <disposable sqlite> report run-20260824-002422 --rebuild --format json`
+→ `run not found: run-20260824-002422` (no run was stored because import
+rejected the package), exit 1.
+
+No events were stored, so no projection, signals, or governed result exists for
+the raw package.
+
+### T4: Facts, gaps, and classification
+
+Because the package is rejected at the contract boundary, none of lifecycle,
+native/governed outcome, validation, scope, decision domains, or coverage can be
+derived for the raw package. Everything downstream remains **not evaluated** (no
+clean promotion, no synthesized facts).
+
+| Unknown | Classification | Evidence |
+|---|---|---|
+| Canonical `ailuros.timeline.v1` package from the producer | **evidence-missing** (producer/exporter conformance gap) | audit errors: `manifest 'files' entry missing 'name'` (x2); import `status: invalid` |
+| Recognized `event_type` names for the exporter's own governance/projection events | **mapping-missing** | 17 unknown-event_type warnings (`project_scope`, `project_validation`, `projection.*`, `backend.*`, ...) — the validator's event-type registry does not yet cover them |
+| Lifecycle / native & governed outcome / validation / scope / decisions / coverage | evidence-missing (downstream of the rejected package; never evaluated) | no events imported; report `run not found` |
+| Consumer bug | none | the validator correctly rejects a non-conformant raw export; no validator relaxation was made |
+
+**Result:** the producer still violates the canonical package contract for the
+newest raw export — the timeline shape and schema version are fixed, but
+`manifest.files` entries are still missing `name`. The direct-consumption proof
+is **not** established for the raw directory as shipped; it remains gated on the
+P0 lossless, privacy-screened `ailuros.timeline.v1` export gap (now reduced to
+`manifest.files[].name` plus event-type registration). This is a documented
+failure, not a silent substitution: the failing raw sample is preserved and no
+wrapper or normalizer was applied.
+
+### 8065 re-run confirmation (run-20260824-004751)
+
+The 8065 retry re-tested the same newest raw EverRun `evidence/` directory
+(`.everrun/history/run-20260824-002422/evidence/`) directly through the
+production path with **no wrapper, no normalizer, and no event rewriting**. At
+check time the newest post-fix run (`run-20260824-004751`, this retry) had
+produced no `evidence/` directory, so `run-20260824-002422` remains the newest
+raw export available.
+
+Re-run results are identical to the first 8065 attempt:
+
+- `evidence-audit` → `ok=false`, `decision=fail`; errors `manifest 'files'
+  entry missing 'name'` (x2); `events_count=21`; 17 unknown-event_type
+  warnings.
+- `import-evidence-package` (disposable SQLite) →
+  `{"status": "invalid", "detail": "Evidence package contract invalid: manifest
+  'files' entry missing 'name'; manifest 'files' entry missing 'name'"}`, exit 1.
+- `report run-20260824-002422 --rebuild --format json` → `run not found:
+  run-20260824-002422`, exit 1; no events stored, so nothing downstream exists
+  to evaluate.
+
+Classification is unchanged: `manifest.files[].name` is **evidence-missing**
+(producer/exporter conformance gap), the 17 unrecognized governance/projection
+event types are **mapping-missing**, downstream lifecycle / native & governed
+outcome / validation / scope / decision domains / coverage remain
+**evidence-missing** (never evaluated), and there is **no consumer bug** (the
+validator still correctly rejects the non-conformant raw export and was not
+relaxed).
+
+**Result (re-run):** direct producer-to-consumer conformance is still **not
+established**. The raw directory remains gated on the P0 lossless,
+privacy-screened `ailuros.timeline.v1` export gap (now `manifest.files[].name`
+plus event-type registration). The failing raw sample is preserved and
+unchanged; no wrapper, normalizer, or payload rewrite was applied.
+
+### 8065 post-fix direct acceptance (run-20260824-004751)
+
+This is the post-fix re-run after the EverRun exporter conformance
+implementation landed. The exporter now emits `manifest.files[].name`, closing
+the structural contract gap recorded above. The raw `evidence/` output is
+tested directly through the production path with **no wrapper, no normalizer,
+and no event rewriting**.
+
+### T1: Newest post-fix EverRun evidence located
+
+| Fact | Value |
+|---|---|
+| Repo | `main-runtimegovernance` (this repo) |
+| run_id | `run-20260824-004751` |
+| Evidence path | `.everrun/history/run-20260824-004751/evidence/` (raw exporter output; not copied into this repo) |
+| manifest.generated_at | `2026-08-23T23:16:46.552374+00:00` |
+| manifest.schema_version / exporter_version | `ailuros.timeline.v1` / `1.0` |
+| manifest.files | `[{"name": "manifest.json"}, {"name": "timeline.json"}]` — post-fix entries now carry `name` |
+| timeline shape | object with `events`, `run_id`, `schema_version` (`ailuros.timeline.v1`) |
+| evidence_count | 38 (`coverage`: recognized 7, source_preserved_unknown 31) |
+
+`run-20260824-002422` also holds a regenerated post-fix export, but
+`run-20260824-004751` is the newest run with an `evidence/` directory at check
+time (the current run `run-20260824-011708` had not yet produced one). No raw
+artifacts were copied into this repo.
+
+### T2: Direct package audit result
+
+`python -m ailuros evidence-audit .everrun/history/run-20260824-004751/evidence --format json`
+
+| Field | Value |
+|---|---|
+| ok | true |
+| decision | warn |
+| errors | none (0 structural contract errors) |
+| events_count | 38 |
+| rules_evaluated | 2 |
+| warnings | 34 unknown-event_type warnings (`backend.command`, `backend.resolve`, `backend.use`, `coder.result`, `completion_preflight.summary`, `fallback_started`, `planner.decision`, `project_scope`, `project_validation`, `projection.*`, `role.run_summary`, `runtime.run_config`, `session.fallback`) |
+| exit | 0 |
+
+The raw producer output now **satisfies** the `ailuros.timeline.v1` structural
+contract. The remaining warnings are event-type registry gaps, not structural
+contract errors.
+
+### T3: Direct import and rebuild result
+
+`python -m ailuros --db <disposable sqlite> import-evidence-package .everrun/history/run-20260824-004751/evidence`
+→ `{"status": "created", "run_id": "run-20260824-004751", "events_imported": 38, "events_skipped": 0, "source_digest": null}`, exit 0.
+
+`python -m ailuros --db <disposable sqlite> report run-20260824-004751 --rebuild --format json`
+→ completes (exit 0) with: `lifecycle=running`, `outcome=unknown`,
+`native_outcome=unknown`, `governed_outcome=unknown`,
+`aggregate_governed_outcome=unknown`, `validation=passed`, `scope=clean`,
+`why_stopped=execution_control: human_review`, `decision_count=1`,
+`signal_summaries=[]`, `event_count=38`, `evidence_refs=7`,
+`started_at=2026-08-24T00:47:53+02:00`, `completed_at=null`.
+
+The import stores all 38 events and the rebuild completes on the exact audited
+package; no transformation was applied between producer and consumer.
+
+### T4: Facts, gaps, and classification
+
+| Fact | Value | Source |
+|---|---|---|
+| Lifecycle | `running` (no `run_completed` event in the export) | report `lifecycle=running`, `completed_at=null` |
+| Native outcome | `unknown` | report `native_outcome=unknown` |
+| Governed outcome | `unknown` (aggregate `unknown`; not promoted to clean) | report `governed_outcome=unknown` |
+| Validation | `passed` (`project_validation` events, exit 0) | report `validation=passed` |
+| Scope | `clean` (`project_scope` allowed_scope=true, forbidden_touched=false, 2 changed files) | report `scope=clean` |
+| Decision domains | `execution_control` (`human_review`) — 1 decision | report `decision_reasons=[execution_control/human_review]`, `why_stopped=execution_control: human_review` |
+| Coverage | authority/approval/budget `unknown`; validation/scope `evaluated` | report `governance_coverage` |
+
+| Unknown | Classification | Evidence |
+|---|---|---|
+| 34 unrecognized event types (`backend.*`, `projection.*`, `session.fallback`, ...) | **mapping-missing** — validator event-type registry does not cover exporter's governance/projection events; preserved as `source_preserved_unknown` | `evidence-audit` warnings; manifest `coverage.source_preserved_unknown=31` |
+| Lifecycle terminal event (`run_completed`) absent | **evidence-missing** — exporter emits no run-completion event, so lifecycle stays `running` and outcome `unknown` | report `lifecycle=running`, `completed_at=null` |
+| Authority / approval / budget coverage | **evidence-missing** — export contains no such records | report `governance_coverage` (all `unknown`) |
+| Consumer bug | none | validator correctly accepts the now-conformant raw export; no validator relaxation, no wrapper, no payload rewrite |
+
+**Result (post-fix):** direct producer-to-consumer conformance is **now
+established** for the newest post-fix raw EverRun evidence directory. The
+`manifest.files[].name` structural gap is closed by the exporter conformance
+implementation; the raw directory enters audit → import → rebuild/report with
+no wrapper, no normalizer, and no event rewriting. Remaining unknowns are
+evidence-missing (no terminal event, no authority/approval/budget records in
+the export) or mapping-missing (event-type registry coverage), never inferred
+as clean. The previously failing raw sample (`run-20260824-002422`) was
+documented before this cleaner post-fix sample was tested.
+
+### 8065 current-run re-confirmation (run-20260824-011708)
+
+This run re-ran T1-T3 against the same newest post-fix raw EverRun
+`evidence/` directory (`.everrun/history/run-20260824-004751/evidence/`) with
+**no wrapper, no normalizer, and no event rewriting**. The current run
+(`run-20260824-011708`) had not yet produced an `evidence/` directory at check
+time, so `run-20260824-004751` remains the newest raw export available.
+
+Results are identical to the recorded post-fix acceptance above:
+
+- `evidence-audit` → `ok=true`, `decision=warn`, `errors=[]`,
+  `events_count=38`, 34 unknown-event_type warnings.
+- `import-evidence-package` (disposable SQLite) →
+  `{"status": "created", "run_id": "run-20260824-004751", "events_imported": 38,
+  "events_skipped": 0}`.
+- `report run-20260824-004751 --rebuild --format json` → `lifecycle=running`,
+  `outcome=unknown`, `governed_outcome=unknown`, `validation=passed`,
+  `scope=clean`, `why_stopped=execution_control: human_review`,
+  `decision_count=1`, `event_count=38`, `evidence_refs=7`.
+
+The direct producer-to-consumer conformance proof stands: the raw directory is
+directly consumable by the production audit → import → rebuild/report path, and
+the recorded facts, gaps, and classification are unchanged.

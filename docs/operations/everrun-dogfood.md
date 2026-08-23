@@ -93,6 +93,72 @@ The production path is executed on the faithful copy:
 - Raw `.everrun/history`, generated reports, and runtime artifacts are **not**
   committed.
 
+### Direct Raw Acceptance (8065)
+
+8065 re-tests the newest raw EverRun `evidence/` output directly through the
+production path with **no wrapper and no normalizer**. The newest raw export
+(`run-20260824-002422`) fixes the 8064-era shape (timeline object with
+`schema_version`/`run_id`/`events`, `schema_version: ailuros.timeline.v1`,
+manifest `files` array) but still fails contract validation:
+
+- `evidence-audit` → `ok=false`, `decision=fail`; errors: `manifest 'files'
+  entry missing 'name'` (x2); 17 unknown-event_type warnings.
+- `import-evidence-package` → `status=invalid` (same contract errors); no events
+  stored.
+- `report RUN_ID --rebuild` → `run not found` (nothing was imported).
+
+Direct producer-to-consumer conformance is therefore **not yet established**.
+The raw EverRun export still needs the lossless `ailuros.timeline.v1`
+transformation (specifically `manifest.files[].name` and event-type
+registration) before it can enter load/ingest/rebuild/report. This is a
+documented producer-conformance gap, not an Ailuros validation failure; the
+validator correctly rejects the non-conformant raw export and was not relaxed.
+
+The 8065 retry (`run-20260824-004751`) re-confirmed this result unchanged on
+the same newest raw directory: `evidence-audit` still returns `ok=false`
+(`manifest.files[].name` missing x2, 17 unknown-event_type warnings),
+`import-evidence-package` still returns `status=invalid`, and
+`report --rebuild` still returns `run not found`. The newest post-fix run at
+check time had not yet produced an `evidence/` directory. Direct acceptance
+remains gated on the producer emitting `manifest.files[].name` and registering
+its event types; no wrapper, normalizer, or payload rewrite was applied.
+
+### Direct Raw Acceptance — Post-Fix (8065)
+
+After the EverRun exporter conformance implementation, the raw `evidence/`
+output now carries `manifest.files[].name`, closing the structural contract
+gap above. The post-fix re-run uses the newest raw export
+(`run-20260824-004751`, `.everrun/history/run-20260824-004751/evidence/`)
+directly through the production path with **no wrapper, no normalizer, and no
+event rewriting**:
+
+- `evidence-audit` → `ok=true`, `decision=warn`, `errors=[]`, `events_count=38`.
+  34 unknown-event_type warnings remain (`backend.*`, `projection.*`,
+  `session.fallback`, ...) — event-type registry gaps, not structural errors.
+- `import-evidence-package` (disposable SQLite) →
+  `{"status": "created", "events_imported": 38, "events_skipped": 0}`.
+- `report run-20260824-004751 --rebuild --format json` → completes:
+  `lifecycle=running`, `outcome=unknown`, `governed_outcome=unknown`,
+  `validation=passed`, `scope=clean`, `why_stopped=execution_control:
+  human_review`, `decision_count=1`, `event_count=38`, `evidence_refs=7`.
+
+Direct producer-to-consumer conformance is **now established** for the newest
+post-fix raw EverRun evidence directory. The remaining `unknown` values are
+evidence-missing (the export carries no `run_completed` event and no
+authority/approval/budget records) or mapping-missing (event-type registry
+coverage); none are inferred as clean. The previously failing raw sample
+(`run-20260824-002422`) was documented before the post-fix sample was tested;
+no wrapper, normalizer, or payload rewrite was applied.
+
+The 8065 current run (`run-20260824-011708`) re-confirmed this result on the
+same newest raw directory (`run-20260824-004751`): `evidence-audit` returns
+`ok=true`/`warn` with `errors=[]`, `import-evidence-package` returns
+`status=created` (38 events), and `report --rebuild` returns
+`lifecycle=running`, `governed_outcome=unknown`, `validation=passed`,
+`scope=clean`. No newer `evidence/` directory existed at check time. Direct
+acceptance of the raw producer output remains established with no wrapper,
+normalizer, or payload rewrite applied.
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:
