@@ -72,6 +72,18 @@ def _decision_matches(decision: DecisionSummary, patterns: set[str]) -> bool:
     return decision.decision in patterns
 
 
+def _dedupe_evidence_refs(refs: list[EvidenceRef]) -> list[EvidenceRef]:
+    """Return refs de-duplicated by event_id, preserving first-seen order."""
+    seen: set[str] = set()
+    deduped: list[EvidenceRef] = []
+    for ref in refs:
+        if ref.event_id in seen:
+            continue
+        seen.add(ref.event_id)
+        deduped.append(ref)
+    return deduped
+
+
 def _decision_domain_matches(decision: DecisionSummary, domains: set[str]) -> bool:
     return decision.projected_domain in domains or decision.domain in domains
 
@@ -384,6 +396,43 @@ def _coder_semantic_failure_rule(
     ]
 
 
+def _review_required_cause_evidence(
+    projection: ExecutionProjection,
+) -> list[EvidenceRef]:
+    """Union of evidence refs from records that force a REVIEW_REQUIRED outcome.
+
+    Mirrors _governed_outcome's review-required causes: unresolved-required
+    approval records, unknown-required budget records, and unknown-required
+    authority records. Returns [] when no record-backed cause exists (e.g. the
+    outcome came from a require_review decision, which the projection cannot
+    attribute to a specific event).
+    """
+    resolved_subject_actions = {
+        _approval_subject_action(record)
+        for record in projection.approval_records
+        if record.state in {ApprovalState.APPROVED, ApprovalState.DENIED}
+    }
+    refs: list[EvidenceRef] = []
+    for record in projection.approval_records:
+        if (
+            record.required is True
+            and record.state == ApprovalState.UNKNOWN
+            and _approval_subject_action(record) not in resolved_subject_actions
+        ):
+            refs.extend(record.evidence_refs)
+    for record in projection.budget_records:
+        if record.required is not True:
+            continue
+        status_lowered = record.status.strip().lower()
+        values_are_sufficient = record.limit is not None and record.consumed is not None
+        if not values_are_sufficient and status_lowered in _BUDGET_UNKNOWN_STATUSES:
+            refs.extend(record.evidence_refs)
+    for record in projection.authority_records:
+        if record.required is True and record.state == AuthorityState.UNKNOWN:
+            refs.extend(record.evidence_refs)
+    return _dedupe_evidence_refs(refs)
+
+
 def _human_review_required_rule(
     projection: ExecutionProjection,
 ) -> list[GovernanceSignal]:
@@ -391,6 +440,8 @@ def _human_review_required_rule(
 
     if projection.outcome != Outcome.REVIEW_REQUIRED:
         return []
+    cause_evidence = _review_required_cause_evidence(projection)
+    evidence_refs = cause_evidence or list(projection.evidence_refs)
     return [
         GovernanceSignal.build(
             run_id=projection.run_id,
@@ -398,7 +449,7 @@ def _human_review_required_rule(
             severity=Severity.MEDIUM,
             subject="review",
             details={"outcome": projection.outcome.value},
-            evidence_refs=list(projection.evidence_refs),
+            evidence_refs=evidence_refs,
         )
     ]
 

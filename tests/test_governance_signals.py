@@ -3,6 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from ailuros.core.execution import (
+    ApprovalRecord,
+    ApprovalState,
+    AuthorityRecord,
+    AuthorityState,
+    BudgetRecord,
     DecisionSummary,
     EvidenceRef,
     ExecutionProjection,
@@ -30,6 +35,9 @@ def _make_projection(
     scope: Scope = Scope.CLEAN,
     decisions: list[DecisionSummary] | None = None,
     evidence_refs: list[EvidenceRef] | None = None,
+    approval_records: list[ApprovalRecord] | None = None,
+    budget_records: list[BudgetRecord] | None = None,
+    authority_records: list[AuthorityRecord] | None = None,
 ) -> ExecutionProjection:
     now = datetime.now(UTC)
     return ExecutionProjection(
@@ -44,6 +52,9 @@ def _make_projection(
         completed_at=now + timedelta(hours=1),
         decisions=decisions or [],
         evidence_refs=evidence_refs or [],
+        approval_records=approval_records or [],
+        budget_records=budget_records or [],
+        authority_records=authority_records or [],
         decision_count=len(decisions) if decisions else 0,
     )
 
@@ -608,6 +619,132 @@ def test_human_review_required_not_fired_for_other_outcomes() -> None:
         proj = _make_projection(outcome=outcome)
         signals = derive_signals(proj)
         assert not any(s.type == "human_review_required" for s in signals)
+
+
+# ── human_review_required: tightening evidence provenance ──────────────
+
+
+def test_human_review_required_record_backed_evidence_is_narrow() -> None:
+    now = datetime.now(UTC)
+    approval_ref = EvidenceRef(event_id="evt-approval")
+    budget_ref = EvidenceRef(event_id="evt-budget")
+    unrelated_ref = EvidenceRef(event_id="evt-unrelated")
+    proj = _make_projection(
+        outcome=Outcome.REVIEW_REQUIRED,
+        evidence_refs=[approval_ref, budget_ref, unrelated_ref],
+        approval_records=[
+            ApprovalRecord(
+                subject="release",
+                required=True,
+                state=ApprovalState.UNKNOWN,
+                timestamp=now,
+                evidence_refs=[approval_ref],
+            ),
+        ],
+        budget_records=[
+            BudgetRecord(
+                subject="run-budget",
+                unit="tokens",
+                status="unknown",
+                required=True,
+                evidence_refs=[budget_ref],
+            ),
+        ],
+    )
+    signals = derive_signals(proj)
+    hr = [s for s in signals if s.type == "human_review_required"]
+    assert len(hr) == 1
+    assert hr[0].evidence_refs == [approval_ref, budget_ref]
+    assert unrelated_ref not in hr[0].evidence_refs
+
+
+def test_human_review_required_authority_record_backed_evidence_is_narrow() -> None:
+    authority_ref = EvidenceRef(event_id="evt-authority")
+    unrelated_ref = EvidenceRef(event_id="evt-unrelated")
+    proj = _make_projection(
+        outcome=Outcome.REVIEW_REQUIRED,
+        evidence_refs=[authority_ref, unrelated_ref],
+        authority_records=[
+            AuthorityRecord(
+                actor="agent-1",
+                state=AuthorityState.UNKNOWN,
+                required=True,
+                evidence_refs=[authority_ref],
+            ),
+        ],
+    )
+    signals = derive_signals(proj)
+    hr = [s for s in signals if s.type == "human_review_required"]
+    assert len(hr) == 1
+    assert hr[0].evidence_refs == [authority_ref]
+    assert unrelated_ref not in hr[0].evidence_refs
+
+
+def test_human_review_required_decision_backed_preserves_projection_evidence() -> None:
+    ref = EvidenceRef(event_id="evt-req")
+    proj = _make_projection(
+        outcome=Outcome.REVIEW_REQUIRED,
+        evidence_refs=[ref],
+        decisions=[DecisionSummary(domain="planner", decision="require_review")],
+    )
+    signals = derive_signals(proj)
+    hr = [s for s in signals if s.type == "human_review_required"]
+    assert len(hr) == 1
+    assert hr[0].evidence_refs == [ref]
+
+
+def test_human_review_required_parity_and_determinism() -> None:
+    now = datetime.now(UTC)
+    approval_ref = EvidenceRef(event_id="evt-approval")
+    unrelated_ref = EvidenceRef(event_id="evt-unrelated")
+    proj = _make_projection(
+        outcome=Outcome.REVIEW_REQUIRED,
+        evidence_refs=[approval_ref, unrelated_ref],
+        approval_records=[
+            ApprovalRecord(
+                subject="release",
+                required=True,
+                state=ApprovalState.UNKNOWN,
+                timestamp=now,
+                evidence_refs=[approval_ref],
+            ),
+        ],
+    )
+    first = derive_signals(proj)
+    second = derive_signals(proj)
+    assert [s.type for s in first] == [s.type for s in second]
+    assert [s.signal_id for s in first] == [s.signal_id for s in second]
+    hr = next(s for s in first if s.type == "human_review_required")
+    assert hr.severity == "medium"
+    assert hr.details == {"outcome": "review_required"}
+    assert hr.evidence_refs == [approval_ref]
+
+
+# ── T3: unprovable narrowing is preserved (decision/aggregate rules) ────
+
+
+def test_forbidden_path_touched_evidence_preserved_when_unprovable() -> None:
+    path_ref = EvidenceRef(event_id="evt-fp")
+    proj = _make_projection(
+        decisions=[DecisionSummary(domain="path", decision="forbidden_path")],
+        evidence_refs=[path_ref],
+    )
+    signals = derive_signals(proj)
+    fp = [s for s in signals if s.type == "forbidden_path_touched"]
+    assert len(fp) == 1
+    assert fp[0].evidence_refs == [path_ref]
+
+
+def test_validation_failure_evidence_preserved_when_unprovable() -> None:
+    ref = EvidenceRef(event_id="evt-vf")
+    proj = _make_projection(
+        validation=Validation.FAILED,
+        evidence_refs=[ref],
+    )
+    signals = derive_signals(proj)
+    vf = [s for s in signals if s.type == "validation_failure"]
+    assert len(vf) == 1
+    assert vf[0].evidence_refs == [ref]
 
 
 # ── Multiple signals from same projection ───────────────────────────────
