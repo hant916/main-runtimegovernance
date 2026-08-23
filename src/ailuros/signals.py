@@ -156,18 +156,22 @@ def _repeated_validation_failure_rule(
 def _evidence_inconsistency_rule(
     projection: ExecutionProjection,
 ) -> list[GovernanceSignal]:
-    domains: dict[str, set[str]] = {}
+    domains: dict[tuple[str | None, str], set[str]] = {}
     for d in projection.decisions:
-        key = d.projected_domain
+        key = (d.scope_ref, d.projected_domain)
         domains.setdefault(key, set()).add(d.decision)
 
     conflicts: list[dict[str, Any]] = []
-    for domain_key, decisions in domains.items():
+    for (scope_ref, domain_key), decisions in domains.items():
         has_allow = "allow" in decisions
         has_deny = bool({"block", "fail", "blocked", "deny"} & decisions)
         if has_allow and has_deny:
             conflicts.append(
-                {"projected_domain": domain_key, "decisions": sorted(decisions)}
+                {
+                    "scope_ref": scope_ref,
+                    "projected_domain": domain_key,
+                    "decisions": sorted(decisions),
+                }
             )
 
     if not conflicts:

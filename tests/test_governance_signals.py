@@ -248,6 +248,97 @@ def test_no_evidence_inconsistency_when_all_block() -> None:
     assert not any(s.type == "evidence_inconsistency" for s in signals)
 
 
+# ── evidence_inconsistency: scope-aware grouping ────────────────────────
+
+
+def test_evidence_inconsistency_same_scope_and_domain_conflicts() -> None:
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(
+                domain="bash", decision="allow", scope_ref="scope-a"
+            ),
+            DecisionSummary(
+                domain="bash", decision="block", scope_ref="scope-a"
+            ),
+        ],
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    signals = derive_signals(proj)
+    ei = [s for s in signals if s.type == "evidence_inconsistency"]
+    assert len(ei) == 1
+    assert len(ei[0].details["conflicts"]) == 1
+    conflict = ei[0].details["conflicts"][0]
+    assert conflict["scope_ref"] == "scope-a"
+    assert conflict["projected_domain"] == "source_preserved_unknown"
+
+
+def test_no_evidence_inconsistency_across_different_scopes() -> None:
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(
+                domain="bash", decision="allow", scope_ref="scope-a"
+            ),
+            DecisionSummary(
+                domain="bash", decision="block", scope_ref="scope-b"
+            ),
+        ],
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    signals = derive_signals(proj)
+    assert not any(s.type == "evidence_inconsistency" for s in signals)
+
+
+def test_no_evidence_inconsistency_unscoped_vs_scoped() -> None:
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(domain="bash", decision="allow"),
+            DecisionSummary(
+                domain="bash", decision="block", scope_ref="scope-a"
+            ),
+        ],
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    signals = derive_signals(proj)
+    assert not any(s.type == "evidence_inconsistency" for s in signals)
+
+
+def test_evidence_inconsistency_unscoped_same_domain_still_conflicts() -> None:
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(domain="bash", decision="allow"),
+            DecisionSummary(domain="bash", decision="block"),
+        ],
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    signals = derive_signals(proj)
+    ei = [s for s in signals if s.type == "evidence_inconsistency"]
+    assert len(ei) == 1
+    assert len(ei[0].details["conflicts"]) == 1
+    assert ei[0].details["conflicts"][0]["scope_ref"] is None
+
+
+def test_evidence_inconsistency_conflict_is_isolated_per_scope() -> None:
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(
+                domain="bash", decision="allow", scope_ref="scope-a"
+            ),
+            DecisionSummary(
+                domain="bash", decision="block", scope_ref="scope-a"
+            ),
+            DecisionSummary(
+                domain="bash", decision="block", scope_ref="scope-b"
+            ),
+        ],
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    signals = derive_signals(proj)
+    ei = [s for s in signals if s.type == "evidence_inconsistency"]
+    assert len(ei) == 1
+    assert len(ei[0].details["conflicts"]) == 1
+    assert ei[0].details["conflicts"][0]["scope_ref"] == "scope-a"
+
+
 # ── scope_violation ─────────────────────────────────────────────────────
 
 
