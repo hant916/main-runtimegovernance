@@ -6,6 +6,12 @@ from pathlib import Path
 AILUROS = Path("src/ailuros")
 ADAPTERS = AILUROS / "adapters"
 SERVER = AILUROS / "server"
+CORE = AILUROS / "core"
+
+CORE_ALLOWED_IMPORT_PREFIXES: tuple[str, ...] = (
+    "ailuros.core",
+    "ailuros._compat",
+)
 
 FORBIDDEN_CORE_TERMS: list[str] = [
     r"\bclarify\b",
@@ -59,5 +65,31 @@ def test_server_is_read_only() -> None:
 
     assert not violations, (
         f"Server write method violation: {len(violations)} write handler(s) found:\n"
+        + "\n".join(violations)
+    )
+
+
+def _core_dependency_violations() -> list[str]:
+    violations: list[str] = []
+    for py_file in sorted(CORE.rglob("*.py")):
+        content = py_file.read_text(encoding="utf-8")
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("from ailuros.") or stripped.startswith("import ailuros."):
+                name = stripped.split()[1]
+                if not name.startswith(CORE_ALLOWED_IMPORT_PREFIXES):
+                    violations.append(
+                        f"{py_file}: core imports non-leaf dependency {name!r}"
+                    )
+    return violations
+
+
+def test_core_is_a_leaf_dependency_root() -> None:
+    violations = _core_dependency_violations()
+    assert not violations, (
+        "Core boundary violation: src/ailuros/core/ must not import packages outside "
+        "ailuros.core and ailuros._compat. Core is the canonical leaf vocabulary; "
+        "downstream surfaces (projection, signals, execution report) depend on it, "
+        "never the reverse (see docs/architecture/canonical-governance-surface.md):\n"
         + "\n".join(violations)
     )

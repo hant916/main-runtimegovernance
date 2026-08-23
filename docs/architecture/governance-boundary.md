@@ -9,6 +9,10 @@ external boundary surfaces, the product ownership matrix, and temporal invariant
 That contract is the authoritative source for what Ailuros owns and does not own at
 the execution boundary. ADR-0005 boundaries are preserved in both documents.
 
+For the internal module-level ownership map (which module owns which governance
+semantics, and where governance semantics must not be duplicated), see
+[canonical-governance-surface.md](./canonical-governance-surface.md).
+
 ## Core Domain (`src/ailuros/`)
 
 The Ailuros core owns:
@@ -67,6 +71,9 @@ Boundary crossings must follow these rules:
 
 - Code review must reject any PR that introduces a reference-app import or
   domain-specific concept into `src/ailuros/`.
+- `src/ailuros/core/` is a leaf: it imports nothing outside `ailuros.core` and
+  `ailuros._compat`. Downstream surfaces (projection, signals, execution report)
+  depend on core; never the reverse.
 - New data types in `src/ailuros/models/` must be application-agnostic.
 - If a concept is specific to Clarify, EverRun, or radarCreation, it belongs in that
   project's repository or in `examples/`, never in `src/ailuros/`.
