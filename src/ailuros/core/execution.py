@@ -151,7 +151,7 @@ class ApprovalRecord(BaseModel):
     state: ApprovalState
     approver_ref: str | None = None
     scope_ref: str | None = None
-    timestamp: datetime
+    timestamp: datetime | None = None
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
     source: dict[str, Any] = Field(default_factory=dict)
 
@@ -166,7 +166,9 @@ class ApprovalRecord(BaseModel):
 
     @field_validator("timestamp")
     @classmethod
-    def require_timezone(cls, value: datetime) -> datetime:
+    def require_timezone(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return value
         if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
             raise ValueError("datetime must be timezone-aware")
         return value

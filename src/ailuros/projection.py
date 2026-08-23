@@ -500,7 +500,7 @@ def build_execution_projection(
                         scope_ref=_project_record_scope_ref(
                             event_scope_ref, payload
                         ),
-                        timestamp=timestamp or datetime.now(UTC),
+                        timestamp=timestamp,
                         evidence_refs=[EvidenceRef(event_id=event_id)]
                         if event_id
                         else [],
