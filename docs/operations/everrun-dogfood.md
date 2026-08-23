@@ -63,6 +63,36 @@ non-package historical input into a projection or a clean result. The detailed
 ten-row comparison and bounded acceptance decision are recorded in
 `docs/dogfood/everrun-history-baseline.md`.
 
+### Historical Baseline Convergence (8064)
+
+The 8064 re-run records the final convergence for the external
+governed-execution boundary after packs 8052-8063. It re-evaluates the same
+bounded real EverRun evidence and classifies each prior finding as fixed,
+still-open, expected-unknown, or newly-discovered. The full classification,
+responsible-pack mapping, and acceptance record are in
+`docs/dogfood/everrun-history-baseline.md`.
+
+When the referenced run identifier (`run-20260822-180944`) is unavailable
+locally, the pack documents the exact unavailability and uses an equivalent
+real EverRun export that carries the same conflict class
+(`run-20260823-033016`), copied faithfully into a conformant
+`ailuros.timeline.v1` package with all events unchanged. This is a documented
+replay artifact only; it is not a new evidence package, a governance change,
+or a new BLOCKED / HUMAN_REVIEW path.
+
+The production path is executed on the faithful copy:
+`evidence-audit` → `import-evidence-package` (or `batch-import`) →
+`report RUN_ID --rebuild`. Key acceptance checks repeated in this re-run:
+
+- Cross-scope decision differences (`accept` vs `continue`) produce **no**
+  `evidence_inconsistency` signal; same-scope contradictions remain detectable.
+- Review-required scopes remain visible at the aggregate governed-outcome
+  level; an `unknown` governed result is never promoted to clean.
+- Lifecycle, native outcome, governed outcome, coverage, scoped signals,
+  temporal attribution, and evidence refs are recorded separately.
+- Raw `.everrun/history`, generated reports, and runtime artifacts are **not**
+  committed.
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:

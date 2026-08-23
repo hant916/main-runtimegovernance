@@ -134,3 +134,139 @@ rerun. No implementation is made by this record.
 
 No implementation change is proposed by this baseline. Gap candidates require
 their own scoped work before runtime or governance behavior changes.
+
+## 8064 boundary convergence re-run and final record
+
+This is the final convergence record for the external governed-execution
+boundary after packs 8052-8063. It re-runs the bounded real EverRun dogfood
+evidence and classifies every prior finding. The record is documentation-only;
+it changes no production, test, or governance code.
+
+### Sample availability and equivalent evidence rationale
+
+The original run identifier referenced by this batch is `run-20260822-180944`.
+It is **not present** in the local `.everrun/history` directory (only
+`run-20260823-*` runs exist), so the exact original export cannot be replayed
+verbatim. This is the documented unavailability exception allowed by the pack.
+
+The **equivalent real evidence** used is the canonical EverRun export
+`run-20260823-033016` (`.everrun/history/run-20260823-033016/evidence/`), which
+is the run that actually executed packs 8055-8063. Its manifest carries the
+identical conflict class this boundary batch targets:
+
+- `EVIDENCE_CONFLICT`: "Conflicting governance decisions in same execution
+  scope (unknown scope (no pack/iteration metadata)): ['accept', 'continue']"
+  with 10 source refs (9 `accept` + 1 `continue` governance decisions).
+
+The export is not `runtime-evidence-package-v1` conformant as shipped (flat
+timeline, `schema_version: "1.0"`, no `files` array). For the re-run it was
+copied into a faithful conformant `ailuros.timeline.v1` package with **all 196
+events unchanged** (same event ids, types, timestamps, payloads; no new facts,
+no dropped facts). This transformation is documented here and is the same
+lossless-export gap already ranked as P0 below.
+
+### T1: Production path re-run
+
+The faithful conformant copy of `run-20260823-033016` was executed through the
+production Ailuros load/ingest/projection/signals/governed-result path:
+
+| Step | Result |
+|---|---|
+| Contract validation | `ok`, 0 errors, 183 warnings (unknown event types preserved) |
+| `evidence-audit` | `ok`, decision `warn` |
+| `load_evidence_package` | loaded, `run-20260823-033016`, `everrun`, 196 events |
+| `ingest_evidence_package` | `created`, 196 imported, 0 skipped, 0 conflicts |
+| Rebuild projection/signals | 10 decisions, 53 evidence refs, 0 signals |
+| Governed result | `unknown` (no clean promotion) |
+
+Native facts derived: lifecycle `running` (no `run_completed` in the export),
+native outcome `unknown`, governed outcome `unknown`, validation `unknown`,
+scope `unknown`, all coverage dimensions `unknown`, `scope_ref` none. Ten
+governance decisions project as `source_preserved_unknown` with no `scope_ref`
+because the exporter emits no pack/iteration scope metadata.
+
+**Key result:** the `accept` / `continue` mix does **not** produce an
+`evidence_inconsistency` signal. The known run-wide false-positive class is
+closed: sibling scopes (here packs) with different decisions are no longer
+flagged as conflicts solely due to run-wide aggregation.
+
+### T2: Scope semantics verification
+
+- **Cross-scope differences do not create a conflict.** The real sample's
+  `accept` + `continue` decisions do not trigger `evidence_inconsistency`.
+  `_evidence_inconsistency_rule` groups by `(scope_ref, projected_domain)`,
+  so sibling scopes with different decisions are never conflated. Proven by
+  `tests/test_governance_signals.py`:
+  `test_no_evidence_inconsistency_across_different_scopes`,
+  `test_no_evidence_inconsistency_unscoped_vs_scoped`,
+  `test_evidence_inconsistency_conflict_is_isolated_per_scope`.
+- **Same-scope contradictions remain detectable.** An `allow` + `block` (or
+  `allow` + deny-pattern) pair within the **same** `scope_ref` still produces
+  an `evidence_inconsistency` signal. Proven by
+  `test_evidence_inconsistency_same_scope_and_domain_conflicts` and
+  `test_evidence_inconsistency_allow_and_block_same_domain`.
+
+### T3: Governed result and provenance
+
+- Lifecycle `running`, native outcome `unknown`, governed outcome `unknown` —
+  recorded separately, never merged, never promoted to clean.
+- Coverage all `unknown` (no authority/approval/budget/validation/scope
+  evidence in the export), consistent with the second-producer conformance
+  rule that missing constraints are never inferred as clean.
+- Scoped signals: none derived; no `scope_ref` present in the export.
+- Temporal attribution: all timestamps are timezone-aware; `run_started`
+  events are preserved; no `run_completed` event exists, hence lifecycle
+  `running` and governed outcome `unknown`.
+- Evidence refs: 53 projection refs retained and traceable to stored events
+  (each decision and each lifecycle/validation/scope event keeps its
+  `event_id`). `build_governed_execution_result` and `build_run_report` both
+  carry them.
+- Review-required visibility at aggregate level: no review-required scope is
+  present in this sample, so the aggregate is `unknown`. The invariant is
+  proven by `tests/test_governed_outcome.py`:
+  `test_aggregate_review_required_dominates_clean_scopes` and
+  `test_aggregate_review_required_dominates_degraded_scopes` — a
+  `review_required` scope prevents a clean or degraded success claim.
+
+### T4: Convergence classification
+
+| Finding | Before | After 8052-8063 | Responsible pack | Evidence |
+|---|---|---|---|---|
+| Cross-scope decisions flagged as conflicts (run-wide aggregation) | False positive | **Fixed** — no `evidence_inconsistency` for `accept`+`continue` | 8056 scope-governance-decision-consistency, 8058 aggregate-multi-scope-governed-outcome | Real export re-run; `test_no_evidence_inconsistency_across_different_scopes` |
+| Execution scope not carried through the pipeline | Open | **Fixed** — `scope_ref` propagates load→ingest→projection→signals | 8053 add-execution-scope-reference, 8054 propagate-scope-through-evidence-pipeline | `tests/test_projection_decisions.py` external-wrapper tests; `test_second_producer_scoped_evidence_scope_survives_canonical_pipeline` |
+| Authority/approval/budget records not bound to scope | Open | **Fixed** | 8055 scope-governance-records | `tests/test_authority_governance.py`, `test_approval_governance.py`, `test_budget_governance.py` |
+| Signals not scope-aware | Open | **Fixed** | 8057 make-governance-signals-scope-aware | `tests/test_governance_signals.py` T1 signal-identity tests |
+| No multi-scope governed outcome aggregation | Open | **Fixed** — precedence `FAILED > REVIEW_REQUIRED > UNKNOWN > DEGRADED > CLEAN`; UNKNOWN never inferred clean | 8058 aggregate-multi-scope-governed-outcome | `tests/test_governed_outcome.py` aggregation tests |
+| No stable governed-execution result contract | Open | **Fixed** | 8059 add-governed-execution-result-contract | `tests/test_governed_execution_result.py` |
+| Temporal attribution invariants missing | Open | **Fixed** | 8060 add-temporal-governance-invariants | `tests/test_temporal_governance.py` |
+| Signal evidence provenance too broad | Open | **Fixed** — record-backed causes narrowed | 8061 tighten-signal-evidence-provenance | `tests/test_governance_signals.py` evidence-provenance tests |
+| Producer conformance not hardened for scope/provenance | Open | **Fixed** | 8062 harden-producer-conformance-scope-provenance | `tests/test_second_producer_conformance.py`, `test_adapter_conformance.py` |
+| Canonical governance surface not audited/frozen | Open | **Fixed** | 8063 audit-canonical-governance-surface | `docs/architecture/canonical-governance-surface.md`, `tests/test_core_boundary.py` |
+
+Status summary for this re-run: **Fixed 9**, **Still open 0**, **Expected
+unknown 1** (the real sample's governed result is `unknown` because the export
+lacks run-completion and scope metadata — this is expected-unknown, not a
+failure), **Newly discovered 0**.
+
+### Acceptance and remaining gaps
+
+The 8064 batch is **accepted for this bounded convergence**: the real sample
+is re-evaluated through the production path after 8052-8063, the known
+cross-scope false-positive class is closed without suppressing true
+same-scope conflict semantics, unknown evidence stays preserved and
+unpromoted to clean, and no production or test file was modified.
+
+Remaining gaps are seeded as candidate future packs (not implemented here):
+
+1. **P0 — Lossless, privacy-screened EverRun export to
+   `runtime-evidence-package-v1`.** Evidence: the real export is
+   non-conformant as shipped and carries no pack/iteration scope metadata or
+   `run_completed` event; the re-run required a documented faithful
+   transformation and still produced an `unknown` governed result.
+2. **P1 — Scope attribution from EverRun pack/iteration metadata.** Evidence:
+   all 10 real governance decisions project to `scope_ref=None` because the
+   exporter does not emit pack/iteration scope; sibling-scope discrimination
+   is therefore only test-proven, not sample-proven.
+3. **P2 — Emit `run_completed`/terminal lifecycle events in the export.**
+   Evidence: the real sample projects lifecycle `running` and outcome
+   `unknown` solely because no terminal event exists in the export.
