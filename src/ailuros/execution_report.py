@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -14,6 +14,7 @@ from ailuros.core.execution import (
     Lifecycle,
     Outcome,
     RoleSummary,
+    Scope,
     ScopeOutcome,
     Validation,
 )
@@ -76,6 +77,39 @@ class OutcomeReason(BaseModel):
 
     code: str
     evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+
+
+class GovernedExecutionResult(BaseModel):
+    """Stable, source-neutral result contract built from canonical facts.
+
+    The contract packages already-canonical projection and signal facts into a
+    deterministic serialization boundary. It introduces no new governance
+    semantics: lifecycle, native outcome, governed outcome, coverage, signals,
+    and evidence refs are all derived from existing canonical state. It carries
+    no producer-specific statuses and no internal database identifiers.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    scope_ref: str | None = None
+    lifecycle: Lifecycle
+    validation: Validation
+    scope: Scope
+    native_outcome: Outcome
+    governed_outcome: GovernedOutcome
+    coverage: GovernanceCoverage = Field(default_factory=GovernanceCoverage)
+    signals: list[SignalSummary] = Field(default_factory=list)
+    evidence_refs: list[EvidenceRef] = Field(default_factory=list)
+
+    @field_validator("scope_ref", mode="before")
+    @classmethod
+    def require_scope_ref_string(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        raise ValueError("scope_ref must be a string or None")
 
 
 def _derive_why_stopped(
@@ -401,8 +435,44 @@ def build_run_report(
     )
 
 
+def build_governed_execution_result(
+    projection: ExecutionProjection,
+    signals: list[GovernanceSignal],
+) -> GovernedExecutionResult:
+    governed_outcome, _ = derive_governed_outcome(projection, signals)
+    return GovernedExecutionResult(
+        run_id=projection.run_id,
+        scope_ref=projection.scope_ref,
+        lifecycle=projection.lifecycle,
+        validation=projection.validation,
+        scope=projection.scope,
+        native_outcome=derive_native_outcome(
+            projection.lifecycle, projection.decisions
+        ),
+        governed_outcome=governed_outcome,
+        coverage=projection.governance_coverage,
+        signals=[
+            SignalSummary(
+                signal_id=s.signal_id,
+                type=s.type,
+                severity=s.severity,
+                subject=s.subject,
+                evidence_refs=list(s.evidence_refs),
+            )
+            for s in signals
+        ],
+        evidence_refs=list(projection.evidence_refs),
+    )
+
+
 def render_run_report_json(report: RunReport) -> str:
     return report.model_dump_json(indent=2)
+
+
+def render_governed_execution_result_json(
+    result: GovernedExecutionResult,
+) -> str:
+    return result.model_dump_json(indent=2)
 
 
 def render_run_report_markdown(
