@@ -260,3 +260,59 @@ def test_authority_record_scope_not_inferred_from_malformed() -> None:
     ]
     proj = build_execution_projection("run-1", "test", events)
     assert proj.authority_records[0].scope_ref is None
+
+
+# ── T2/T3: record-backed authority signals inherit explicit scope ───────
+
+
+def test_authority_violation_signal_inherits_record_scope() -> None:
+    events = _native_success_events() + [
+        _authority_event(
+            "a",
+            actor="agent-1",
+            requested_target="repo:project-a",
+            observed_target="repo:project-b",
+            status="violation",
+            scope_ref="scope-a",
+        )
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    signals = derive_signals(proj)
+    violation = [s for s in signals if s.type == SignalType.AUTHORITY_VIOLATION]
+    assert len(violation) == 1
+    assert violation[0].scope_ref == "scope-a"
+
+
+def test_authority_violation_signal_unscoped_when_record_unscoped() -> None:
+    events = _native_success_events() + [
+        _authority_event("a", actor="agent-1", status="violation")
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    signals = derive_signals(proj)
+    violation = [s for s in signals if s.type == SignalType.AUTHORITY_VIOLATION]
+    assert len(violation) == 1
+    assert violation[0].scope_ref is None
+
+
+def test_authority_unknown_signal_inherits_record_scope() -> None:
+    events = _native_success_events() + [
+        _authority_event("a", actor="agent-1", required=True, scope_ref="scope-a")
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    signals = derive_signals(proj)
+    unknown = [s for s in signals if s.type == SignalType.AUTHORITY_UNKNOWN]
+    assert len(unknown) == 1
+    assert unknown[0].scope_ref == "scope-a"
+
+
+def test_authority_signals_keep_independent_scope_identity() -> None:
+    events = _native_success_events() + [
+        _authority_event("a", actor="agent-1", status="violation", scope_ref="scope-a"),
+        _authority_event("b", actor="agent-2", status="violation", scope_ref="scope-b"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    signals = derive_signals(proj)
+    violation = [s for s in signals if s.type == SignalType.AUTHORITY_VIOLATION]
+    assert len(violation) == 2
+    assert {s.scope_ref for s in violation} == {"scope-a", "scope-b"}
+    assert violation[0].signal_id != violation[1].signal_id

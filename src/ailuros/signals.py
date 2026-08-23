@@ -5,7 +5,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from ailuros._compat import StrEnum
 from ailuros.core.execution import (
@@ -50,9 +50,13 @@ def _make_signal_id(
     signal_type: str,
     subject: str,
     evidence_refs: list[EvidenceRef],
+    scope_ref: str | None = None,
 ) -> str:
     evidence_identity = ":".join(sorted(r.event_id for r in evidence_refs))
-    raw = f"{run_id}:{signal_type}:{subject}:{evidence_identity}"
+    if scope_ref is None:
+        raw = f"{run_id}:{signal_type}:{subject}:{evidence_identity}"
+    else:
+        raw = f"{run_id}:{signal_type}:{subject}:{scope_ref}:{evidence_identity}"
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
@@ -80,10 +84,20 @@ class GovernanceSignal(BaseModel):
     type: str
     severity: str
     subject: str
+    scope_ref: str | None = None
     details: dict[str, Any]
     evidence_refs: list[EvidenceRef]
     rule_version: str
     created_at: datetime
+
+    @field_validator("scope_ref", mode="before")
+    @classmethod
+    def require_scope_ref_string(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        raise ValueError("scope_ref must be a string or None")
 
     @staticmethod
     def build(
@@ -93,13 +107,17 @@ class GovernanceSignal(BaseModel):
         subject: str,
         details: dict[str, Any],
         evidence_refs: list[EvidenceRef],
+        scope_ref: str | None = None,
     ) -> GovernanceSignal:
         return GovernanceSignal(
-            signal_id=_make_signal_id(run_id, signal_type.value, subject, evidence_refs),
+            signal_id=_make_signal_id(
+                run_id, signal_type.value, subject, evidence_refs, scope_ref
+            ),
             run_id=run_id,
             type=signal_type.value,
             severity=severity.value,
             subject=subject,
+            scope_ref=scope_ref,
             details=details,
             evidence_refs=evidence_refs,
             rule_version=RULE_VERSION,
@@ -424,6 +442,7 @@ def _approval_required_unresolved_rule(
             subject="approval",
             details=_approval_details(r),
             evidence_refs=list(r.evidence_refs),
+            scope_ref=r.scope_ref,
         )
         for r in records
     ]
@@ -443,6 +462,7 @@ def _approval_denied_rule(
             subject="approval",
             details=_approval_details(r),
             evidence_refs=list(r.evidence_refs),
+            scope_ref=r.scope_ref,
         )
         for r in records
     ]
@@ -487,6 +507,7 @@ def _budget_exceeded_rule(
                 subject="budget",
                 details=_budget_details(record),
                 evidence_refs=list(record.evidence_refs),
+                scope_ref=record.scope_ref,
             )
         )
     return signals
@@ -515,6 +536,7 @@ def _budget_unknown_rule(
                 subject="budget",
                 details=_budget_details(record),
                 evidence_refs=list(record.evidence_refs),
+                scope_ref=record.scope_ref,
             )
         )
     return signals
@@ -545,6 +567,7 @@ def _authority_violation_rule(
             subject="authority",
             details=_authority_details(r),
             evidence_refs=list(r.evidence_refs),
+            scope_ref=r.scope_ref,
         )
         for r in records
     ]
@@ -566,6 +589,7 @@ def _authority_unknown_rule(
             subject="authority",
             details=_authority_details(r),
             evidence_refs=list(r.evidence_refs),
+            scope_ref=r.scope_ref,
         )
         for r in records
     ]

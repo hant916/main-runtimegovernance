@@ -456,6 +456,77 @@ def test_approval_denied_only_from_explicit_denial() -> None:
     assert not any(s.type == SignalType.APPROVAL_DENIED.value for s in signals)
 
 
+# ── T2/T3: record-backed approval signals inherit explicit scope ────────
+
+
+def test_approval_denied_signal_inherits_record_scope() -> None:
+    proj = _projection(
+        approval_records=[
+            _record(
+                subject="release",
+                decision="denied",
+                state=ApprovalState.DENIED,
+                scope_ref="scope-a",
+            ),
+        ]
+    )
+    signals = derive_signals(proj)
+    denied = [s for s in signals if s.type == SignalType.APPROVAL_DENIED.value]
+    assert len(denied) == 1
+    assert denied[0].scope_ref == "scope-a"
+
+
+def test_approval_denied_signal_unscoped_when_record_unscoped() -> None:
+    proj = _projection(
+        approval_records=[
+            _record(subject="release", decision="denied",
+                    state=ApprovalState.DENIED),
+        ]
+    )
+    signals = derive_signals(proj)
+    denied = [s for s in signals if s.type == SignalType.APPROVAL_DENIED.value]
+    assert len(denied) == 1
+    assert denied[0].scope_ref is None
+
+
+def test_approval_unresolved_signal_inherits_record_scope() -> None:
+    proj = _projection(
+        approval_records=[
+            _record(subject="release", required=True, scope_ref="scope-a"),
+        ]
+    )
+    signals = derive_signals(proj)
+    unresolved = [
+        s for s in signals if s.type == SignalType.APPROVAL_REQUIRED_UNRESOLVED.value
+    ]
+    assert len(unresolved) == 1
+    assert unresolved[0].scope_ref == "scope-a"
+
+
+def test_approval_signals_keep_independent_scope_identity() -> None:
+    proj = _projection(
+        approval_records=[
+            _record(
+                subject="release",
+                decision="denied",
+                state=ApprovalState.DENIED,
+                scope_ref="scope-a",
+            ),
+            _record(
+                subject="release",
+                decision="denied",
+                state=ApprovalState.DENIED,
+                scope_ref="scope-b",
+            ),
+        ]
+    )
+    signals = derive_signals(proj)
+    denied = [s for s in signals if s.type == SignalType.APPROVAL_DENIED.value]
+    assert len(denied) == 2
+    assert {s.scope_ref for s in denied} == {"scope-a", "scope-b"}
+    assert denied[0].signal_id != denied[1].signal_id
+
+
 def test_clean_projection_yields_no_approval_signals() -> None:
     proj = _projection()
     signals = derive_signals(proj)

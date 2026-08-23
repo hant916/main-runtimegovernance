@@ -421,6 +421,64 @@ def test_no_unknown_when_status_explicit() -> None:
     assert not any(s.type == SignalType.BUDGET_UNKNOWN.value for s in signals)
 
 
+# ── T2/T3: record-backed budget signals inherit explicit scope ──────────
+
+
+def test_budget_exceeded_signal_inherits_record_scope() -> None:
+    proj = _projection(
+        budget_records=[
+            _record(subject="run-budget", unit="tokens", scope_ref="scope-a",
+                    limit=100.0, consumed=150.0),
+        ]
+    )
+    signals = derive_signals(proj)
+    exceeded = [s for s in signals if s.type == SignalType.BUDGET_EXCEEDED.value]
+    assert len(exceeded) == 1
+    assert exceeded[0].scope_ref == "scope-a"
+
+
+def test_budget_exceeded_signal_unscoped_when_record_unscoped() -> None:
+    proj = _projection(
+        budget_records=[
+            _record(subject="run-budget", unit="tokens",
+                    limit=100.0, consumed=150.0),
+        ]
+    )
+    signals = derive_signals(proj)
+    exceeded = [s for s in signals if s.type == SignalType.BUDGET_EXCEEDED.value]
+    assert len(exceeded) == 1
+    assert exceeded[0].scope_ref is None
+
+
+def test_budget_unknown_signal_inherits_record_scope() -> None:
+    proj = _projection(
+        budget_records=[
+            _record(subject="run-budget", unit="tokens", required=True,
+                    scope_ref="scope-a"),
+        ]
+    )
+    signals = derive_signals(proj)
+    unknown = [s for s in signals if s.type == SignalType.BUDGET_UNKNOWN.value]
+    assert len(unknown) == 1
+    assert unknown[0].scope_ref == "scope-a"
+
+
+def test_budget_signals_keep_independent_scope_identity() -> None:
+    proj = _projection(
+        budget_records=[
+            _record(subject="run-budget", unit="tokens", scope_ref="scope-a",
+                    limit=100.0, consumed=150.0),
+            _record(subject="run-budget", unit="tokens", scope_ref="scope-b",
+                    limit=100.0, consumed=150.0),
+        ]
+    )
+    signals = derive_signals(proj)
+    exceeded = [s for s in signals if s.type == SignalType.BUDGET_EXCEEDED.value]
+    assert len(exceeded) == 2
+    assert {s.scope_ref for s in exceeded} == {"scope-a", "scope-b"}
+    assert exceeded[0].signal_id != exceeded[1].signal_id
+
+
 def test_signal_types_registered() -> None:
     assert SignalType.BUDGET_EXCEEDED.value == "budget_exceeded"
     assert SignalType.BUDGET_UNKNOWN.value == "budget_unknown"

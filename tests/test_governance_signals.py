@@ -102,6 +102,74 @@ def test_signal_id_differs_by_evidence() -> None:
     assert id1 != id2
 
 
+# ── T1: scope attribution to signal identity ────────────────────────────
+
+
+def test_signal_id_is_deterministic_with_scope() -> None:
+    refs = [EvidenceRef(event_id="evt-a")]
+    id1 = _make_signal_id("run-x", "validation_failure", "validation", refs, "scope-a")
+    id2 = _make_signal_id("run-x", "validation_failure", "validation", refs, "scope-a")
+    assert id1 == id2
+
+
+def test_signal_id_differs_by_scope() -> None:
+    refs = [EvidenceRef(event_id="evt-a")]
+    id_a = _make_signal_id("run-1", "budget_exceeded", "budget", refs, "scope-a")
+    id_b = _make_signal_id("run-1", "budget_exceeded", "budget", refs, "scope-b")
+    assert id_a != id_b
+
+
+def test_signal_id_unscoped_matches_previous_identity() -> None:
+    refs = [EvidenceRef(event_id="evt-a")]
+    assert _make_signal_id("run-x", "validation_failure", "validation", refs) == _make_signal_id(
+        "run-x", "validation_failure", "validation", refs, None
+    )
+
+
+def test_build_carries_scope_ref() -> None:
+    signal = GovernanceSignal.build(
+        run_id="run-1",
+        signal_type=SignalType.BUDGET_EXCEEDED,
+        severity=Severity.HIGH,
+        subject="budget",
+        details={"key": "value"},
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+        scope_ref="scope-a",
+    )
+    assert signal.scope_ref == "scope-a"
+
+
+def test_build_defaults_scope_ref_none() -> None:
+    signal = GovernanceSignal.build(
+        run_id="run-1",
+        signal_type=SignalType.VALIDATION_FAILURE,
+        severity=Severity.HIGH,
+        subject="validation",
+        details={},
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    assert signal.scope_ref is None
+
+
+def test_governance_signal_scope_ref_malformed_rejected() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        GovernanceSignal(
+            signal_id="x",
+            run_id="run-1",
+            type="budget_exceeded",
+            severity="high",
+            subject="budget",
+            scope_ref=42,  # type: ignore[arg-type]
+            details={},
+            evidence_refs=[],
+            rule_version=RULE_VERSION,
+            created_at=datetime.now(UTC),
+        )
+
+
 # ── Clean state: no signals ─────────────────────────────────────────────
 
 
@@ -588,6 +656,33 @@ def test_governance_signal_model_dump() -> None:
     assert data["evidence_refs"] == [
         {"event_id": "evt-1", "artifact": "a.json", "pointer": None}
     ]
+
+
+def test_governance_signal_model_dump_includes_scope_ref() -> None:
+    signal = GovernanceSignal.build(
+        run_id="run-1",
+        signal_type=SignalType.AUTHORITY_VIOLATION,
+        severity=Severity.CRITICAL,
+        subject="authority",
+        details={"key": "val"},
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+        scope_ref="scope-a",
+    )
+    data = signal.model_dump(mode="json")
+    assert data["scope_ref"] == "scope-a"
+
+
+def test_governance_signal_model_dump_scope_ref_none() -> None:
+    signal = GovernanceSignal.build(
+        run_id="run-1",
+        signal_type=SignalType.SCOPE_VIOLATION,
+        severity=Severity.CRITICAL,
+        subject="scope",
+        details={"key": "val"},
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    data = signal.model_dump(mode="json")
+    assert data["scope_ref"] is None
 
 
 # ── Edge cases ──────────────────────────────────────────────────────────
