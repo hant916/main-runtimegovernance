@@ -1,0 +1,135 @@
+{
+ "schema_version": "impl-pack.v3.convergence",
+ "identity": {
+  "project": "ailuros",
+  "batch": "post-freeze-convergence",
+  "id": "8071.lock-direct-everrun-package-regression",
+  "sequence": 8071,
+  "slug": "lock-direct-everrun-package-regression",
+  "title": "Lock direct EverRun package acceptance as a regression test",
+  "type": "runtime_governance",
+  "pack_kind": "convergence"
+ },
+ "scheduling": {
+  "status_source_of_truth": "filename_suffix",
+  "allowed_suffixes": [
+   "todo",
+   "done"
+  ],
+  "on_success": "rename_todo_to_done",
+  "on_failure": "keep_todo"
+ },
+ "human_pressure": {
+  "one_screen_brief": "Turn the production-derived fixture from 8070 into a deterministic regression test for the exact failure class found on 2026-08-23: manifest/timeline contract mismatch plus semantic projection collapse to unknown. The test must fail if schema/files/container shape or source-proven lifecycle/decision/validation/scope semantics regress.",
+  "why_now": "A one-time dogfood pass is insufficient; the repaired producer-consumer contract must become executable evidence in the Ailuros suite.",
+  "red_lines": [
+   "No EverRun-specific branch in src/ailuros.",
+   "No validator relaxation.",
+   "No new governance dimension."
+  ]
+ },
+ "machine_core": {
+  "goal": "Add one focused end-to-end regression test that exercises validate -> load -> ingest -> rebuild -> governed result using the 8070 fixture.",
+  "invariants": [
+   "The fixture enters through the same public package path as any producer.",
+   "Source-private event types remain irrelevant to acceptance unless canonical facts depend on them.",
+   "Source-proven canonical facts must not fall back to unknown."
+  ],
+  "files": {
+   "allow": [
+    "tests/test_evidence_package_ingest.py",
+    "tests/test_projection_rebuild.py",
+    "tests/test_runtime_evidence_contract_v1.py",
+    "tests/test_execution_report.py",
+    "fixtures/runtime-evidence/everrun-postfix-minimal/**"
+   ],
+   "create": [],
+   "forbid": [
+    ".everrun/**",
+    "src/ailuros/regression.py",
+    "runtime history",
+    "generated databases",
+    "lockfiles"
+   ]
+  },
+  "steps": [
+   {
+    "id": "T1",
+    "title": "Assert package contract",
+    "details": [
+     "Validate manifest schema/files and timeline object envelope with the existing validator."
+    ]
+   },
+   {
+    "id": "T2",
+    "title": "Assert semantic projection",
+    "details": [
+     "Ingest and rebuild.",
+     "Assert terminal lifecycle plus validation/scope/decision-domain facts exactly where the fixture carries source evidence."
+    ]
+   },
+   {
+    "id": "T3",
+    "title": "Assert no accidental producer coupling",
+    "details": [
+     "Test behavior through shared functions only; do not inspect source == everrun to choose behavior."
+    ]
+   }
+  ],
+  "acceptance": [
+   "The original structural failure class is covered by executable tests.",
+   "The original semantic-unknown failure class is covered by executable tests.",
+   "Tests use shared production code paths.",
+   "Full suite passes."
+  ],
+  "validate": [
+   "python -m pytest tests/test_runtime_evidence_contract_v1.py tests/test_evidence_package_ingest.py tests/test_projection_rebuild.py tests/test_execution_report.py -q",
+   "python -m pytest tests -q"
+  ],
+  "contracts": [
+   {
+    "id": "CV1",
+    "kind": "convergence",
+    "producer": {
+     "artifact": "end-to-end regression test covering structural and semantic-unknown failure classes"
+    },
+    "consumer": {
+     "component": "evidence package ingest and projection rebuild pipeline",
+     "production_path": false
+    },
+    "observable_effect": {
+     "kind": "documentation",
+     "assertion": "Regression tests exercise validate, load, ingest, rebuild, and governed result via shared production code paths."
+    },
+    "proofs": [
+     {
+      "layer": "behavioral",
+      "gate": "hard",
+      "assertion": "Focused and full test suites pass covering both failure classes."
+     }
+    ]
+   }
+  ]
+ },
+ "judge": {
+  "must_check": [
+   "8070 fixture is the only new evidence dependency.",
+   "Regression assertions correspond to the real 2026-08-23 failure class.",
+   "No test branches on EverRun identity to alter semantics.",
+   "No validator weakening occurs.",
+   "Full validation passes."
+  ],
+  "reject_if": [
+   "Test only checks JSON shape and ignores the known semantic projection failures.",
+   "Producer identity selects a special code path.",
+   "Unknown is coerced to clean.",
+   "Validation expectations are weakened.",
+   "Validation fails."
+  ]
+ },
+ "execution_policy": {
+  "max_attempts": 2,
+  "on_max_attempts": "stop_and_keep_todo"
+ },
+ "evidence_matrix_requested_from_coder": true
+}
