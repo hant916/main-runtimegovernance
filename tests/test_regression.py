@@ -1,5 +1,10 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
+from ailuros.adapters.evidence_package import (
+    ingest_evidence_package,
+    load_evidence_package,
+)
 from ailuros.core.execution import (
     ApprovalRecord,
     ApprovalState,
@@ -14,11 +19,20 @@ from ailuros.core.execution import (
     Scope,
     Validation,
 )
+from ailuros.projection import rebuild_projections_and_signals
 from ailuros.regression import (
     GovernanceDimension,
     GovernanceTransition,
     compare_governance_projections,
 )
+from ailuros.storage.sqlite_storage import SQLiteStorage
+
+HERE = Path(__file__).resolve().parent
+REPO_ROOT = HERE.parent
+EVERRUN_POSTFIX_MINIMAL = (
+    REPO_ROOT / "fixtures" / "runtime-evidence" / "everrun-postfix-minimal"
+)
+SECOND_PRODUCER = REPO_ROOT / "fixtures" / "runtime-evidence" / "second-producer"
 
 
 def _projection(
@@ -273,3 +287,61 @@ def test_governance_delta_real_everrun_pair_transition_matrix() -> None:
         GovernanceDimension.BUDGET_COVERAGE,
     ):
         assert facts[dimension] == ("unknown", "unknown", unknown)
+
+
+# ── canonical producer parity: regression read-model is source-neutral ───────
+
+
+def _project_from_fixture(tmp_path, fixture: Path):
+    storage = SQLiteStorage(tmp_path / f"{fixture.name}.db")
+    storage.init()
+    package = load_evidence_package(fixture)
+    ingest_evidence_package(storage, package)
+    projection, _ = rebuild_projections_and_signals(storage, package.run_id)
+    return projection
+
+
+def test_canonical_everrun_and_second_producer_regression_is_source_label_inert(
+    tmp_path,
+) -> None:
+    """T2/T1: both canonical fixtures travel the shared load -> ingest -> rebuild
+    path, and their projections feed the regression read-model. Relabeling only
+    the source leaves the full 12-dimension transition matrix unchanged, proving
+    the comparator reads facts, never producer identity."""
+    everrun = _project_from_fixture(tmp_path, EVERRUN_POSTFIX_MINIMAL)
+    second = _project_from_fixture(tmp_path, SECOND_PRODUCER)
+
+    everrun_relabeled = everrun.model_copy(update={"source": "second-producer"})
+    second_relabeled = second.model_copy(update={"source": "everrun"})
+
+    baseline = compare_governance_projections(everrun, second)
+    relabeled = compare_governance_projections(everrun_relabeled, second_relabeled)
+
+    assert len(baseline.dimensions) == 12
+    assert [
+        (d.dimension, d.baseline, d.current, d.transition)
+        for d in baseline.dimensions
+    ] == [
+        (d.dimension, d.baseline, d.current, d.transition)
+        for d in relabeled.dimensions
+    ]
+    assert baseline.baseline_run_id == everrun.run_id
+    assert baseline.current_run_id == second.run_id
+
+
+def test_canonical_fixture_self_delta_under_relabel_is_identity(tmp_path) -> None:
+    """A projection compared against its own source-relabeled clone must yield
+    only unchanged/unknown transitions: source label alone cannot manufacture a
+    regression or improvement."""
+    everrun = _project_from_fixture(tmp_path, EVERRUN_POSTFIX_MINIMAL)
+    second = _project_from_fixture(tmp_path, SECOND_PRODUCER)
+
+    for projection in (everrun, second):
+        clone = projection.model_copy(update={"source": "relabeled-producer"})
+        delta = compare_governance_projections(projection, clone)
+        for item in delta.dimensions:
+            assert item.baseline == item.current
+            assert item.transition in {
+                GovernanceTransition.UNCHANGED,
+                GovernanceTransition.UNKNOWN,
+            }

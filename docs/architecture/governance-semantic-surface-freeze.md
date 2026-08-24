@@ -69,6 +69,18 @@ metadata only. Locked by `tests/test_regression.py`
 `test_governance_delta_ignores_source_identity_variation`,
 `test_governance_delta_ignores_run_id_variation`, and
 `test_governance_delta_detects_improvement_and_ignores_producer_identity`.
+Canonical-parity evidence (8073): both canonical fixtures — the EverRun-derived
+`fixtures/runtime-evidence/everrun-postfix-minimal` and the generic MCP-style
+`fixtures/runtime-evidence/second-producer` — are driven through the identical
+shared pipeline (validate → load → ingest → rebuild → report) and through the
+regression read-model with only the source label relabeled; the full 12-dimension
+transition matrix is unchanged. Locked by `test_second_producer_conformance.py`
+(`test_everrun_postfix_minimal_and_second_producer_run_identical_shared_pipeline`,
+`test_projection_source_label_is_inert_to_regression_interpretation`,
+`test_unknown_events_survive_without_promoting_clean_across_canonical_fixtures`)
+and `test_regression.py`
+(`test_canonical_everrun_and_second_producer_regression_is_source_label_inert`,
+`test_canonical_fixture_self_delta_under_relabel_is_identity`).
 
 ---
 

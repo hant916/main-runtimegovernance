@@ -30,6 +30,7 @@ from ailuros.adapters.evidence_package import (
 from ailuros.cli import app
 from ailuros.execution_report import build_run_report
 from ailuros.projection import build_execution_projection, rebuild_projections_and_signals
+from ailuros.regression import GovernanceTransition, compare_governance_projections
 from ailuros.storage.sqlite_storage import SQLiteStorage
 
 HERE = Path(__file__).resolve().parent
@@ -37,6 +38,9 @@ REPO_ROOT = HERE.parent
 SECOND_PRODUCER = REPO_ROOT / "fixtures" / "runtime-evidence" / "second-producer"
 INVALID_FIXTURES = SECOND_PRODUCER / "invalid"
 FIRST_PRODUCER = HERE / "fixtures" / "evidence_package" / "valid-v1"
+EVERRUN_POSTFIX_MINIMAL = (
+    REPO_ROOT / "fixtures" / "runtime-evidence" / "everrun-postfix-minimal"
+)
 
 SCOPE_REF = "scope-mcp-sp-001"
 
@@ -213,6 +217,127 @@ def test_unknown_producer_specific_event_is_preserved_not_dropped(tmp_path: Path
     unknown_event = next(e for e in events if e.event_id == "evt-sp-004")
     assert unknown_event.payload["event_type"] == "mcp.tool.result_received"
     assert unknown_event.payload["payload"] == {"tool": "generic.search", "result_size": 12}
+
+
+def test_everrun_postfix_minimal_and_second_producer_run_identical_shared_pipeline(
+    tmp_path: Path,
+) -> None:
+    """T1: both canonical fixtures — the EverRun-derived minimal package and the
+    generic MCP-style second-producer package — travel through the byte-identical
+    shared function objects (validate -> load -> ingest -> rebuild -> report).
+    Structurally identical result shapes are produced from each fixture even
+    though their raw evidence and governed outcomes differ."""
+    from ailuros.execution_report import build_run_report
+    from ailuros.projection import rebuild_projections_and_signals
+
+    fixtures = {
+        "everrun": EVERRUN_POSTFIX_MINIMAL,
+        "second": SECOND_PRODUCER,
+    }
+    outcomes: dict[str, tuple] = {}
+    for name, fixture in fixtures.items():
+        validation = validate_evidence_package_contract(fixture)
+        assert validation.ok is True
+        assert validation.errors == []
+
+        package = load_evidence_package(fixture)
+        storage = _new_storage(tmp_path / name)
+        ingest_result = ingest_evidence_package(storage, package)
+        assert ingest_result.status == ImportStatus.CREATED
+
+        proj, signals = rebuild_projections_and_signals(storage, package.run_id)
+        report = build_run_report(proj, signals)
+        outcomes[name] = (validation, package, ingest_result, proj, signals, report)
+
+    everrun = outcomes["everrun"]
+    second = outcomes["second"]
+
+    assert everrun[0].source == "everrun"
+    assert second[0].source == "generic-mcp-workflow"
+    assert everrun[0].source != second[0].source
+
+    for index in (3, 5):  # projection and report result shapes
+        assert type(everrun[index]) is type(second[index])
+        assert type(everrun[index]).model_fields.keys() == type(second[index]).model_fields.keys()
+
+    # Different evidence stays free to produce different governed outcomes.
+    assert everrun[5].governed_outcome != second[5].governed_outcome
+
+
+def test_projection_source_label_is_inert_to_regression_interpretation(
+    tmp_path: Path,
+) -> None:
+    """T2: clone each canonical fixture's normalized projection changing ONLY the
+    source label, then run the regression read-model. The transition matrix must
+    be unchanged, and a projection compared against its own source-relabeled
+    clone must show no real change (only unchanged/unknown transitions)."""
+    projections = {}
+    for name, fixture in {
+        "everrun": EVERRUN_POSTFIX_MINIMAL,
+        "second": SECOND_PRODUCER,
+    }.items():
+        package = load_evidence_package(fixture)
+        storage = _new_storage(tmp_path / name)
+        ingest_evidence_package(storage, package)
+        proj, _ = rebuild_projections_and_signals(storage, package.run_id)
+        projections[name] = proj
+
+    everrun = projections["everrun"]
+    second = projections["second"]
+
+    everrun_relabeled = everrun.model_copy(update={"source": "generic-mcp-workflow"})
+    second_relabeled = second.model_copy(update={"source": "everrun"})
+
+    baseline = compare_governance_projections(everrun, second)
+    relabeled = compare_governance_projections(everrun_relabeled, second_relabeled)
+    assert [
+        (d.dimension, d.baseline, d.current, d.transition)
+        for d in baseline.dimensions
+    ] == [
+        (d.dimension, d.baseline, d.current, d.transition)
+        for d in relabeled.dimensions
+    ]
+
+    for proj, relabeled_proj in ((everrun, everrun_relabeled), (second, second_relabeled)):
+        self_delta = compare_governance_projections(proj, relabeled_proj)
+        for dimension_delta in self_delta.dimensions:
+            assert dimension_delta.baseline == dimension_delta.current
+            assert dimension_delta.transition in {
+                GovernanceTransition.UNCHANGED,
+                GovernanceTransition.UNKNOWN,
+            }
+
+
+def test_unknown_events_survive_without_promoting_clean_across_canonical_fixtures(
+    tmp_path: Path,
+) -> None:
+    """T3: producer-private unknown events in BOTH canonical fixtures survive
+    ingestion as raw evidence and are never promoted into a clean_success
+    governed outcome. The EverRun fixture carries project_validation/
+    project_scope outside the canonical vocabulary; the second-producer carries
+    mcp.tool.result_received. Neither run may be reported as clean."""
+    fixtures = {
+        "everrun": (EVERRUN_POSTFIX_MINIMAL, "run-20260824-004751", "unknown"),
+        "second": (SECOND_PRODUCER, "run-second-producer-001", "failed"),
+    }
+    for name, (fixture, run_id, expected_outcome) in fixtures.items():
+        validation = validate_evidence_package_contract(fixture)
+        assert validation.ok is True
+        assert any("unknown event_type" in w for w in validation.warnings)
+
+        package = load_evidence_package(fixture)
+        storage = _new_storage(tmp_path / name)
+        ingest_result = ingest_evidence_package(storage, package)
+        assert ingest_result.status == ImportStatus.CREATED
+        assert ingest_result.events_imported == len(package.events)
+
+        stored_events = storage.list_events(run_id)
+        assert len(stored_events) == len(package.events)
+
+        proj, signals = rebuild_projections_and_signals(storage, run_id)
+        report = build_run_report(proj, signals)
+        assert report.governed_outcome != "clean_success"
+        assert report.governed_outcome == expected_outcome
 
 
 def test_second_producer_events_are_not_silently_treated_as_clean(tmp_path: Path) -> None:
