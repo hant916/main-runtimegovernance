@@ -1,0 +1,54 @@
+{
+  "name": "real_everrun_pair_8067",
+  "description": "Real EverRun baseline/current pair accepted in 8067, frozen as a deterministic golden comparison for compare_governance_projections. Expected transitions come only from the human-reviewed 8067 result; no transition is synthesized.",
+  "provenance": {
+    "pack": "8067.prove-real-governance-regression-from-everrun-runs",
+    "accepted_reason": "planner_proposed_accept_and_no_blocking_rule_triggered",
+    "comparability_rationale": "Both runs are conformant ailuros.timeline.v1 exports from the same repo/source; current is the immediate successor of baseline.",
+    "source_evidence": "Both exports carry project_validation status=passed and project_scope status=clean; neither carries run_completed, authority, approval, or budget records."
+  },
+  "baseline": {
+    "run_id": "run-20260824-004751",
+    "lifecycle": "running",
+    "outcome": "unknown",
+    "validation": "passed",
+    "scope": "clean",
+    "decisions": [
+      {"domain": "execution_control", "decision": "human_review"}
+    ],
+    "governance_coverage": {
+      "validation": "evaluated",
+      "scope": "evaluated"
+    }
+  },
+  "current": {
+    "run_id": "run-20260824-011708",
+    "lifecycle": "running",
+    "outcome": "unknown",
+    "validation": "passed",
+    "scope": "clean",
+    "decisions": [
+      {"domain": "execution_control", "decision": "accept"},
+      {"domain": "execution_control", "decision": "accept"},
+      {"domain": "execution_control", "decision": "continue"}
+    ],
+    "governance_coverage": {
+      "validation": "evaluated",
+      "scope": "evaluated"
+    }
+  },
+  "expected": [
+    {"dimension": "native_outcome", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "governed_outcome", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "validation", "baseline": "passed", "current": "passed", "transition": "unchanged"},
+    {"dimension": "scope", "baseline": "clean", "current": "clean", "transition": "unchanged"},
+    {"dimension": "authority", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "approval", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "budget", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "authority_coverage", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "approval_coverage", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "budget_coverage", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "validation_coverage", "baseline": "evaluated", "current": "evaluated", "transition": "unchanged"},
+    {"dimension": "scope_coverage", "baseline": "evaluated", "current": "evaluated", "transition": "unchanged"}
+  ]
+}
