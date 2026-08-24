@@ -418,6 +418,124 @@ def test_evidence_inconsistency_conflict_is_isolated_per_scope() -> None:
     assert ei[0].details["conflicts"][0]["scope_ref"] == "scope-a"
 
 
+# ── 8079: locked positive and negative controls ─────────────────────────
+
+
+def test_negative_control_real_incident_accept_continue_across_scopes() -> None:
+    """The real EverRun run-wide false positive: `accept`/`continue` decisions
+    in sibling scopes must NOT emit an `evidence_inconsistency` signal. This is
+    the exact failure class that run-wide aggregation used to flag (8064).
+    """
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(
+                domain="execution_control",
+                decision="accept",
+                scope_ref="pack-a",
+            ),
+            DecisionSummary(
+                domain="execution_control",
+                decision="continue",
+                scope_ref="pack-b",
+            ),
+        ],
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    signals = derive_signals(proj)
+    assert not any(s.type == "evidence_inconsistency" for s in signals)
+
+
+def test_negative_control_conflict_vocabulary_across_distinct_scopes() -> None:
+    """A pair that WOULD conflict if flattened (`allow` + `block`) must NOT
+    conflict when it lives in distinct scopes. This proves the boundary is
+    scope-aware, not vocabulary-gated: no false inconsistency for differing
+    decisions across scopes.
+    """
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(
+                domain="execution_control",
+                decision="allow",
+                scope_ref="pack-a",
+            ),
+            DecisionSummary(
+                domain="execution_control",
+                decision="block",
+                scope_ref="pack-b",
+            ),
+        ],
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    signals = derive_signals(proj)
+    assert not any(s.type == "evidence_inconsistency" for s in signals)
+
+
+def test_positive_control_same_scope_and_domain_conflict_remains() -> None:
+    """Paired positive control: `allow` + `block` inside the same scope and the
+    same projected domain must still emit `evidence_inconsistency` with the
+    scope/domain provenance intact. Same-scope contradictions are never
+    suppressed by the scope-aware repair.
+    """
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(
+                domain="execution_control",
+                decision="allow",
+                projected_domain="execution_control",
+                scope_ref="pack-a",
+            ),
+            DecisionSummary(
+                domain="execution_control",
+                decision="block",
+                projected_domain="execution_control",
+                scope_ref="pack-a",
+            ),
+        ],
+        evidence_refs=[EvidenceRef(event_id="evt-1")],
+    )
+    signals = derive_signals(proj)
+    ei = [s for s in signals if s.type == "evidence_inconsistency"]
+    assert len(ei) == 1
+    conflicts = ei[0].details["conflicts"]
+    assert len(conflicts) == 1
+    assert conflicts[0]["scope_ref"] == "pack-a"
+    assert conflicts[0]["projected_domain"] == "execution_control"
+    assert set(conflicts[0]["decisions"]) == {"allow", "block"}
+
+
+def test_evidence_inconsistency_signal_points_to_source_evidence_refs() -> None:
+    """T3 provenance: the emitted conflict signal must point to the source
+    evidence refs that back the conflicting decisions, not to fabricated or
+    unrelated refs. The signal's evidence refs are the projection's source
+    evidence refs (DecisionSummary carries no per-decision refs, so the source
+    refs of the conflicting run are the provenance anchor).
+    """
+    src_a = EvidenceRef(event_id="evt-src-a", artifact="timeline.json")
+    src_b = EvidenceRef(event_id="evt-src-b", artifact="timeline.json")
+    unrelated = EvidenceRef(event_id="evt-unrelated", artifact="timeline.json")
+    proj = _make_projection(
+        decisions=[
+            DecisionSummary(
+                domain="execution_control",
+                decision="allow",
+                scope_ref="pack-a",
+            ),
+            DecisionSummary(
+                domain="execution_control",
+                decision="block",
+                scope_ref="pack-a",
+            ),
+        ],
+        evidence_refs=[src_a, src_b, unrelated],
+    )
+    signals = derive_signals(proj)
+    ei = [s for s in signals if s.type == "evidence_inconsistency"]
+    assert len(ei) == 1
+    emitted = {ref.event_id for ref in ei[0].evidence_refs}
+    assert {"evt-src-a", "evt-src-b", "evt-unrelated"} == emitted
+    assert emitted == {ref.event_id for ref in proj.evidence_refs}
+
+
 # ── scope_violation ─────────────────────────────────────────────────────
 
 

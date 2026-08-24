@@ -319,6 +319,39 @@ Red lines honored: no event ids are collapsed, conflict detection is not
 weakened, and the on-disk source packages are never mutated (conflict inputs
 are deep copies in memory only).
 
+### Scope Conflict Positive and Negative Controls (8079)
+
+8079 locks the scope-aware `evidence_inconsistency` boundary as a two-sided
+regression control. The original EverRun dogfood failure was a run-wide false
+positive: sibling scopes (packs) with different decisions were flagged as
+conflicts solely because of run-wide aggregation. The repaired rule
+(`_evidence_inconsistency_rule` in `src/ailuros/signals.py`) groups decisions by
+`(scope_ref, projected_domain)` instead, so the exact conflict boundary must be
+protected against both regression directions:
+
+- **Negative control (T1)** — bound to the real incident class. The real
+  `accept` / `continue` mix across sibling scopes produces **no**
+  `evidence_inconsistency` signal
+  (`test_negative_control_real_incident_accept_continue_across_scopes`). A pair
+  that *would* conflict if flattened (`allow` + `block`) but lives in distinct
+  scopes also produces **no** signal
+  (`test_negative_control_conflict_vocabulary_across_distinct_scopes`), proving
+  the boundary is scope-aware, not vocabulary-gated.
+- **Positive control (T2)** — `allow` + `block` inside the **same** scope and
+  the **same** projected domain still emits `evidence_inconsistency` with the
+  scope/domain provenance intact
+  (`test_positive_control_same_scope_and_domain_conflict_remains`). Same-scope
+  contradictions are never suppressed.
+- **Provenance (T3)** — the emitted conflict signal points to the source
+  evidence refs backing the conflicting decisions, and never to fabricated
+  refs (`test_evidence_inconsistency_signal_points_to_source_evidence_refs`).
+  `DecisionSummary` carries no per-decision refs, so the projection's source
+  evidence refs are the provenance anchor.
+
+These controls add no new signal type and no new conflict vocabulary; they lock
+the already-implemented scope-aware semantics against both false-positive
+(cross-scope) and false-negative (same-scope) regressions.
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:
