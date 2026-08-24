@@ -278,6 +278,47 @@ exactly. Replay is entirely offline on disposable storage; the source fixture
 files are verified byte-identical before and after replay, and no runtime
 orchestration or source-evidence mutation is added.
 
+### Import and Rebuild Idempotency Proof (8077)
+
+8077 locks exact-event-id import idempotency and rebuild idempotency for the
+canonical production-derived evidence fixture
+(`fixtures/runtime-evidence/everrun-postfix-minimal/`, run
+`run-20260824-004751`) and the second-producer fixture
+(`fixtures/runtime-evidence/second-producer/`).
+
+- **Repeated import is idempotent and preserves exact event ids.**
+  `tests/test_evidence_package_import.py`
+  (`test_repeated_import_of_canonical_package_is_idempotent`,
+  `test_repeated_import_is_idempotent_for_second_producer`,
+  `test_repeated_import_does_not_change_stored_content`) imports the identical
+  package twice and asserts: first import `CREATED` with all events imported,
+  second import `ALREADY_PRESENT` with zero imported and all events skipped, the
+  stored id set equals the package id set exactly once each (no collapse, no
+  duplication), and stored sequences/payloads are unchanged by the re-import.
+  The events table keys on `event_id`, so exact-event-id semantics are
+  structural, not incidental.
+- **Repeated rebuild is idempotent.**
+  `test_repeated_rebuild_is_idempotent_across_canonical_fixtures` rebuilds twice
+  on the same storage and asserts stable projection records (full `model_dump`
+  and stored `projections.projection_json`), stable signals (type/severity/
+  subject/evidence refs, plus stored `signals` rows excluding the build-time
+  `created_at` stamp), stable evidence refs that all resolve to stored events,
+  and a stable governed result (`RunReport` and `GovernedExecutionResult` full
+  dumps). `test_rebuild_signals_are_non_empty_and_stable_for_second_producer`
+  proves the signal path with the second producer's non-empty
+  `authority_violation` signal set.
+- **Conflict semantics are preserved, not silently absorbed.**
+  `test_same_event_id_conflicting_content_returns_conflict_not_absorbed` and
+  `test_conflict_detected_even_when_only_last_event_differs` re-import an
+  in-memory copy that reuses the exact event ids but changes one event's
+  content: the import returns `CONFLICT` (never `ALREADY_PRESENT`), nothing is
+  absorbed, and the originally stored payloads are preserved. Conflict is
+  detected even when only the last event differs.
+
+Red lines honored: no event ids are collapsed, conflict detection is not
+weakened, and the on-disk source packages are never mutated (conflict inputs
+are deep copies in memory only).
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:
