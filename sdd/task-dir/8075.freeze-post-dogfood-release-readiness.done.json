@@ -1,0 +1,149 @@
+{
+ "schema_version": "impl-pack.v3.convergence",
+ "identity": {
+  "project": "ailuros",
+  "batch": "post-freeze-convergence",
+  "id": "8075.freeze-post-dogfood-release-readiness",
+  "sequence": 8075,
+  "slug": "freeze-post-dogfood-release-readiness",
+  "title": "Freeze post-dogfood governance release readiness",
+  "type": "runtime_governance",
+  "pack_kind": "convergence"
+ },
+ "scheduling": {
+  "status_source_of_truth": "filename_suffix",
+  "allowed_suffixes": [
+   "todo",
+   "done"
+  ],
+  "on_success": "rename_todo_to_done",
+  "on_failure": "keep_todo"
+ },
+ "human_pressure": {
+  "one_screen_brief": "Close the current convergence line after 8065-8074 by producing one release-readiness record grounded in direct EverRun acceptance, semantic projection proof, real regression evidence, source-neutral parity and regression-policy audit. This is a freeze/checkpoint pack, not a request for another capability.",
+  "why_now": "The useful endpoint is a trustworthy, reproducible governance baseline that future work can compare against, not an endless stream of new primitives.",
+  "red_lines": [
+   "No production behavior changes.",
+   "No test expectation changes.",
+   "No new governance primitive.",
+   "No claim of readiness if any required predecessor remains unresolved."
+  ]
+ },
+ "machine_core": {
+  "goal": "Record whether the current Ailuros governance evaluator/regression surface is ready to freeze as the next trusted baseline and enumerate only evidence-backed residual gaps.",
+  "invariants": [
+   "Readiness is derived from predecessor evidence, not pack status alone.",
+   "Direct raw producer acceptance is required; wrapper-only proof is insufficient.",
+   "At least one real governance regression case and second-producer neutrality evidence are required.",
+   "Open defects remain explicit and block a clean readiness claim when materially relevant."
+  ],
+  "files": {
+   "allow": [
+    "docs/architecture/governance-semantic-surface-freeze.md",
+    "docs/operations/everrun-dogfood.md",
+    "docs/dogfood/everrun-history-baseline.md"
+   ],
+   "create": [
+    "docs/architecture/governance-release-readiness-2026-08.md"
+   ],
+   "forbid": [
+    "src/**",
+    "tests/**",
+    ".everrun/**",
+    "runtime history",
+    "generated databases",
+    "lockfiles"
+   ]
+  },
+  "steps": [
+   {
+    "id": "T1",
+    "title": "Collect predecessor evidence",
+    "details": [
+     "Read outcomes from 8065-8074 and actual code/test state.",
+     "Separate implemented, production-proven, synthetic-only and unresolved capabilities."
+    ]
+   },
+   {
+    "id": "T2",
+    "title": "Evaluate readiness gates",
+    "details": [
+     "Require direct raw EverRun audit/import/rebuild success.",
+     "Require source-proven lifecycle/decision/validation/scope projection.",
+     "Require real regression golden case and source-neutral second-producer parity.",
+     "Require regression-policy audit with no unresolved proven contradiction."
+    ]
+   },
+   {
+    "id": "T3",
+    "title": "Write baseline and residual gaps",
+    "details": [
+     "Record a frozen baseline only if gates pass.",
+     "Rank remaining gaps by production evidence; do not invent future features."
+    ]
+   },
+   {
+    "id": "T4",
+    "title": "Run final validation",
+    "details": [
+     "Run full repository suite unchanged and record result."
+    ]
+   }
+  ],
+  "acceptance": [
+   "Readiness document distinguishes pack-complete from production-proven.",
+   "All required gates are backed by concrete evidence.",
+   "Residual gaps remain explicit.",
+   "No production or test changes occur.",
+   "Full suite passes."
+  ],
+  "validate": [
+   "python -m pytest tests -q"
+  ],
+  "contracts": [
+   {
+    "id": "CV1",
+    "kind": "convergence",
+    "producer": {
+     "artifact": "release readiness record grounded in direct EverRun acceptance and governance evidence"
+    },
+    "consumer": {
+     "component": "governance release readiness document",
+     "production_path": false
+    },
+    "observable_effect": {
+     "kind": "documentation",
+     "assertion": "A readiness document distinguishes pack-complete from production-proven, with explicit residual gaps."
+    },
+    "proofs": [
+     {
+      "layer": "behavioral",
+      "gate": "hard",
+      "assertion": "Readiness document cites concrete evidence; full validation passes."
+     }
+    ]
+   }
+  ]
+ },
+ "judge": {
+  "must_check": [
+   "8065-8074 are reviewed from evidence, not filename suffix alone.",
+   "Wrapper-only or synthetic-only proof is not mislabeled as production convergence.",
+   "A clean readiness claim requires all stated gates.",
+   "No speculative roadmap is added.",
+   "Full validation passes."
+  ],
+  "reject_if": [
+   "Readiness is declared because packs are done without checking behavioral evidence.",
+   "A failed direct producer or regression gate is hidden as expected unknown.",
+   "Production/tests are modified in this checkpoint pack.",
+   "New primitives or orchestration semantics are proposed as part of acceptance.",
+   "Validation fails."
+  ]
+ },
+ "execution_policy": {
+  "max_attempts": 2,
+  "on_max_attempts": "stop_and_keep_todo"
+ },
+ "evidence_matrix_requested_from_coder": true
+}
