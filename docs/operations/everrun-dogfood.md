@@ -235,6 +235,49 @@ Focused coverage: `tests/test_regression.py`
 `test_governance_delta_real_everrun_pair_transition_matrix` pins the full
 twelve-dimension transition matrix above.
 
+### Deterministic Replay Proof (8076)
+
+8076 locks deterministic replay of the canonical governance pipeline against a
+real production-derived evidence fixture:
+`fixtures/runtime-evidence/everrun-postfix-minimal/` (run id
+`run-20260824-004751`). The fixture is a privacy-screened minimal distillation
+of the accepted 8065/8066 raw EverRun evidence: it retains only the events that
+prove terminal lifecycle, execution-control decision domain, validation status
+and scope status (`run_started`, the single `governance_decision`
+(`human_review`, `domain=execution_control`), the two `project_validation`
+events, and the `project_scope` event). Incidental identifiers and
+source-private telemetry are sanitized without changing event semantics, and no
+governance fact absent from the accepted package is added.
+
+The fixture is replayed **twice, independently**, through the same production
+pipeline (`validate_evidence_package_contract` → `audit_evidence_package` →
+`load_evidence_package` → `ingest_evidence_package` →
+`rebuild_projections_and_signals` → `build_run_report`) into two separate
+disposable SQLite storage instances. `tests/test_production_evidence_replay.py`
+asserts that both replays produce identical canonical facts:
+
+- Governance semantics: lifecycle, native outcome, governed outcome, validation,
+  scope, decision count and decision domains, governance coverage, changes,
+  started/completed timestamps, and the governed report (including
+  `why_stopped` and decision reasons).
+- Evidence attribution: identical `evidence_refs`, and every reference resolves
+  to the same stored event in both storages.
+- Unknowns stay unknown: `lifecycle=running` (the export carries no
+  `run_completed`), `outcome=unknown`, `governed_outcome=unknown`, and
+  authority/approval/budget coverage `unknown` on both replays. Nothing is
+  promoted to clean.
+- Unknown-event-type registry warnings are **not** suppressed: the fixture's
+  `evidence-audit` still returns `decision=warn` with the same three
+  `unknown event_type` warnings (the two `project_validation` events and the
+  `project_scope` event) the accepted raw package produced.
+
+The only intentionally excluded incidental field is `GovernanceSignal.created_at`
+(stamped with `datetime.now(UTC)` at signal build time; it carries no governance
+semantics or evidence attribution). All other canonical fields are compared
+exactly. Replay is entirely offline on disposable storage; the source fixture
+files are verified byte-identical before and after replay, and no runtime
+orchestration or source-evidence mutation is added.
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:

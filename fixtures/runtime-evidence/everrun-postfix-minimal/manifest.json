@@ -1,0 +1,28 @@
+{
+  "package_version": "1",
+  "source": "everrun",
+  "target": "ailuros",
+  "governance_mode": "observe",
+  "schema_version": "ailuros.timeline.v1",
+  "run_id": "run-20260824-004751",
+  "generated_at": "2026-08-24T00:47:53+02:00",
+  "files": [
+    {"name": "manifest.json", "required": true},
+    {"name": "timeline.json", "required": true}
+  ],
+  "metadata": {
+    "agent_name": "everrun",
+    "description": "Minimal privacy-screened canonical fixture distilled from the accepted 8065/8066 raw EverRun evidence (run-20260824-004751)"
+  },
+  "provenance": {
+    "source_artifact": "everrun-exporter",
+    "source_pointer": "history/run-20260824-004751/evidence",
+    "source_event_type": "run_started",
+    "metadata": {"framework": "everrun"}
+  },
+  "pkg_metadata": {
+    "exporter_version": "1.0.0",
+    "source_digest": "sha256:everrun-postfix-minimal-fixture",
+    "coverage": {"events": 5, "files": 2}
+  }
+}

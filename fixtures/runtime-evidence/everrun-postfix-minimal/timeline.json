@@ -1,0 +1,85 @@
+{
+  "schema_version": "ailuros.timeline.v1",
+  "run_id": "run-20260824-004751",
+  "events": [
+    {
+      "event_id": "096c61058c4836c11123ae65c44d46e8f95bd79290d33a1d522f1ca7c4d4b97c",
+      "event_type": "run_started",
+      "payload": {
+        "agent": "codex",
+        "model": "default",
+        "provider": "codex",
+        "role": "judge",
+        "session_id": "everrun-planner-run-20260824-004751"
+      },
+      "timestamp": "2026-08-24T00:47:53+02:00"
+    },
+    {
+      "event_id": "e0226f129d79a3277853613435f43b95cee6f8a0f2253d16fb321be6e63ef7ef",
+      "event_type": "governance_decision",
+      "payload": {
+        "decision": "human_review",
+        "domain": "execution_control",
+        "hard_gates": {
+          "forbidden_files": "clean",
+          "planner": "available",
+          "scope": "clean",
+          "validation": "passed"
+        },
+        "reason": "All controller authoritative_completion_facts are true (deps, validation, scope, forbidden-files, git baseline) and pytest passed, and no reject_if condition fired: the coder used the raw evidence directory directly with no wrapper/normalizer/payload rewrite, did not relax the validator, preserved the failing sample run-20260824-002422 while documenting the failure, and committed no raw history or db. However, this is a convergence pack whose CV1 proof is a HARD behavioral gate requiring audit ok=true, a created/idempotent import, and a completed report rebuild. Runtime evidence shows that gate FAILED: evidence-audit returned ok=false/decision=fail with 'manifest files entry missing name' x2, import returned status=invalid, and report --rebuild returned 'run not found'. A failed hard proof cannot be treated as passed, so ACCEPT is not permitted regardless of the passing controller gates. This is not a coder defect or a retriable deterministic repair â€” the pack's\n...[truncated]...",
+        "rule": "planner_human_review",
+        "warnings": [
+          "coder_permission_gate_blocked"
+        ]
+      },
+      "timestamp": "2026-08-24T01:15:11+02:00"
+    },
+    {
+      "event_id": "26bd6b9f28326958c886af9abc2a9bb59ef2c4ff72ac55a5687fd7059e8f8707",
+      "event_type": "project_validation",
+      "payload": {
+        "failed_count": 0,
+        "passed": true,
+        "passed_commands": [
+          "python -m pytest tests -q"
+        ],
+        "passed_count": 1,
+        "status": "passed"
+      },
+      "timestamp": "2026-08-24T01:08:48+02:00"
+    },
+    {
+      "event_id": "4c28b5dff4c2ad8ffa482221f5ccb5bab0ab583d46be7400ec90051dcad5d2fe",
+      "event_type": "project_validation",
+      "payload": {
+        "command": "python -m pytest tests -q",
+        "elapsed_seconds": 147.69,
+        "exit_code": 0,
+        "index": 1,
+        "passed": true,
+        "status": "passed",
+        "total": 1
+      },
+      "timestamp": "2026-08-24T01:08:48+02:00"
+    },
+    {
+      "event_id": "d125830d3781ae3a9a1a5db6ecd6834b679a120694a05a79bbd05f541474fa99",
+      "event_type": "project_scope",
+      "payload": {
+        "allowed_scope": true,
+        "baseline_commit": "30cbad6baba05255b4f9ec9ce6783ed000026dc7",
+        "changed_files": [
+          "docs/dogfood/everrun-history-baseline.md",
+          "docs/operations/everrun-dogfood.md"
+        ],
+        "changed_files_count": 2,
+        "changed_files_source": "pack_start_baseline",
+        "diff_chars": 247419,
+        "diff_path": ".everrun\\history\\run-20260824-004751\\packs\\8065.accept-raw-everrun-evidence-without-wrapper\\iteration-001\\diff.patch",
+        "forbidden_touched": false,
+        "status": "clean"
+      },
+      "timestamp": "2026-08-24T01:08:48+02:00"
+    }
+  ]
+}
