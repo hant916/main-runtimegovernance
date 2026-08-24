@@ -194,6 +194,47 @@ Regression proof: focused tests in `tests/test_projection_lifecycle.py`,
 above plus the conservative missing-evidence behavior. Focused projection tests
 and the full suite pass.
 
+### Governance Regression Delta Proof (8067)
+
+8067 validates `compare_governance_projections()` against a real EverRun
+baseline/current pair. Both projections are built through the production
+load/project path, then the comparator's transition matrix is diffed against
+the source evidence. No comparator defect was reproduced, so no production
+comparator code was changed.
+
+Real pair selection (explicit comparability rationale): `run-20260824-004751`
+(post-fix raw acceptance) as baseline and `run-20260824-011708` (its immediate
+successor) as current. Both are conformant `ailuros.timeline.v1` exports from
+the same repo/source, so they are comparable on every dimension the comparator
+reads.
+
+| Dimension | Baseline fact | Current fact | Source evidence | Transition |
+|---|---|---|---|---|
+| Native outcome | `unknown` | `unknown` | current export carries `run_completed` (`outcome=success`) | `unknown` |
+| Governed outcome | `unknown` | `unknown` | current export carries `run_completed` (`outcome=success`) | `unknown` |
+| Validation | `passed` | `passed` | `project_validation` `status=passed` (both) | `unchanged` |
+| Scope | `clean` | `clean` | `project_scope` `status=clean` (both) | `unchanged` |
+| Authority / approval / budget | `unknown` | `unknown` | no such records in either export | `unknown` |
+| Validation / scope coverage | `evaluated` | `evaluated` | validation/scope evidence present in both | `unchanged` |
+| Authority / approval / budget coverage | `unknown` | `unknown` | no records in either export | `unknown` |
+
+The comparator labels every evidence-missing dimension `unknown` and every
+unchanged fact `unchanged`; it fabricates no improvement or regression, and it
+never branches on producer identity. This matches the documented semantics of
+`compare_governance_projections()`.
+
+One discrepancy is a projection-side event-ordering gap, not a comparator
+defect: the export writes the terminal `run_completed` event (index 68) before
+the three `run_started` events (indices 69-71), so `build_execution_projection`
+derives `lifecycle=running` for `run-20260824-011708` even though the terminal
+`success` fact is present. Fixing that belongs to `src/ailuros/projection.py`
+and is out of scope here (source projections are not mutated); it is recorded
+as a future candidate.
+
+Focused coverage: `tests/test_regression.py`
+`test_governance_delta_real_everrun_pair_transition_matrix` pins the full
+twelve-dimension transition matrix above.
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:

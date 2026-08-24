@@ -171,3 +171,61 @@ def test_governance_delta_preserves_incomparable_transitions() -> None:
     assert _transition(result, GovernanceDimension.GOVERNED_OUTCOME) == (
         GovernanceTransition.INCOMPARABLE
     )
+
+
+def test_governance_delta_real_everrun_pair_transition_matrix() -> None:
+    coverage = GovernanceCoverage(validation="evaluated", scope="evaluated")
+    baseline = _projection(
+        "run-20260824-004751",
+        lifecycle=Lifecycle.RUNNING,
+        outcome=Outcome.UNKNOWN,
+        decisions=[
+            DecisionSummary(domain="execution_control", decision="human_review")
+        ],
+        coverage=coverage,
+    )
+    current = _projection(
+        "run-20260824-011708",
+        lifecycle=Lifecycle.RUNNING,
+        outcome=Outcome.UNKNOWN,
+        decisions=[
+            DecisionSummary(domain="execution_control", decision="accept"),
+            DecisionSummary(domain="execution_control", decision="accept"),
+            DecisionSummary(domain="execution_control", decision="continue"),
+        ],
+        coverage=coverage,
+    )
+
+    result = compare_governance_projections(baseline, current)
+
+    assert result.baseline_run_id == "run-20260824-004751"
+    assert result.current_run_id == "run-20260824-011708"
+    facts = {
+        item.dimension: (item.baseline, item.current, item.transition)
+        for item in result.dimensions
+    }
+    unchanged = GovernanceTransition.UNCHANGED
+    unknown = GovernanceTransition.UNKNOWN
+    assert facts[GovernanceDimension.VALIDATION] == ("passed", "passed", unchanged)
+    assert facts[GovernanceDimension.SCOPE] == ("clean", "clean", unchanged)
+    assert facts[GovernanceDimension.VALIDATION_COVERAGE] == (
+        "evaluated",
+        "evaluated",
+        unchanged,
+    )
+    assert facts[GovernanceDimension.SCOPE_COVERAGE] == (
+        "evaluated",
+        "evaluated",
+        unchanged,
+    )
+    for dimension in (
+        GovernanceDimension.NATIVE_OUTCOME,
+        GovernanceDimension.GOVERNED_OUTCOME,
+        GovernanceDimension.AUTHORITY,
+        GovernanceDimension.APPROVAL,
+        GovernanceDimension.BUDGET,
+        GovernanceDimension.AUTHORITY_COVERAGE,
+        GovernanceDimension.APPROVAL_COVERAGE,
+        GovernanceDimension.BUDGET_COVERAGE,
+    ):
+        assert facts[dimension] == ("unknown", "unknown", unknown)
