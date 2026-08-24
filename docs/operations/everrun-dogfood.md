@@ -650,6 +650,35 @@ second-producer packages without changing raw evidence, ingestion idempotency,
 or conflict detection. Malformed wrappers remain unprojected rather than being
 inferred as canonical governance events.
 
+### Canonical Producer Compatibility Matrix (8080)
+
+`tests/test_producer_compatibility_matrix.py` is the bounded regression matrix
+over every currently evidence-backed canonical producer fixture. It parameterizes
+one shared pipeline (`validate` → `audit` → `load` → `ingest` → `rebuild` →
+`report` → governed result) across all producers instead of branching by
+producer, and pins the expected audit acceptance and a minimal evidence-backed
+set of projection/report facts per fixture.
+
+**Proven producers (exactly two):**
+
+| Producer | Fixture | Run id | Canonical facts pinned |
+|---|---|---|---|
+| EverRun (production dogfood, 8065/8066/8076/8077) | `fixtures/runtime-evidence/everrun-postfix-minimal/` | `run-20260824-004751` | `lifecycle=running`, `outcome=unknown`, `governed_outcome=unknown`, `validation=passed`, `scope=clean`, `why_stopped=execution_control: human_review`, authority/approval/budget coverage `unknown`, 3 unknown-event warnings |
+| Generic MCP-style workflow (second-producer conformance) | `fixtures/runtime-evidence/second-producer/` | `run-second-producer-001` | `lifecycle=completed`, `outcome=failed`, `governed_outcome=failed`, `validation=passed`, `scope=unknown`, `scope_ref=scope-mcp-sp-001`, `authority_records=[violation]`, `budget_records=[within_limit]`, `signal=authority_violation`, 4 unknown-event warnings |
+
+Both fixtures are contract-accepted (`audit` → `ok=true`, `decision=warn`,
+`rules_evaluated=2`) and are replayed through the identical shared pipeline with
+no producer-identity branching. Neither fixture is ever promoted to a clean
+governed outcome; their differing governed outcomes (`unknown` vs `failed`) come
+from their different raw evidence, not from fixture modification.
+
+**Unproven boundary (explicitly not claimed):** the synthetic contract samples
+under `tests/fixtures/evidence_package/*` (`sample-agent-v1`, `sample-agent-v0`)
+are not producers and are excluded from the matrix. A real external integration
+that emits `runtime-evidence-package-v1` from LangGraph, OpenAI Agents SDK, an
+MCP server, or any other framework remains deferred and unproven — the matrix
+asserts none of these names appear as a proven producer.
+
 ---
 
 ## Product Acceptance Checklist
