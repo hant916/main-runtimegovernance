@@ -558,3 +558,65 @@ def test_native_scoped_event_still_projects_without_wrapper() -> None:
     proj = build_execution_projection("run-1", "test", events)
     assert proj.scope_ref == "native-scope"
     assert proj.decisions[0].scope_ref == "native-scope"
+
+
+# ── EverRun post-fix decision payload shapes ───────────────────────────
+
+
+def test_everrun_accept_decision_projects_execution_control_domain() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={
+                "decision": "accept",
+                "domain": "execution_control",
+                "hard_gates": {
+                    "forbidden_files": "clean",
+                    "planner": "available",
+                    "scope": "clean",
+                    "validation": "passed",
+                },
+                "reason": "planner_proposed_accept_and_no_blocking_rule_triggered",
+                "rule": "planner_accept",
+                "warnings": [],
+            },
+        ),
+        _event("run_completed", event_id="e3"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    d = proj.decisions[0]
+    assert d.decision == "accept"
+    assert d.domain == "execution_control"
+    assert d.projected_domain == "execution_control"
+    assert proj.outcome == Outcome.SUCCESS
+
+
+def test_everrun_human_review_decision_projects_execution_control_without_blocking() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "governance_decision",
+            event_id="e2",
+            payload={
+                "decision": "human_review",
+                "domain": "execution_control",
+                "hard_gates": {
+                    "forbidden_files": "clean",
+                    "planner": "available",
+                    "scope": "clean",
+                    "validation": "passed",
+                },
+                "reason": "human_review_required",
+                "rule": "planner_human_review",
+                "warnings": ["coder_permission_gate_blocked"],
+            },
+        ),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    d = proj.decisions[0]
+    assert d.decision == "human_review"
+    assert d.domain == "execution_control"
+    assert d.projected_domain == "execution_control"
+    assert proj.outcome not in {Outcome.BLOCKED, Outcome.REVIEW_REQUIRED}

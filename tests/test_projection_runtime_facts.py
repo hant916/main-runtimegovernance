@@ -410,3 +410,59 @@ def test_failed_no_override_for_non_capability_reasons() -> None:
     proj = build_execution_projection("run-1", "test", events)
     assert proj.outcome == Outcome.SUCCESS
     assert proj.lifecycle == Lifecycle.COMPLETED
+
+
+# ── EverRun post-fix validation/scope payload shapes ───────────────────
+
+
+def test_everrun_validation_payload_projects_passed() -> None:
+    events = [
+        _event("project_validation", event_id="e1", payload={
+            "failed_count": 0,
+            "passed": True,
+            "passed_commands": ["python -m pytest tests -q"],
+            "passed_count": 1,
+            "status": "passed",
+        }),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.validation == Validation.PASSED
+
+
+def test_everrun_scope_payload_projects_clean_and_changes() -> None:
+    events = [
+        _event("project_scope", event_id="e1", payload={
+            "allowed_scope": True,
+            "baseline_commit": "30cbad6baba05255b4f9ec9ce6783ed000026dc7",
+            "changed_files": ["docs/operations/everrun-dogfood.md"],
+            "changed_files_count": 1,
+            "changed_files_source": "pack_start_baseline",
+            "forbidden_touched": False,
+            "status": "clean",
+        }),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.scope == Scope.CLEAN
+    assert [c.description for c in proj.changes] == ["docs/operations/everrun-dogfood.md"]
+
+
+def test_everrun_sample_leaves_missing_governance_dimensions_unknown() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event("project_validation", event_id="e2", payload={"status": "passed"}),
+        _event("project_scope", event_id="e3", payload={
+            "status": "clean",
+            "changed_files": ["docs/operations/everrun-dogfood.md"],
+        }),
+        _event("governance_decision", event_id="e4", payload={
+            "decision": "accept",
+            "domain": "execution_control",
+        }),
+        _event("run_completed", event_id="e5"),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.approval_records == []
+    assert proj.budget_records == []
+    assert proj.authority_records == []
+    assert proj.lifecycle == Lifecycle.COMPLETED
+    assert proj.outcome == Outcome.SUCCESS

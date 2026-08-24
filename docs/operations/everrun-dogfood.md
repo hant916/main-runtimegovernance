@@ -159,6 +159,41 @@ same newest raw directory (`run-20260824-004751`): `evidence-audit` returns
 acceptance of the raw producer output remains established with no wrapper,
 normalizer, or payload rewrite applied.
 
+### Semantic Projection Convergence (8066)
+
+8066 verifies that the post-fix raw EverRun package accepted by 8065 projects
+its source-proven terminal, decision, validation and scope semantics into
+canonical Ailuros fields instead of false unknowns. It is verification only:
+`src/ailuros/projection.py` already consumes the post-fix shapes correctly and
+source-neutrally, so no production code was changed.
+
+The post-fix payload shapes observed from the accepted sample, and the canonical
+projection for each:
+
+| Fact | Source event + payload | Canonical projection | Status |
+|---|---|---|---|
+| Terminal state | `run_completed` event (authoritative run-level evidence) | `lifecycle=completed`, `outcome=success` | Projects correctly; the terminal fact is driven by `event_type`, never by the free-text `payload.outcome`/`decision_state` fields |
+| Execution-control decision | `governance_decision` with `decision=accept` or `human_review`, `domain=execution_control` | `DecisionSummary.projected_domain=execution_control` | Projects correctly; explicit canonical `domain` is preserved without producer-identity or free-text inference |
+| Validation | `project_validation` with `status=passed` | `validation=passed` | Projects correctly; status string projects deterministically |
+| Scope | `project_scope` with `status=clean`, `changed_files=[...]` | `scope=clean`, `changes=[...]` | Projects correctly; clean/violated status and file list project deterministically |
+
+No consumer defect was reproduced. The projection reads only canonical
+`event_type` and `payload` fields (`projection.py` `build_execution_projection`)
+and never branches on producer identity or reads free-text `reason`/`outcome`
+strings to invent semantics. The `run_completed` shape carries a free-text
+`outcome` field that is deliberately ignored for terminal-state derivation.
+
+Missing-evidence handling remains conservative. The accepted sample carries no
+`run_completed` event and no authority/approval/budget records, so lifecycle
+stays `running` and those dimensions stay unknown/empty — never promoted to
+clean or evaluated.
+
+Regression proof: focused tests in `tests/test_projection_lifecycle.py`,
+`tests/test_projection_decisions.py`, and
+`tests/test_projection_runtime_facts.py` pin each source-proven projection
+above plus the conservative missing-evidence behavior. Focused projection tests
+and the full suite pass.
+
 ### Validate, Then Import a Single Package
 
 Validate the completed package before it enters storage:

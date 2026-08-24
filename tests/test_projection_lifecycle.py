@@ -304,3 +304,37 @@ def test_schema_version_default() -> None:
 def test_schema_version_override() -> None:
     proj = build_execution_projection("run-1", "test", [], schema_version="2.0")
     assert proj.schema_version == "2.0"
+
+
+def test_everrun_run_completed_payload_projects_terminal_success() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "run_completed",
+            event_id="e2",
+            payload={
+                "decision_impact": "terminal",
+                "decision_state": "accept",
+                "exit_code": 0,
+                "outcome": "success",
+                "process_state": "succeeded",
+            },
+        ),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.lifecycle == Lifecycle.COMPLETED
+    assert proj.outcome == Outcome.SUCCESS
+
+
+def test_everrun_run_terminal_outcome_not_read_from_payload() -> None:
+    events = [
+        _event("run_started", event_id="e1"),
+        _event(
+            "run_completed",
+            event_id="e2",
+            payload={"outcome": "failed", "decision_state": "accept"},
+        ),
+    ]
+    proj = build_execution_projection("run-1", "test", events)
+    assert proj.lifecycle == Lifecycle.COMPLETED
+    assert proj.outcome == Outcome.SUCCESS
