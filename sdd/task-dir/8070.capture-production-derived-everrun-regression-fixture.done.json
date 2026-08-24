@@ -1,0 +1,146 @@
+{
+ "schema_version": "impl-pack.v3.convergence",
+ "identity": {
+  "project": "ailuros",
+  "batch": "post-freeze-convergence",
+  "id": "8070.capture-production-derived-everrun-regression-fixture",
+  "sequence": 8070,
+  "slug": "capture-production-derived-everrun-regression-fixture",
+  "title": "Capture a minimal production-derived EverRun governance fixture",
+  "type": "runtime_governance",
+  "pack_kind": "convergence"
+ },
+ "scheduling": {
+  "status_source_of_truth": "filename_suffix",
+  "allowed_suffixes": [
+   "todo",
+   "done"
+  ],
+  "on_success": "rename_todo_to_done",
+  "on_failure": "keep_todo"
+ },
+ "human_pressure": {
+  "one_screen_brief": "After 8065-8069, distill the successful raw EverRun package path into the smallest privacy-screened canonical fixture that preserves only the governance facts needed to reproduce lifecycle, decision-domain, validation and scope projection. This fixture is derived from production evidence but must not copy raw history, prompts, patches, secrets or unrelated telemetry.",
+  "why_now": "The direct producer fix needs a durable regression artifact or the same cross-repo contract can silently break again.",
+  "do_not_misread": [
+   "Do not commit a full real run.",
+   "Do not invent facts absent from the accepted raw package."
+  ],
+  "red_lines": [
+   "No raw .everrun/history.",
+   "No secrets or model text.",
+   "No new governance semantics.",
+   "No producer-specific code path."
+  ]
+ },
+ "machine_core": {
+  "goal": "Create one minimal canonical evidence-package fixture derived from the accepted 8065/8066 raw EverRun evidence and prove it reproduces the same canonical facts through the existing pipeline.",
+  "invariants": [
+   "Fixture facts are traceable to the accepted raw package.",
+   "Only minimal canonical events needed for the reproduced facts are retained.",
+   "Sanitization may replace incidental identifiers but must not change event semantics.",
+   "Unknown source-private telemetry is omitted only because it is irrelevant to this focused regression fixture, not because unknown is treated as clean."
+  ],
+  "files": {
+   "allow": [
+    "fixtures/runtime-evidence/**",
+    "tests/test_runtime_evidence_contract_v1.py",
+    "tests/test_projection_runtime_facts.py",
+    "docs/operations/everrun-dogfood.md"
+   ],
+   "create": [
+    "fixtures/runtime-evidence/everrun-postfix-minimal/manifest.json",
+    "fixtures/runtime-evidence/everrun-postfix-minimal/timeline.json"
+   ],
+   "forbid": [
+    ".everrun/**",
+    "*.log",
+    "**/*.log",
+    "runtime history",
+    "generated databases",
+    "lockfiles"
+   ]
+  },
+  "steps": [
+   {
+    "id": "T1",
+    "title": "Derive minimal evidence set",
+    "details": [
+     "Use only the raw package accepted by 8065/8066.",
+     "Select the minimum events proving terminal lifecycle, execution-control decision domain, validation status and scope status."
+    ]
+   },
+   {
+    "id": "T2",
+    "title": "Privacy screen and canonicalize fixture identity",
+    "details": [
+     "Remove unrelated telemetry and sensitive payload data.",
+     "Preserve semantic values and contract shape; do not fabricate absent governance facts."
+    ]
+   },
+   {
+    "id": "T3",
+    "title": "Add focused replay proof",
+    "details": [
+     "Load, ingest and rebuild the fixture through production functions.",
+     "Assert the same canonical lifecycle/validation/scope/decision facts proven in 8066."
+    ]
+   }
+  ],
+  "acceptance": [
+   "Fixture validates under the unchanged canonical validator.",
+   "Fixture contains no raw history, prompts, patches or secrets.",
+   "Replay reproduces source-proven canonical facts.",
+   "Full suite passes."
+  ],
+  "validate": [
+   "python -m pytest tests/test_runtime_evidence_contract_v1.py tests/test_projection_runtime_facts.py -q",
+   "python -m pytest tests -q"
+  ],
+  "contracts": [
+   {
+    "id": "CV1",
+    "kind": "convergence",
+    "producer": {
+     "artifact": "minimal canonical evidence-package fixture derived from 8065/8066 raw evidence"
+    },
+    "consumer": {
+     "component": "evidence package validator and import pipeline",
+     "production_path": false
+    },
+    "observable_effect": {
+     "kind": "documentation",
+     "assertion": "A minimal canonical fixture validates under the unchanged validator and reproduces source-proven facts."
+    },
+    "proofs": [
+     {
+      "layer": "behavioral",
+      "gate": "hard",
+      "assertion": "Fixture validates and import/replay reproduces canonical facts."
+     }
+    ]
+   }
+  ]
+ },
+ "judge": {
+  "must_check": [
+   "8065 and 8066 are complete before deriving the fixture.",
+   "Every retained semantic fact is source-proven by the accepted raw package.",
+   "Fixture is minimal and privacy-screened.",
+   "No canonical validator relaxation or new producer branch exists.",
+   "Validation passes."
+  ],
+  "reject_if": [
+   "Raw runtime history or sensitive payloads are committed.",
+   "Facts are invented to make the fixture clean.",
+   "The fixture bypasses the production loader/ingest/projection path.",
+   "Unknown evidence is rewritten as clean.",
+   "Validation fails."
+  ]
+ },
+ "execution_policy": {
+  "max_attempts": 2,
+  "on_max_attempts": "stop_and_keep_todo"
+ },
+ "evidence_matrix_requested_from_coder": true
+}
