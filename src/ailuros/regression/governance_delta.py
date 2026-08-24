@@ -181,5 +181,6 @@ def compare_governance_projections(
         current_run_id=current.run_id,
         dimensions=dimensions,
     )
-# NOTE: This module is already source-neutral (see tests). The _SOURCE_NEUTRAL
-# invariant below makes the documented contract explicit in production code.
+# NOTE: This module is source-neutral by construction: no ranking or transition
+# selection reads a projection's source/run identity. Source- and run-id-neutral
+# transitions are locked by tests/test_regression.py.
