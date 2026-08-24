@@ -7,6 +7,11 @@ provenance, temporal attribution, and regression delta.
 **Evidence basis:** Packs 8065–8068, EverRun dogfood runs
 (`run-20260824-004751`, `run-20260824-011708`), and the full clean validation
 suite (1436 passed on 2026-08-24).
+**Consolidating record:** Pack 8082 extends this freeze through 8076–8081
+(replay, idempotency, unknown preservation, conflict controls, producer matrix,
+corpus) and is the production-backed baseline in
+`governance-production-baseline.md` (1482 passed on 2026-08-24). This document
+remains the authoritative inventory of the implemented canonical semantics.
 
 This record freezes the governance semantic surface *proven by implemented code
 and tests*, not by pack titles. It defines what may continue during the freeze
