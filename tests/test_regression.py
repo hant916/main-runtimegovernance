@@ -139,6 +139,50 @@ def test_governance_delta_detects_improvement_and_ignores_producer_identity() ->
     )
 
 
+def test_governance_delta_ignores_source_identity_variation() -> None:
+    coverage = GovernanceCoverage(validation="evaluated", scope="evaluated")
+    baseline = _projection("run-before", source="producer-a", coverage=coverage)
+    current = _projection("run-after", source="producer-b", coverage=coverage)
+    cross_source = compare_governance_projections(baseline, current)
+
+    same_source_baseline = _projection("run-before", source="producer-a", coverage=coverage)
+    same_source_current = _projection("run-after", source="producer-a", coverage=coverage)
+    same_source = compare_governance_projections(same_source_baseline, same_source_current)
+
+    for item in same_source.dimensions:
+        assert item.baseline == item.current
+        assert item.transition == (
+            GovernanceTransition.UNKNOWN
+            if item.baseline == "unknown"
+            else GovernanceTransition.UNCHANGED
+        )
+    assert [
+        (item.dimension, item.baseline, item.current, item.transition)
+        for item in cross_source.dimensions
+    ] == [
+        (item.dimension, item.baseline, item.current, item.transition)
+        for item in same_source.dimensions
+    ]
+
+
+def test_governance_delta_ignores_run_id_variation() -> None:
+    coverage = GovernanceCoverage(validation="evaluated", scope="evaluated")
+    baseline = _projection("run-0001", coverage=coverage)
+    current = _projection("run-0002", coverage=coverage)
+
+    result = compare_governance_projections(baseline, current)
+
+    assert result.baseline_run_id == "run-0001"
+    assert result.current_run_id == "run-0002"
+    for item in result.dimensions:
+        assert item.baseline == item.current
+        assert item.transition == (
+            GovernanceTransition.UNKNOWN
+            if item.baseline == "unknown"
+            else GovernanceTransition.UNCHANGED
+        )
+
+
 def test_governance_delta_preserves_unknown_transitions() -> None:
     baseline = _projection("run-before", validation=Validation.UNKNOWN)
     current = _projection("run-after", validation=Validation.PASSED)

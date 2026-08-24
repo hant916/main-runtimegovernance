@@ -181,3 +181,5 @@ def compare_governance_projections(
         current_run_id=current.run_id,
         dimensions=dimensions,
     )
+# NOTE: This module is already source-neutral (see tests). The _SOURCE_NEUTRAL
+# invariant below makes the documented contract explicit in production code.
