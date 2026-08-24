@@ -82,6 +82,83 @@ and `test_regression.py`
 (`test_canonical_everrun_and_second_producer_regression_is_source_label_inert`,
 `test_canonical_fixture_self_delta_under_relabel_is_identity`).
 
+### 1.3 Regression ordering audit against accepted real cases (8074)
+
+8074 re-audits the existing regression transition ordering (§1.1, §1.2) against
+the accepted real EverRun dogfood cases. It is verification only: no accepted
+real case demonstrated a wrong transition, so no ranking or transition rule was
+changed and no new regression test was added.
+
+**T1 — Inventory (code is the source of truth).** All rank tables and the
+transition rule live in `src/ailuros/regression.py`:
+
+| Element | Location |
+|---|---|
+| Dimension set + order | `GovernanceDimension`, `_DIMENSION_ORDER` (`regression.py:18`, `:62`) |
+| Rank tables | `_OUTCOME_RANKS`, `_VALIDATION_RANKS`, `_SCOPE_RANKS`, `_AUTHORITY_RANKS`, `_APPROVAL_RANKS`, `_BUDGET_RANKS`, `_COVERAGE_RANKS` (`regression.py:64-76`) |
+| Transition rule | `_transition` (`regression.py:83-98`) |
+| Fact extraction | `_facts` (`regression.py:138`) |
+| Rank dispatch | `_ranks_for` (`regression.py:162`) |
+
+Ordered dimensions: native/governed outcome (success 4 > partial 3 >
+review_required 2 > blocked 1 = failed 1), validation (passed 4 > partial 3 >
+not_run 2 > failed 1), scope (clean 2 > violated 1), authority (authorized 2 >
+violation 1), approval (approved 2 > denied 1), budget (within_budget 2 >
+exceeded 1). Non-ordered dimensions: the five coverage dimensions carry only
+`evaluated` (`_COVERAGE_RANKS`); any `unknown` coverage value maps to `unknown`
+and differing non-`unknown`, non-`evaluated` coverage values map to
+`incomparable`.
+
+Transition rule: any `unknown` input → `unknown`; equal values → `unchanged`;
+unranked or equal-ranked differing values → `incomparable`; otherwise
+`improved`/`regressed` by rank order.
+
+**T2 — Check against accepted real cases.** The only accepted real regression
+evidence is the 8067 baseline/current pair, frozen as the 8072 golden case
+(`tests/golden/regression/real_everrun_pair.json`, locked by
+`tests/test_golden_regression.py::test_golden_regression_real_everrun_pair` and
+pinned by `tests/test_regression.py::test_governance_delta_real_everrun_pair_transition_matrix`).
+
+| Dimension | Baseline `run-20260824-004751` | Current `run-20260824-011708` | Comparator transition | Correct? |
+|---|---|---|---|---|
+| native_outcome | unknown | unknown | unknown | yes |
+| governed_outcome | unknown | unknown | unknown | yes |
+| validation | passed | passed | unchanged | yes |
+| scope | clean | clean | unchanged | yes |
+| authority / approval / budget | unknown | unknown | unknown | yes |
+| authority / approval / budget coverage | unknown | unknown | unknown | yes |
+| validation / scope coverage | evaluated | evaluated | unchanged | yes |
+
+Every row matches the documented semantics; the comparator fabricates no
+improvement or regression and never branches on producer identity. No accepted
+real case exercises an `improved`/`regressed`/`incomparable` transition, so the
+relative ordering of the non-`unknown` states is not proven wrong by any
+accepted case. The producer-neutral synthetic tests that do exercise
+improvement/regression (`test_regression.py`
+`test_governance_delta_detects_regressions_across_available_facts`,
+`test_governance_delta_detects_improvement_and_ignores_producer_identity`)
+prove the mechanism, not the correctness of any specific ordering.
+
+**T3 — Correction.** None required. `src/ailuros/regression.py` is unchanged.
+
+**Open policy questions (not defects; no accepted case can settle them):**
+- `blocked` and `failed` share rank 1 (`_OUTCOME_RANKS`), so `blocked ↔ failed`
+  is `incomparable` even though `derive_native_outcome` gives `block` the
+  highest decision priority (`projection.py:33`). No accepted case decides
+  whether one is worse than the other.
+- The regression read-model ranks `governed_outcome` with the same `Outcome`
+  vocabulary as `native_outcome` (`_ranks_for`, `regression.py:163-167`); it
+  does not use the separate `GovernedOutcome` precedence in `core/execution.py`.
+  Documentation-precision note, not a defect.
+- Coverage values other than `evaluated`/`unknown` (e.g. `not_applicable`)
+  become `incomparable` when both differ; not exercised by accepted cases.
+- `planner_proposed_accept_and_no_blocking_rule_triggered`
+  (`docs/contracts/decision-domains.md` §Open Issues) concerns
+  execution_control vocabulary projection: `accept`/`continue`/`human_review`
+  are not `block`/`require_review`, so they leave native outcome at `unknown`
+  for the running-lifecycle accepted pair. This is a projection-vocabulary open
+  question, not a regression-transition defect.
+
 ---
 
 ## 2. Convergence Status (8065–8068)
