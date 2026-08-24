@@ -1,0 +1,76 @@
+{
+  "name": "real_everrun_pair_8067",
+  "kind": "real_production_pair",
+  "description": "The real EverRun baseline/current pair accepted in 8067 and frozen as a golden case in 8072, re-registered here as the anchor of the bounded production-backed governance regression corpus.",
+  "comparability_rationale": "Both runs are conformant ailuros.timeline.v1 exports from the same repo/source; current (run-20260824-011708) is the immediate successor of baseline (run-20260824-004751), so they are comparable on every dimension the comparator reads.",
+  "provenance": {
+    "packs": [
+      "8067.prove-real-governance-regression-from-everrun-runs",
+      "8072.lock-real-governance-regression-golden-case"
+    ],
+    "accepted_reason": "planner_proposed_accept_and_no_blocking_rule_triggered",
+    "source_evidence": "Both exports carry project_validation status=passed and project_scope status=clean; neither carries run_completed, authority, approval, or budget records. The current export writes its terminal run_completed (outcome=success) before its run_started events, so build_execution_projection derives lifecycle=running (projection-side event-ordering gap, not a comparator defect; recorded in 8067, out of scope for the corpus)."
+  },
+  "baseline": {
+    "run_id": "run-20260824-004751",
+    "fixture": "fixtures/runtime-evidence/everrun-postfix-minimal",
+    "evidence_refs": [
+      "fixtures/runtime-evidence/everrun-postfix-minimal/manifest.json",
+      "event:096c61058c4836c11123ae65c44d46e8f95bd79290d33a1d522f1ca7c4d4b97c (run_started)",
+      "event:e0226f129d79a3277853613435f43b95cee6f8a0f2253d16fb321be6e63ef7ef (governance_decision human_review domain=execution_control)",
+      "event:26bd6b9f28326958c886af9abc2a9bb59ef2c4ff72ac55a5687fd7059e8f8707 (project_validation passed)",
+      "event:d125830d3781ae3a9a1a5db6ecd6834b679a120694a05a79bbd05f541474fa99 (project_scope clean)"
+    ],
+    "facts": {
+      "run_id": "run-20260824-004751",
+      "lifecycle": "running",
+      "outcome": "unknown",
+      "validation": "passed",
+      "scope": "clean",
+      "decisions": [
+        {"domain": "execution_control", "decision": "human_review"}
+      ],
+      "governance_coverage": {
+        "validation": "evaluated",
+        "scope": "evaluated"
+      }
+    }
+  },
+  "current": {
+    "run_id": "run-20260824-011708",
+    "fixture": null,
+    "evidence_refs": [
+      "8067 source evidence (raw export not committed per runtime-history red line): current export carries run_completed (outcome=success), project_validation status=passed, project_scope status=clean, and governance_decision events accept/accept/continue (domain=execution_control); no authority/approval/budget records. Facts recorded from the accepted 8067 result and the 8072 golden case."
+    ],
+    "facts": {
+      "run_id": "run-20260824-011708",
+      "lifecycle": "running",
+      "outcome": "unknown",
+      "validation": "passed",
+      "scope": "clean",
+      "decisions": [
+        {"domain": "execution_control", "decision": "accept"},
+        {"domain": "execution_control", "decision": "accept"},
+        {"domain": "execution_control", "decision": "continue"}
+      ],
+      "governance_coverage": {
+        "validation": "evaluated",
+        "scope": "evaluated"
+      }
+    }
+  },
+  "expected": [
+    {"dimension": "native_outcome", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "governed_outcome", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "validation", "baseline": "passed", "current": "passed", "transition": "unchanged"},
+    {"dimension": "scope", "baseline": "clean", "current": "clean", "transition": "unchanged"},
+    {"dimension": "authority", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "approval", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "budget", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "authority_coverage", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "approval_coverage", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "budget_coverage", "baseline": "unknown", "current": "unknown", "transition": "unknown"},
+    {"dimension": "validation_coverage", "baseline": "evaluated", "current": "evaluated", "transition": "unchanged"},
+    {"dimension": "scope_coverage", "baseline": "evaluated", "current": "evaluated", "transition": "unchanged"}
+  ]
+}

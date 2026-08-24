@@ -679,6 +679,48 @@ that emits `runtime-evidence-package-v1` from LangGraph, OpenAI Agents SDK, an
 MCP server, or any other framework remains deferred and unproven — the matrix
 asserts none of these names appear as a proven producer.
 
+### Governance Regression Corpus (8081)
+
+The bounded production-backed governance regression corpus lives in
+`fixtures/governance-regression/cases/*.json` and is exercised by
+`tests/test_regression_corpus.py`. Each corpus case is a real or
+production-derived comparable pair that pre-declares, before the comparator is
+run, the baseline fact, current fact, expected transition, and evidence refs for
+every supported regression dimension. It exists to make the real governance
+regression proof repeatable and bounded; it does not change comparator ranking.
+
+**Corpus cases (exactly two, both evidence-backed):**
+
+| Case | Kind | Baseline → Current | Comparability context |
+|---|---|---|---|
+| `real_everrun_pair_8067` | Real production pair | `run-20260824-004751` → `run-20260824-011708` | Same repo/source `ailuros.timeline.v1`; current is the immediate successor (8067/8072) |
+| `everrun_second_producer_parity` | Production-backed parity | `run-20260824-004751` → `run-second-producer-001` | The two proven producers of the 8080 matrix through the identical production pipeline (8073/8077/8080) |
+
+Corpus mechanics mirror the pack steps:
+
+- **T1 inventory** — every case must carry an explicit comparability rationale,
+  source evidence, and evidence refs on both sides; a case without a defensible
+  comparison context is rejected, not silently compared. The corpus is anchored
+  on the real 8067/8072 pair.
+- **T2 pre-declared expectations** — each case records baseline fact, current
+  fact, expected transition, raw projection facts, and evidence refs for all
+  twelve supported dimensions before any assertion.
+- **T3 run** — `compare_governance_projections()` is run over each case and must
+  reproduce the pre-declared matrix exactly; fixture-backed sides are
+  additionally rebuilt through the production `load → ingest → rebuild` path and
+  their derived canonical facts must equal the pre-declared fact column, tying
+  every recorded fact to on-disk production evidence.
+- **T4 coverage gaps** — reported (not synthesized): no real case exists for the
+  `improved`, `regressed`, or `incomparable` transitions on any dimension, and
+  no real case carries evaluated authority/approval/budget records on both sides
+  of a pair. The corpus asserts these gaps so a new real case that proves a
+  ranked ordering must update the gap declaration explicitly.
+
+Red lines honored: comparator ranking is not changed by the corpus (it proves
+the existing source-neutral comparator reproduces each pre-declared matrix), and
+no raw runtime history is committed (the 8067 current side records its facts
+from the accepted result; only the privacy-screened fixture is committed).
+
 ---
 
 ## Product Acceptance Checklist
