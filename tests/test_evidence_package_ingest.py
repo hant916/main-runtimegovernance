@@ -8,13 +8,18 @@ from ailuros.adapters.evidence_package import (
     ImportStatus,
     ingest_evidence_package,
     load_evidence_package,
+    validate_evidence_package_contract,
 )
+from ailuros.execution_report import build_run_report
 from ailuros.projection import build_execution_projection, rebuild_projections_and_signals
 from ailuros.storage.sqlite_storage import SQLiteStorage
 
 HERE = Path(__file__).resolve().parent
 FIXTURES = HERE / "fixtures" / "evidence_package"
 VALID_V1 = FIXTURES / "valid-v1"
+EVERRUN_POSTFIX_MINIMAL = (
+    HERE.parent / "fixtures" / "runtime-evidence" / "everrun-postfix-minimal"
+)
 
 
 def _new_storage(tmp_path: Path) -> SQLiteStorage:
@@ -295,3 +300,60 @@ def test_imported_scoped_timeline_loads_and_ingests(tmp_path):
 
     projection, _ = rebuild_projections_and_signals(storage, package.run_id)
     assert projection.scope_ref == "scope-timeline-1"
+
+
+def test_everrun_postfix_minimal_package_acceptance_regression(tmp_path):
+    """8071: end-to-end regression on the 8070 production-derived fixture.
+
+    Exercises the shared public pipeline validate -> load -> ingest -> rebuild ->
+    governed result. Source-proven facts (validation/scope/decision-domain) must
+    project determinately; facts the fixture carries no evidence for must stay
+    unknown rather than being coerced to clean. All behavior is selected from
+    evidence shape through shared functions, never from the producer name.
+    """
+    result = validate_evidence_package_contract(EVERRUN_POSTFIX_MINIMAL)
+    assert result.ok is True
+    assert result.errors == []
+    assert result.source == "everrun"
+    assert result.run_id == "run-20260824-004751"
+    assert result.schema_version == "ailuros.timeline.v1"
+    assert result.events_count == 5
+
+    package = load_evidence_package(EVERRUN_POSTFIX_MINIMAL)
+    assert package.source == "everrun"
+    assert len(package.events) == 5
+
+    storage = _new_storage(tmp_path)
+    ingest_result = ingest_evidence_package(storage, package)
+    assert ingest_result.status == ImportStatus.CREATED
+    assert ingest_result.run_id == "run-20260824-004751"
+    assert ingest_result.events_imported == 5
+    assert ingest_result.events_skipped == 0
+
+    projection, signals = rebuild_projections_and_signals(storage, package.run_id)
+    report = build_run_report(projection, signals)
+
+    assert projection.validation.value == "passed"
+    assert projection.scope.value == "clean"
+    assert [c.description for c in projection.changes] == [
+        "docs/dogfood/everrun-history-baseline.md",
+        "docs/operations/everrun-dogfood.md",
+    ]
+    assert projection.decision_count == 1
+    assert [(d.domain, d.decision, d.projected_domain) for d in projection.decisions] == [
+        ("execution_control", "human_review", "execution_control")
+    ]
+    assert projection.governance_coverage.validation.value == "evaluated"
+    assert projection.governance_coverage.scope.value == "evaluated"
+    assert report.validation == "passed"
+    assert report.scope == "clean"
+    assert report.decision_reasons == ["execution_control/human_review"]
+
+    assert projection.lifecycle.value == "running"
+    assert projection.outcome.value == "unknown"
+    assert projection.governance_coverage.authority.value == "unknown"
+    assert projection.governance_coverage.approval.value == "unknown"
+    assert projection.governance_coverage.budget.value == "unknown"
+    assert report.governed_outcome == "unknown"
+    assert report.why_stopped == "execution_control: human_review"
+    assert signals == []
