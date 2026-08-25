@@ -23,7 +23,7 @@
   },
   "pkg_metadata": {
     "exporter_version": "1.0.0",
-    "source_digest": "sha256:abc123",
+    "source_digest": "sha256:15404e646e5f5a0939004684f79eb76eb9f87161a551b87e9e70dd6f0570f6b3",
     "coverage": {"events": 2, "files": 3}
   }
 }

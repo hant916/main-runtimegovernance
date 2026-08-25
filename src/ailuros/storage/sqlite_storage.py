@@ -30,7 +30,12 @@ class SQLiteStorage:
     def init(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
-            sql = Path(__file__).with_name("migrations").joinpath("001_initial.sql").read_text()
+            sql = (
+                Path(__file__)
+                .with_name("migrations")
+                .joinpath("001_initial.sql")
+                .read_text(encoding="utf-8")
+            )
             conn.executescript(sql)
             conn.execute(
                 "INSERT OR IGNORE INTO migrations(version, applied_at) VALUES (?, ?)",
@@ -48,7 +53,7 @@ class SQLiteStorage:
             version = path.stem
             if version in applied:
                 continue
-            conn.executescript(path.read_text())
+            conn.executescript(path.read_text(encoding="utf-8"))
             conn.execute(
                 "INSERT INTO migrations(version, applied_at) VALUES (?, ?)",
                 (version, datetime.now(UTC).isoformat()),

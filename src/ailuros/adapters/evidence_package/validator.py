@@ -9,6 +9,8 @@ from ailuros.core.validation import ValidationResult
 from ailuros.models.event import RuntimeEventType
 
 _V1_SCHEMA = "ailuros.timeline.v1"
+_DIGEST_HEX_LENGTHS = {"sha256": 64, "sha512": 128, "sha1": 40, "md5": 32}
+_HEX_CHARS = frozenset("0123456789abcdef")
 
 # Canonical event-type vocabulary. Well-formed events whose type is outside this
 # set are preserved as warnings rather than errors.
@@ -103,6 +105,56 @@ def _validate_v1_counts(
                 f"pkg_metadata.coverage.files declares {declared_files} files "
                 f"but manifest declares {actual_files}"
             )
+
+
+def _validate_v1_source_digest(
+    manifest: dict[str, Any],
+    warnings: list[str],
+) -> None:
+    """Check that a declared `pkg_metadata.source_digest` is well-formed.
+
+    `source_digest` is a producer attestation about the *upstream source
+    material* the exporter read (agent history, a run directory, an API
+    response). Ailuros never receives that material, so the digest is
+    structurally unverifiable here and is deliberately NOT treated as an
+    integrity proof of the package files. What is checkable is its shape: a
+    value that looks like a digest but is not one is misleading in an audit
+    record, so a malformed value is surfaced as a warning.
+
+    Well-formed = `<algo>:<lowercase-hex>` with a hex length matching the
+    named algorithm. Absent (`None`) stays valid and unremarked.
+    """
+    pkg_metadata = manifest.get("pkg_metadata")
+    if not isinstance(pkg_metadata, dict):
+        return
+    digest = pkg_metadata.get("source_digest")
+    if digest is None:
+        return
+    if not isinstance(digest, str) or not digest.strip():
+        warnings.append(
+            "pkg_metadata.source_digest must be a non-empty string when present"
+        )
+        return
+    if ":" not in digest:
+        warnings.append(
+            f"pkg_metadata.source_digest is not in '<algo>:<hex>' form: {digest!r} "
+            "(unverified producer attestation)"
+        )
+        return
+    algo, _, hexpart = digest.partition(":")
+    expected = _DIGEST_HEX_LENGTHS.get(algo.lower())
+    if expected is None:
+        warnings.append(
+            f"pkg_metadata.source_digest uses unknown digest algorithm {algo!r} "
+            "(unverified producer attestation)"
+        )
+        return
+    if len(hexpart) != expected or not all(c in _HEX_CHARS for c in hexpart):
+        warnings.append(
+            f"pkg_metadata.source_digest declares {algo} but the value is not a "
+            f"{expected}-character lowercase hex digest: {digest!r} "
+            "(unverified producer attestation)"
+        )
 
 
 def _validate_files(
@@ -285,6 +337,7 @@ def validate_evidence_package_contract(
 
     if manifest.get("schema_version") == _V1_SCHEMA and isinstance(timeline, dict):
         _validate_v1_provenance_safety(manifest, errors)
+        _validate_v1_source_digest(manifest, warnings)
         if strict:
             _validate_v1_counts(manifest, events_count, errors)
 

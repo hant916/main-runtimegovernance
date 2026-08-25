@@ -22,7 +22,6 @@
   },
   "pkg_metadata": {
     "exporter_version": "1.0.0",
-    "source_digest": "sha256:everrun-postfix-minimal-fixture",
     "coverage": {"events": 5, "files": 2}
   }
 }

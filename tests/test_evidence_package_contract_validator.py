@@ -153,3 +153,135 @@ def test_valid_string_scope_ref_passes(tmp_path):
     result = validate_evidence_package_contract(pkg)
     assert result.ok is True
     assert result.errors == []
+
+
+# ── pkg_metadata.source_digest well-formedness ──────────────────────────────
+#
+# `source_digest` is a producer attestation about the upstream source material
+# the exporter read. Ailuros never receives that material, so the value is
+# structurally unverifiable and is NOT an integrity proof of the package files.
+# What is checkable is its shape: a value that looks like a digest but is not
+# one is misleading inside an audit record, so it is surfaced as a warning
+# (never an error — a malformed attestation does not invalidate the evidence).
+
+VALID_V1_PKG = FIXTURES / "valid-v1"
+
+
+def _copy_valid_v1(tmp_path: Path) -> Path:
+    dest = tmp_path / "pkg-v1"
+    shutil.copytree(VALID_V1_PKG, dest)
+    return dest
+
+
+def _set_source_digest(pkg: Path, value: object) -> None:
+    manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
+    manifest.setdefault("pkg_metadata", {})["source_digest"] = value
+    _write_json(pkg / "manifest.json", manifest)
+
+
+def _digest_warnings(result) -> list[str]:
+    return [w for w in result.warnings if "source_digest" in w]
+
+
+def test_absent_source_digest_is_valid_and_unremarked(tmp_path):
+    """Omitting the attestation is the honest default and must stay silent."""
+    pkg = _copy_valid_v1(tmp_path)
+    manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
+    manifest.get("pkg_metadata", {}).pop("source_digest", None)
+    _write_json(pkg / "manifest.json", manifest)
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True
+    assert _digest_warnings(result) == []
+
+
+def test_well_formed_source_digest_is_accepted_silently(tmp_path):
+    pkg = _copy_valid_v1(tmp_path)
+    _set_source_digest(pkg, "sha256:" + "a" * 64)
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True
+    assert _digest_warnings(result) == []
+
+
+def test_placeholder_source_digest_is_warned_not_silently_accepted(tmp_path):
+    """The exact defect this check exists for: a `sha256:`-prefixed string that
+    is not a digest at all must not pass as an integrity-looking audit field."""
+    pkg = _copy_valid_v1(tmp_path)
+    _set_source_digest(pkg, "sha256:everrun-postfix-minimal-fixture")
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True, "a malformed attestation must not invalidate evidence"
+    warnings = _digest_warnings(result)
+    assert len(warnings) == 1
+    assert "not a 64-character lowercase hex digest" in warnings[0]
+    assert "unverified producer attestation" in warnings[0]
+
+
+def test_source_digest_without_algorithm_prefix_is_warned(tmp_path):
+    pkg = _copy_valid_v1(tmp_path)
+    _set_source_digest(pkg, "a" * 64)
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True
+    assert any("not in '<algo>:<hex>' form" in w for w in _digest_warnings(result))
+
+
+def test_source_digest_with_unknown_algorithm_is_warned(tmp_path):
+    pkg = _copy_valid_v1(tmp_path)
+    _set_source_digest(pkg, "crc32:deadbeef")
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True
+    assert any("unknown digest algorithm" in w for w in _digest_warnings(result))
+
+
+def test_uppercase_hex_source_digest_is_warned(tmp_path):
+    """Digests are compared as lowercase hex; uppercase would break equality."""
+    pkg = _copy_valid_v1(tmp_path)
+    _set_source_digest(pkg, "sha256:" + "A" * 64)
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True
+    assert _digest_warnings(result)
+
+
+def test_empty_source_digest_is_warned(tmp_path):
+    pkg = _copy_valid_v1(tmp_path)
+    _set_source_digest(pkg, "   ")
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True
+    assert any("must be a non-empty string" in w for w in _digest_warnings(result))
+
+
+def test_canonical_fixtures_declare_no_fabricated_source_digest():
+    """Regression guard: the committed canonical fixtures must never carry a
+    placeholder digest again. They have no real upstream digest available, so
+    the honest representation is to omit the field."""
+    repo_root = HERE.parent
+    for name in ("everrun-postfix-minimal", "second-producer"):
+        pkg = repo_root / "fixtures" / "runtime-evidence" / name
+        result = validate_evidence_package_contract(pkg)
+        assert _digest_warnings(result) == [], (
+            f"{name} declares a malformed source_digest: {result.warnings}"
+        )
+        manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
+        assert "source_digest" not in manifest.get("pkg_metadata", {})
+
+
+def test_non_ascii_package_loads_regardless_of_platform_default_encoding(tmp_path):
+    """Regression: JSON must be read as UTF-8, not the platform default codepage.
+
+    On a non-UTF-8 default locale (e.g. cp1252/cp936 Windows) a bare
+    `Path.read_text()` raises UnicodeDecodeError on any non-ASCII byte. Every
+    JSON read on the evidence path is pinned to utf-8; this locks that.
+    """
+    pkg = _copy_valid_v1(tmp_path)
+    manifest = json.loads((pkg / "manifest.json").read_text(encoding="utf-8"))
+    manifest.setdefault("metadata", {})["description"] = "治理证据包 — ünïcodé ✓"
+    _write_json(pkg / "manifest.json", manifest)
+
+    result = validate_evidence_package_contract(pkg)
+    assert result.ok is True
+    assert result.errors == []

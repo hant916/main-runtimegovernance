@@ -10,7 +10,8 @@ suite (1436 passed on 2026-08-24).
 **Consolidating record:** Pack 8082 extends this freeze through 8076–8081
 (replay, idempotency, unknown preservation, conflict controls, producer matrix,
 corpus) and is the production-backed baseline in
-`governance-production-baseline.md` (1482 passed on 2026-08-24). This document
+`governance-production-baseline.md` (1482 passed on 2026-08-24; 1493 after the
+2026-08-25 audit fixes). This document
 remains the authoritative inventory of the implemented canonical semantics.
 
 This record freezes the governance semantic surface *proven by implemented code

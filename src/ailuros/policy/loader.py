@@ -15,7 +15,7 @@ class PolicyLoader:
     def load_file(self, path: str | Path) -> Policy:
         source = Path(path)
         try:
-            data = json.loads(source.read_text())
+            data = json.loads(source.read_text(encoding="utf-8"))
         except OSError as exc:
             raise PolicyValidationError(f"{source}: {exc}") from exc
         except json.JSONDecodeError as exc:

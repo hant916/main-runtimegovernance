@@ -26,7 +26,7 @@ REGRESSION_GOLDEN = GOLDEN_DIR / "regression" / "real_everrun_pair.json"
 def _load_fixtures():
     fixtures = []
     for f in sorted(GOLDEN_DIR.glob("*.json")):
-        data = json.loads(f.read_text())
+        data = json.loads(f.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             continue
         fixtures.append(pytest.param(data, id=data["name"]))
@@ -35,7 +35,7 @@ def _load_fixtures():
 
 def _write_policy(tmp_path: Path, policy_dict: dict) -> Path:
     path = tmp_path / f"{policy_dict['policy_id']}.json"
-    path.write_text(json.dumps(policy_dict))
+    path.write_text(json.dumps(policy_dict), encoding="utf-8")
     return path
 
 
@@ -95,7 +95,7 @@ def _ordered_result(result) -> list[tuple[str, str, str, str]]:
 
 
 def test_golden_regression_real_everrun_pair() -> None:
-    data = json.loads(REGRESSION_GOLDEN.read_text())
+    data = json.loads(REGRESSION_GOLDEN.read_text(encoding="utf-8"))
     baseline = _projection_from_facts(data["baseline"])
     current = _projection_from_facts(data["current"])
 
@@ -122,7 +122,7 @@ def test_golden_regression_real_everrun_pair() -> None:
 
 
 def test_golden_regression_real_everrun_pair_is_deterministic() -> None:
-    data = json.loads(REGRESSION_GOLDEN.read_text())
+    data = json.loads(REGRESSION_GOLDEN.read_text(encoding="utf-8"))
     baseline = _projection_from_facts(data["baseline"])
     current = _projection_from_facts(data["current"])
 

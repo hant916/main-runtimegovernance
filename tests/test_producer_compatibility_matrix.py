@@ -40,6 +40,8 @@ Red lines honored:
 from __future__ import annotations
 
 import inspect
+import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -163,6 +165,10 @@ UNPROVEN_PRODUCER_NAMES = {
 }
 
 PROVEN_PRODUCER_NAMES = set(PRODUCERS)
+
+# A producer label that appears nowhere in the codebase, used to prove that the
+# source string is inert for governance facts.
+_NEUTRAL_LABEL = "zzz-neutral-relabel-probe"
 
 
 def _new_storage(tmp_path: Path, name: str) -> SQLiteStorage:
@@ -305,15 +311,91 @@ def test_each_producer_projects_expected_canonical_facts(tmp_path, name: str) ->
 
 def test_shared_pipeline_is_parameterized_not_branched() -> None:
     """The shared pipeline takes only (tmp_path, fixture) — no producer
-    parameter — and its source contains no producer-identity literal, so it
-    cannot branch by producer."""
+    parameter — so a caller cannot select a producer-specific code path."""
     assert inspect.signature(_run_shared_pipeline).parameters.keys() == {
         "tmp_path",
         "fixture",
     }
-    source = inspect.getsource(_run_shared_pipeline)
-    for literal in ("everrun", "second-producer", "generic-mcp-workflow"):
-        assert literal not in source
+
+
+@pytest.mark.parametrize("name", sorted(PRODUCERS))
+def test_producer_label_is_inert_for_governance_facts(tmp_path, name: str) -> None:
+    """Behavioral source-neutrality: relabelling the producer in the manifest
+    changes no governance fact.
+
+    This is the load-bearing proof that the pipeline does not branch on
+    producer identity. The fixture is copied to a temp dir and its `source`
+    (and the provenance framework label) is rewritten to a name that appears
+    nowhere in the codebase; every canonical governance fact must be
+    byte-identical to the untouched original. The on-disk fixture is never
+    modified.
+    """
+    meta = PRODUCERS[name]
+    baseline = _facts(_run_shared_pipeline(tmp_path / "orig", meta["path"]))
+
+    relabelled_dir = tmp_path / "relabelled"
+    shutil.copytree(meta["path"], relabelled_dir)
+    manifest_path = relabelled_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["source"] = _NEUTRAL_LABEL
+    manifest["metadata"]["agent_name"] = _NEUTRAL_LABEL
+    manifest["provenance"]["metadata"]["framework"] = _NEUTRAL_LABEL
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    relabelled_outcomes = _run_shared_pipeline(tmp_path / "relab", relabelled_dir)
+
+    # The label itself did change — otherwise the test would prove nothing.
+    assert relabelled_outcomes["validation"].source == _NEUTRAL_LABEL
+    assert relabelled_outcomes["validation"].source != meta["source"]
+
+    # ...but no governance fact moved.
+    assert _facts(relabelled_outcomes) == baseline == meta["expected"]
+
+    # The source fixture on disk was not mutated.
+    original_manifest = json.loads(
+        (meta["path"] / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert original_manifest["source"] == meta["source"]
+
+
+@pytest.mark.parametrize("name", sorted(PRODUCERS))
+def test_projection_stage_is_neutral_even_when_handed_a_producer_name(
+    tmp_path, name: str
+) -> None:
+    """Directly probe the projection stage with the producer name.
+
+    `rebuild_projections_and_signals` defaults to `source="rebuild"`, so the
+    manifest's producer label never reaches `build_execution_projection` on the
+    normal path — which means the relabel test above cannot, on its own, prove
+    the projection stage is neutral. This test closes that hole by feeding the
+    real producer name (and a neutral one) straight into the projection stage
+    and asserting the governance facts are identical.
+    """
+    meta = PRODUCERS[name]
+    package = load_evidence_package(meta["path"])
+    storage = _new_storage(tmp_path, package.run_id)
+    ingest_evidence_package(storage, package)
+
+    def facts_for(source: str) -> tuple:
+        proj, signals = rebuild_projections_and_signals(
+            storage, package.run_id, source=source
+        )
+        report = build_run_report(proj, signals)
+        return (
+            proj.lifecycle,
+            proj.outcome,
+            proj.validation,
+            proj.scope,
+            proj.scope_ref,
+            proj.decision_count,
+            proj.event_count,
+            sorted(ref.event_id for ref in proj.evidence_refs),
+            report.governed_outcome,
+            report.why_stopped,
+        )
+
+    assert facts_for(meta["source"]) == facts_for(_NEUTRAL_LABEL)
+    assert facts_for(meta["source"]) == facts_for("rebuild")
 
 
 @pytest.mark.parametrize("name", sorted(PRODUCERS))
@@ -346,11 +428,14 @@ def test_all_producers_share_one_pipeline_and_result_shapes(tmp_path) -> None:
     assert type(reports[0]) is type(reports[1])
     assert type(reports[0]).model_fields.keys() == type(reports[1]).model_fields.keys()
 
-    # Same shared pipeline: the exact callable was used for both.
-    assert all(
-        outcomes_by_name[n]["proj"].run_id == PRODUCERS[n]["run_id"]
-        for n in PRODUCERS
+    # Structurally identical, yet genuinely different governance outcomes:
+    # the shared shape is not achieved by flattening the producers together.
+    governed = {outcomes_by_name[n]["report"].governed_outcome for n in PRODUCERS}
+    assert len(governed) > 1, (
+        "both producers produced the same governed outcome — the matrix would "
+        "not prove that one pipeline handles genuinely different evidence"
     )
+    assert {r.run_id for r in projs} == {m["run_id"] for m in PRODUCERS.values()}
 
 
 # ── T4: the proven boundary is exactly the two producers ────────────────────

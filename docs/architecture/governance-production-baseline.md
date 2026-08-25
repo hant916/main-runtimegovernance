@@ -11,7 +11,7 @@ open gaps without inventing fixes, and states the post-8082 next-step rule.
 `docs/architecture/governance-semantic-surface-freeze.md`,
 `docs/architecture/governance-release-readiness-2026-08.md`, the committed
 fixtures and golden case, and the full clean validation suite (1482 passed on
-2026-08-24).
+2026-08-24; **1493 passed after the 2026-08-25 audit fixes**, see §3.1a).
 **Relationship to prior records:** extends the 8069 semantic-surface freeze and
 the 8075 release-readiness checkpoint with the 8076–8081 durability/evidence
 line (deterministic replay, import/rebuild idempotency, unknown-event
@@ -105,11 +105,72 @@ for new production evidence; not fixed here).
    `lifecycle=running` despite the `success` fact. Fix belongs to
    `src/ailuros/projection.py`; out of scope here (source projections are not
    mutated). Evidence: `everrun-dogfood.md` §8067.
-2. **8068 record-state gap (process, not behavior).** The 8068 pack record is
-   `sdd/task-dir/8068.*.todo.json` in git but `.done.json` on disk (rename
-   uncommitted at check time). The source-neutrality behavior itself is
-   mechanically locked by `test_regression.py`; this is a bookkeeping gap only,
-   and it is **not** a blocking correctness defect.
+2. ~~**8068 record-state gap (process, not behavior).**~~ **Closed 2026-08-25.**
+   The rename `8068.*.todo.json` -> `8068.*.done.json` is now committed to git,
+   so filename-suffix status (the declared source of truth) agrees on disk and
+   in the index. The source-neutrality behavior remains mechanically locked by
+   `test_regression.py`.
+
+### 3.1a Defects found and fixed in the 2026-08-25 baseline audit
+
+These were found by auditing this record against the tree it describes. All are
+fixed; each carries a locking test.
+
+1. **Fabricated `source_digest` in canonical fixtures (audit-integrity).** Both
+   canonical fixtures declared `"source_digest": "sha256:<placeholder-text>"` —
+   a `sha256:`-prefixed string that was not a digest — and the synthetic
+   `tests/fixtures/evidence_package/valid-v1` declared `"sha256:abc123"`.
+   Nothing validated the field, so an integrity-looking value flowed unchecked
+   through `ingest` into stored audit records.
+   **Fix:** `_validate_v1_source_digest` in
+   `src/ailuros/adapters/evidence_package/validator.py` now checks the value is
+   well-formed `<algo>:<lowercase-hex>` with an algorithm-correct length, and
+   emits a **warning** (never an error) tagged `unverified producer
+   attestation`. The canonical fixtures now **omit** the field (no real upstream
+   digest exists for them; omission is the honest representation); the synthetic
+   v1 fixture carries a genuinely computed sha256 of its own timeline bytes.
+   **Semantics clarified:** `source_digest` attests to *upstream source material
+   Ailuros never receives*. It is structurally unverifiable here and is **not**
+   an integrity proof of the package files. Locked by 8 tests in
+   `tests/test_evidence_package_contract_validator.py`.
+2. **Non-UTF-8 JSON/SQL reads (platform defect).** `policy/loader.py` and
+   `storage/sqlite_storage.py` (x2) read files with bare `Path.read_text()`,
+   which uses the platform default codepage. On a non-UTF-8 locale (verified:
+   `cp1252` on this machine) any non-ASCII byte raised `UnicodeDecodeError`,
+   breaking policy loading and DB migration. **Fix:** all reads pinned to
+   `encoding="utf-8"`; regression locked by
+   `test_non_ascii_package_loads_regardless_of_platform_default_encoding`.
+   `tests/test_golden_regression.py` had the same latent defect (3 sites).
+3. **`mypy` was not clean (contradicted the readiness claim).** `signals.py`
+   reused one loop variable `record` across approval/budget/authority loops, so
+   mypy narrowed it to `ApprovalRecord` and reported 6 errors. Behavior was
+   correct; the annotation was not. **Fix:** distinct loop variables. `mypy src`
+   is now `Success: no issues found in 88 source files`.
+4. **Producer-neutrality was asserted by source-text introspection.**
+   `test_shared_pipeline_is_parameterized_not_branched` grepped the *test
+   helper's* own source for producer literals — it could not observe the
+   production pipeline at all. **Fix:** replaced with
+   `test_producer_label_is_inert_for_governance_facts`, which copies each
+   fixture, rewrites `source`/`agent_name`/`framework` to a label absent from
+   the codebase, and asserts every canonical governance fact is unchanged while
+   confirming the label itself did change. This is now behavioral evidence, not
+   a text scan.
+5. **Producer label never reaches the projection stage (proof gap, found by
+   mutation testing the fix for #4).** `rebuild_projections_and_signals`
+   defaults to `source="rebuild"` and the shared pipeline does not forward the
+   manifest `source`, so `build_execution_projection` never sees the producer
+   name on the normal path. A relabel test therefore *cannot* prove the
+   projection stage is neutral — that stage was neutral only because it was
+   never handed the label. Verified by injecting
+   `if source == "everrun": projection_events = projection_events[:1]` into
+   `build_execution_projection`: the relabel test still passed.
+   **Fix:** `test_projection_stage_is_neutral_even_when_handed_a_producer_name`
+   feeds the real producer name directly into the projection stage and compares
+   against a neutral label. Both injected branches are now caught.
+   **Note for future work:** this is a *proof* gap, not a behavior defect — but
+   it means source-neutrality at the projection layer is currently guaranteed by
+   an unforwarded default rather than by design. If the pipeline is ever changed
+   to forward the real `source`, this test becomes the load-bearing guard.
 
 ### 3.2 Evidence-coverage gaps (recorded, not fixed, not promoted)
 
@@ -134,14 +195,20 @@ for new production evidence; not fixed here).
    projections post-run only.
 7. **8068 contract claim (insufficient-evidence, record-keeping).** The pack
    declared `production_path: true` but delivered a behavioral test-lock; the
-   behavior is locked and the record is `.done` on disk.
+   behavior is locked and the record is `.done` in git as of 2026-08-25.
 8. **Duplicated regression module (housekeeping note).** Package
    `src/ailuros/regression/` and standalone `src/ailuros/regression.py` carry
    identical semantics; behavior identical and locked.
 
-No fix is invented for any gap above. Correctness defect #1 remains explicitly
-open and non-blocking; evidence-coverage gaps #1–#6 are the target inputs for
-future production evidence.
+No fix is invented for any **evidence-coverage** gap above: those close only
+when real production evidence arrives. Correctness defect #1 (terminal-event
+ordering) remains explicitly open and non-blocking. The §3.1a defects were
+mechanical faults in this repository — not missing evidence — and were fixed
+directly, each with a locking test.
+
+**Validation after the 2026-08-25 audit:** `python -m pytest tests -q` →
+**1493 passed**; `python -m ruff check src tests` → **All checks passed**;
+`python -m mypy src` → **Success: no issues found in 88 source files**.
 
 ---
 
@@ -153,7 +220,8 @@ Command (run unchanged, no test modifications, on 2026-08-24):
 python -m pytest tests -q
 ```
 
-Result: **1482 passed** in ~130s, 1 warning. The single warning is the
+Result at freeze time: **1482 passed** in ~130s, 1 warning (**1493 passed**
+after the 2026-08-25 audit fixes in §3.1a). The single warning is the
 environmental `PytestCacheWarning` (`could not create cache path … [WinError 183]`
 — Windows pytest cache-path creation; unrelated to the suite, identical class to
 the warning recorded in the 8069 freeze doc and the 8075 readiness doc). No

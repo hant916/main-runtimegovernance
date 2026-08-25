@@ -413,23 +413,23 @@ def _review_required_cause_evidence(
         if record.state in {ApprovalState.APPROVED, ApprovalState.DENIED}
     }
     refs: list[EvidenceRef] = []
-    for record in projection.approval_records:
+    for approval in projection.approval_records:
         if (
-            record.required is True
-            and record.state == ApprovalState.UNKNOWN
-            and _approval_subject_action(record) not in resolved_subject_actions
+            approval.required is True
+            and approval.state == ApprovalState.UNKNOWN
+            and _approval_subject_action(approval) not in resolved_subject_actions
         ):
-            refs.extend(record.evidence_refs)
-    for record in projection.budget_records:
-        if record.required is not True:
+            refs.extend(approval.evidence_refs)
+    for budget in projection.budget_records:
+        if budget.required is not True:
             continue
-        status_lowered = record.status.strip().lower()
-        values_are_sufficient = record.limit is not None and record.consumed is not None
+        status_lowered = budget.status.strip().lower()
+        values_are_sufficient = budget.limit is not None and budget.consumed is not None
         if not values_are_sufficient and status_lowered in _BUDGET_UNKNOWN_STATUSES:
-            refs.extend(record.evidence_refs)
-    for record in projection.authority_records:
-        if record.required is True and record.state == AuthorityState.UNKNOWN:
-            refs.extend(record.evidence_refs)
+            refs.extend(budget.evidence_refs)
+    for authority in projection.authority_records:
+        if authority.required is True and authority.state == AuthorityState.UNKNOWN:
+            refs.extend(authority.evidence_refs)
     return _dedupe_evidence_refs(refs)
 
 

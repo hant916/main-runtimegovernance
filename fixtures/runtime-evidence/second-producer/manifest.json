@@ -22,7 +22,6 @@
   },
   "pkg_metadata": {
     "exporter_version": "1.0.0",
-    "source_digest": "sha256:second-producer-fixture",
     "coverage": {"events": 6, "files": 2}
   }
 }
