@@ -381,6 +381,51 @@ def evidence_audit(
         raise typer.Exit(1)
 
 
+@app.command("evidence-conformance")
+def evidence_conformance(
+    package_path: Path,
+    format: Annotated[
+        ReportFormat,
+        typer.Option("--format", help="Report format: json or md."),
+    ] = ReportFormat.json,
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Write the report to this file instead of stdout."),
+    ] = None,
+) -> None:
+    """Report per-capability governance evidence conformance for a package.
+
+    Reads only canonical structured events and reports, for each Ailuros
+    governance capability, whether the package carries enough canonical evidence
+    to evaluate it. This is evidence sufficiency reporting, not structural
+    package validation and not runtime governance.
+    """
+    from ailuros.evidence_conformance import (
+        conformance_result_to_json,
+        conformance_result_to_markdown,
+        evaluate_evidence_conformance,
+    )
+
+    if not package_path.is_dir():
+        typer.echo(f"evidence package directory not found: {package_path}", err=True)
+        raise typer.Exit(1)
+
+    result = evaluate_evidence_conformance(package_path)
+    if format == ReportFormat.md:
+        rendered = conformance_result_to_markdown(result)
+    else:
+        rendered = conformance_result_to_json(result)
+
+    if out is not None:
+        out.write_text(rendered, encoding="utf-8")
+        typer.echo(str(out))
+    else:
+        typer.echo(rendered)
+
+    if not result.package_valid:
+        raise typer.Exit(1)
+
+
 @app.command("import-evidence-package")
 def import_evidence_package(
     package_dir: Path,

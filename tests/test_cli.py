@@ -29,3 +29,20 @@ def test_evidence_audit_invalid_package_exits_nonzero() -> None:
     result = CliRunner().invoke(app, ["evidence-audit", str(INVALID_DUPLICATE)])
     assert result.exit_code != 0
     assert "duplicates event_id" in result.stdout
+
+
+def test_evidence_conformance_valid_package_exits_zero() -> None:
+    result = CliRunner().invoke(app, ["evidence-conformance", str(SECOND_PRODUCER)])
+    assert result.exit_code == 0
+    data = json.loads(result.stdout)
+    assert data["package_valid"] is True
+    assert data["run_id"] == "run-second-producer-001"
+
+
+def test_evidence_conformance_invalid_package_exits_nonzero() -> None:
+    result = CliRunner().invoke(
+        app, ["evidence-conformance", str(INVALID_DUPLICATE)]
+    )
+    assert result.exit_code != 0
+    data = json.loads(result.stdout)
+    assert data["package_valid"] is False
