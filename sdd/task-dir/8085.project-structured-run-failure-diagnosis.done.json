@@ -1,0 +1,180 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-diagnosis",
+    "id": "8085.project-structured-run-failure-diagnosis",
+    "sequence": 8085,
+    "slug": "project-structured-run-failure-diagnosis",
+    "title": "Project structured run failure diagnosis",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Operators still need a second model after imperfect runs to answer four questions: what did not complete, what evidence-backed root-cause class is visible, what is the current risk, and what should happen next. Ailuros already has canonical evidence/reporting surfaces. Add the smallest producer-neutral diagnosis projection over structured canonical evidence. It must distinguish process/execution failure, scope failure, validation failure or absence, and unproven completion without guessing vendor/API causes from logs or rewriting governance facts.",
+    "why_now": "EverRun is beginning to emit richer runtime evidence; the next consumer-side value is turning those facts into a concise, deterministic operator diagnosis instead of requiring manual log archaeology.",
+    "do_not_misread": [
+      "Diagnosis is not execution and must not edit packs, repositories or runtime state.",
+      "A root-cause class is evidence-backed classification, not speculative causal storytelling.",
+      "Ailuros must remain producer-neutral; EverRun is a reference producer, not a semantic branch.",
+      "Unknown evidence remains unknown and must not be promoted to a specific API/OS/OOM cause."
+    ],
+    "red_lines": [
+      "No source == everrun branch.",
+      "No parsing of raw console prose to manufacture governance facts.",
+      "No automatic remediation or pack mutation.",
+      "No ACCEPT decision from diagnosis alone.",
+      "Do not change frozen regression ordering or core governance projection semantics."
+    ]
+  },
+  "machine_core": {
+    "goal": "Produce a deterministic operator-facing diagnosis from canonical structured run evidence with four bounded fields: incomplete work, root-cause class, current risk, and next action recommendation.",
+    "files": {
+      "allow": [
+        "src/ailuros/execution_report.py",
+        "src/ailuros/problems.py",
+        "src/ailuros/evidence/**",
+        "src/ailuros/cli.py",
+        "src/ailuros/*diagnos*.py",
+        "tests/test_execution_report.py",
+        "tests/test_*diagnos*.py",
+        "tests/test_cli.py",
+        "docs/contracts/**"
+      ],
+      "create": [
+        "src/ailuros/run_diagnosis.py",
+        "tests/test_run_diagnosis.py",
+        "docs/contracts/run-diagnosis-v1.md"
+      ],
+      "forbid": [
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/regression.py",
+        "src/ailuros/regression/**",
+        "src/ailuros/storage/**",
+        "fixtures/**",
+        ".everrun/**",
+        "lockfiles"
+      ]
+    },
+    "red_lines": [
+      "Use canonical structured events/fields only for diagnosis decisions.",
+      "Do not infer rate limiting, OOM, network failure or vendor outage unless a canonical structured fact explicitly proves that class.",
+      "Do not convert missing validation or missing acceptance evidence into failed validation; preserve the distinction.",
+      "Do not recommend widening scope as a generic response to scope contamination."
+    ],
+    "invariants": [
+      "The same canonical evidence yields the same diagnosis regardless of producer source label.",
+      "Diagnosis never overrides canonical lifecycle/outcome/governance facts.",
+      "Unknown or insufficient cause evidence yields an unknown/insufficient-evidence diagnosis rather than a guessed cause.",
+      "Recommendations are advisory and bounded to existing operator concepts such as retry, repair runtime/pack definition, confirm/reconcile, stop or human review.",
+      "Structural package validity and diagnosis are separate concerns."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "canonical structured execution evidence"},
+        "consumer": {"component": "Ailuros run diagnosis projection", "production_path": true},
+        "observable_effect": {
+          "kind": "operator_behavior",
+          "assertion": "An imperfect run produces a deterministic concise diagnosis covering incomplete work, evidence-backed root-cause class, risk, and next action without producer-specific branches or speculative log parsing."
+        },
+        "proofs": [
+          {"layer": "process", "gate": "hard", "assertion": "A canonical executor/process-loss fact yields execution_runtime/process_supervision class and does not name an API/vendor cause when none is proven."},
+          {"layer": "scope", "gate": "hard", "assertion": "Canonical scope contamination yields scope_boundary class and recommends fixing attribution/pack scope evidence rather than blind coder retry."},
+          {"layer": "evidence", "gate": "hard", "assertion": "A done lifecycle with missing accepted validation evidence is diagnosed as unproven completion, distinct from validation failure."},
+          {"layer": "neutrality", "gate": "hard", "assertion": "Changing manifest source metadata leaves the diagnosis unchanged."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "Malformed packages remain validator failures and are not diagnosed as runtime failures.",
+      "Contradictory canonical facts produce an explicit evidence inconsistency/unknown diagnosis rather than selecting the convenient fact.",
+      "Missing root-cause evidence keeps root cause unknown while still allowing risk/incomplete-work facts supported by evidence.",
+      "If no safe next action can be determined, recommend human_review/inspection rather than inventing a fix."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Define a closed minimal diagnosis vocabulary",
+        "details": [
+          "Keep root-cause classes small and operational: execution_runtime/process_supervision, scope_boundary, validation, unproven_completion, pack_definition, evidence_inconsistent, unknown.",
+          "Reuse existing action/status vocabulary where available instead of introducing a new policy language.",
+          "Define risk in a small closed form sufficient for operator display; avoid maturity scoring or multidimensional lenses."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Project diagnosis from structured evidence",
+        "details": [
+          "Read canonical execution/report/evidence structures already present in Ailuros.",
+          "Map only explicit structured facts to diagnosis classes.",
+          "Preserve evidence references/identifiers so each conclusion can be traced without copying raw logs."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Render the four operator questions",
+        "details": [
+          "Expose concise human-readable and deterministic machine-readable output for: incomplete, root cause, risk, next action.",
+          "Prefer extending the existing execution report/CLI surface rather than creating a new service.",
+          "Keep recommendation advisory; no write/action execution occurs here."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Lock no-guess and source-neutral behavior",
+        "details": [
+          "Test process loss with no vendor cause and prove the diagnosis stays generic/unknown at the sub-cause level.",
+          "Test scope, failed validation, missing validation/acceptance, and contradictory evidence separately.",
+          "Relabel source metadata and prove byte-equivalent machine diagnosis where generated timestamps are fixed."
+        ]
+      }
+    ],
+    "acceptance": [
+      "Canonical imperfect-run evidence yields the four bounded diagnosis fields.",
+      "Process loss does not get mislabeled as Volcengine/API/OOM without explicit evidence.",
+      "Scope failure, validation failure, and unproven completion remain distinct.",
+      "Producer relabeling is behaviorally inert.",
+      "No repository/runtime mutation or automatic remediation is introduced.",
+      "Existing governance projection/regression behavior is unchanged.",
+      "Full tests, ruff and mypy pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_run_diagnosis.py tests/test_execution_report.py -q",
+      "python -m pytest tests -q",
+      "ruff check src tests",
+      "mypy src"
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "Diagnosis uses structured canonical evidence only and is source-neutral.",
+      "The four output questions are concise and deterministic.",
+      "Unknown causes remain unknown instead of being guessed from vendor/log context.",
+      "Scope, validation and unproven completion semantics are not collapsed.",
+      "Recommendations do not execute changes or bypass governance gates.",
+      "Frozen projection/regression semantics are untouched and all validation passes."
+    ],
+    "reject_if": [
+      "Any source == everrun semantic branch is introduced.",
+      "Free-form console/log parsing becomes authoritative diagnosis evidence.",
+      "Diagnosis can automatically edit a pack, widen scope or fabricate acceptance evidence.",
+      "A missing fact is reported as a passed or failed fact without evidence.",
+      "The implementation introduces a complex policy engine or multidimensional maturity model.",
+      "Forbidden files change or validation fails."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}

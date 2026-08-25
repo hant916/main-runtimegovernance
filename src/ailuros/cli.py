@@ -337,6 +337,76 @@ def report(
     typer.echo(rendered)
 
 
+@app.command()
+def diagnose(
+    run_id: str,
+    format: Annotated[
+        ReportFormat,
+        typer.Option("--format", "-f", help="Diagnosis format: json or md."),
+    ] = ReportFormat.json,
+    rebuild: Annotated[
+        bool,
+        typer.Option("--rebuild", help="Rebuild the execution projection before diagnosing."),
+    ] = False,
+) -> None:
+    """Produce a deterministic advisory diagnosis for a run.
+
+    Reads the stored execution projection and signals and renders the four
+    bounded diagnosis fields: incomplete work, root-cause class, current risk,
+    and next action recommendation. The diagnosis is advisory only: it never
+    edits a pack, widens scope, or mutates runtime state.
+    """
+    from ailuros.core.execution import ExecutionProjection
+    from ailuros.projection import rebuild_projections_and_signals
+    from ailuros.run_diagnosis import (
+        diagnose_run,
+        render_diagnosis_json,
+        render_diagnosis_markdown,
+    )
+    from ailuros.signals import GovernanceSignal
+
+    try:
+        storage = open_storage()
+        storage.get_run(run_id)
+    except (AilurosNotFoundError, typer.BadParameter) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    if rebuild:
+        try:
+            rebuild_projections_and_signals(storage, run_id)
+        except (AilurosNotFoundError, AilurosDataCorruptionError) as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(1) from exc
+
+    stored = storage.get_projection(run_id)
+    if stored is None:
+        typer.echo(
+            f"No projection found for run {run_id}. "
+            "Rebuild it with --rebuild or run the projection step separately.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    projection = ExecutionProjection.model_validate(stored["projection"])
+
+    signal_dicts = storage.get_signals(run_id)
+    signal_rule_version = signal_dicts[0].get("rule_version", "1.0.0") if signal_dicts else "1.0.0"
+    signals = [
+        GovernanceSignal.model_validate({**s, "rule_version": signal_rule_version})
+        for s in signal_dicts
+    ]
+
+    diagnosis = diagnose_run(projection, signals)
+
+    if format == ReportFormat.md:
+        rendered = render_diagnosis_markdown(diagnosis)
+    else:
+        rendered = render_diagnosis_json(diagnosis)
+
+    typer.echo(rendered)
+
+
 @app.command("evidence-audit")
 def evidence_audit(
     package_path: Path,
