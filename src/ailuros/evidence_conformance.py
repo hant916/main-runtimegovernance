@@ -113,11 +113,10 @@ _CAPABILITY_SPECS: tuple[_CapabilitySpec, ...] = (
     _CapabilitySpec(
         id="regression_prerequisites",
         alternatives=(
-            frozenset({"run_started"}),
             frozenset({"run_completed"}),
             frozenset({"run_failed"}),
         ),
-        evidence_ids=("run_started", "run_completed", "run_failed"),
+        evidence_ids=("run_completed", "run_failed"),
     ),
     _CapabilitySpec(
         id="authority",

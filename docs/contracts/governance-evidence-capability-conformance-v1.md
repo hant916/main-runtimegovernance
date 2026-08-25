@@ -40,7 +40,7 @@ or a structured payload reference (e.g. `authority_evidence.payload.actor`).
 |---|---|---|
 | `lifecycle` | `run_started` **or** `run_completed` **or** `run_failed` | `run_started`, `run_completed`, `run_failed` |
 | `outcome` | `run_completed` **or** `run_failed` | `run_completed`, `run_failed` |
-| `regression_prerequisites` | `run_started` **or** `run_completed` **or** `run_failed` | `run_started`, `run_completed`, `run_failed` |
+| `regression_prerequisites` | `run_completed` **or** `run_failed` | `run_completed`, `run_failed` |
 | `authority` | `authority_evidence.payload.actor` (non-empty) | `authority_evidence.payload.actor` |
 | `approval` | `approval_evidence.payload.subject` (non-empty) | `approval_evidence.payload.subject` |
 | `budget` | `budget_evidence.payload.subject` **and** `budget_evidence.payload.unit` (both non-empty) | `budget_evidence.payload.subject`, `budget_evidence.payload.unit` |
@@ -51,30 +51,13 @@ The matrix is deterministic and ordered exactly as listed above. A producer is
 not required to implement every capability: absent optional governance evidence
 yields `missing_evidence`, never package corruption.
 
-### Open issue: `regression_prerequisites` is not yet discriminating (v1)
-
-`regression_prerequisites` currently carries the **same requirement set as
-`lifecycle`**, so it reports `evaluable` for any package with a `run_started`
-anchor and never adds information beyond what `lifecycle` already says. On the
-real production-derived fixture it reports `evaluable` while the regression
-comparator can only ever return `unknown` for that pair.
-
-This matters because a ranked regression verdict (`improved` / `regressed`)
-requires a **ranked value on both sides** of a comparison. Real EverRun exports
-carry no `run_completed`, so `outcome` stays `unknown`, so every ranked
-transition stays unproven — the exact gap recorded in
-`governance-production-baseline.md` §3.2. A producer reading this matrix today
-sees `regression_prerequisites: evaluable` and can reasonably conclude their
-package is sufficient for regression comparison. It is not.
-
-The likely correct requirement is the one `outcome` already states
-(`run_completed` or `run_failed`), which is what makes a ranked transition
-possible. That is **not** applied here: changing it alters published v1
-capability semantics and would flip the status reported for an already-accepted
-canonical fixture, which needs its own pack rather than an in-place edit.
-
-Until then, treat `regression_prerequisites` as a placeholder that restates
-`lifecycle`, and read `outcome` for whether ranked regression is achievable.
+`lifecycle` and `regression_prerequisites` are intentionally distinct. Lifecycle
+observability answers *was the run observed at all* (`run_started` suffices);
+ordered-regression comparability answers *is there a terminal outcome side to
+compare*. Terminal outcome evidence (`run_completed` or `run_failed`) is a
+prerequisite for ordered outcome comparison — it is not proof that every
+governance dimension is comparable, only that the run reached an endpoint whose
+outcome can be ranked.
 
 ## Status Vocabulary
 

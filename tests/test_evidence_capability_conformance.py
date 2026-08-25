@@ -204,8 +204,8 @@ def test_full_evidence_package_is_evaluable_for_every_capability(
 
 
 def test_minimal_run_anchor_is_partial_never_fabricated(tmp_path: Path) -> None:
-    """Only run_started: lifecycle and regression prerequisites are evaluable,
-    every other capability is missing evidence — never fabricated success."""
+    """Only run_started: lifecycle is evaluable but outcome and regression
+    prerequisites are missing evidence — never fabricated success."""
     pkg = _make_package(
         tmp_path,
         include_terminal=False,
@@ -219,9 +219,13 @@ def test_minimal_run_anchor_is_partial_never_fabricated(tmp_path: Path) -> None:
     assert result.package_valid is True
     statuses = _statuses(result)
     assert statuses["lifecycle"] == "evaluable"
-    assert statuses["regression_prerequisites"] == "evaluable"
+    assert statuses["outcome"] == "missing_evidence"
+    assert statuses["regression_prerequisites"] == "missing_evidence"
+    assert _missing(result)["regression_prerequisites"] == [
+        "run_completed",
+        "run_failed",
+    ]
     for cap in (
-        "outcome",
         "authority",
         "approval",
         "budget",
@@ -229,6 +233,37 @@ def test_minimal_run_anchor_is_partial_never_fabricated(tmp_path: Path) -> None:
         "validation",
     ):
         assert statuses[cap] == "missing_evidence"
+
+
+# ── T2/T3: regression prerequisites requires a canonical terminal side ─────
+
+
+def test_regression_prerequisites_is_satisfied_by_run_completed_alone() -> None:
+    """A canonical run_completed alone is sufficient for regression
+    prerequisites: ordered comparison needs a terminal side."""
+    events = [_event("evt-001", "run_completed", {"result": "completed"})]
+    result = evaluate_capability(events, "regression_prerequisites")
+    assert result.status == CapabilityStatus.EVALUABLE
+    assert result.missing_evidence == []
+
+
+def test_regression_prerequisites_is_satisfied_by_run_failed_alone() -> None:
+    """A canonical run_failed alone is also sufficient: either terminal event
+    independently satisfies regression prerequisites."""
+    events = [_event("evt-001", "run_failed", {"error": "boom"})]
+    result = evaluate_capability(events, "regression_prerequisites")
+    assert result.status == CapabilityStatus.EVALUABLE
+    assert result.missing_evidence == []
+
+
+def test_regression_prerequisites_is_never_satisfied_by_run_started_alone() -> None:
+    """Mutation guard: run_started alone must never satisfy regression
+    prerequisites, and the missing ids stay the precise terminal identifiers.
+    Exercises the behavioral evaluator (evaluate_capability), not source text."""
+    events = [_event("evt-001", "run_started", {"workflow": "unit"})]
+    result = evaluate_capability(events, "regression_prerequisites")
+    assert result.status == CapabilityStatus.MISSING_EVIDENCE
+    assert result.missing_evidence == ["run_completed", "run_failed"]
 
 
 def test_second_producer_fixture_capability_statuses() -> None:
@@ -250,7 +285,7 @@ def test_everrun_postfix_minimal_fixture_capability_statuses() -> None:
     assert result.package_valid is True
     statuses = _statuses(result)
     assert statuses["lifecycle"] == "evaluable"
-    assert statuses["regression_prerequisites"] == "evaluable"
+    assert statuses["regression_prerequisites"] == "missing_evidence"
     assert statuses["scope"] == "evaluable"
     assert statuses["validation"] == "evaluable"
     assert statuses["outcome"] == "missing_evidence"
@@ -354,7 +389,9 @@ def test_relabel_to_unseen_producer_is_inert(tmp_path: Path) -> None:
     assert relabeled_result.package_valid == baseline.package_valid
 
 
-def test_removing_terminal_evidence_degrades_only_outcome(tmp_path: Path) -> None:
+def test_removing_terminal_evidence_degrades_outcome_and_regression_prerequisites(
+    tmp_path: Path,
+) -> None:
     full = _make_package(tmp_path)
     full_statuses = _statuses(evaluate_evidence_conformance(full))
     assert full_statuses == ALL_EVALUABLE
@@ -363,6 +400,7 @@ def test_removing_terminal_evidence_degrades_only_outcome(tmp_path: Path) -> Non
     statuses = _statuses(evaluate_evidence_conformance(degraded))
     expected = dict(ALL_EVALUABLE)
     expected["outcome"] = "missing_evidence"
+    expected["regression_prerequisites"] = "missing_evidence"
     assert statuses == expected
 
 
