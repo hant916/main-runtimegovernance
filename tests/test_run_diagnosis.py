@@ -288,6 +288,112 @@ class TestSourceNeutrality:
         assert render_diagnosis_json(diagnosis) == render_diagnosis_json(diagnosis)
 
 
+class TestSourceNeutralityAcrossEveryBranch:
+    """Producer neutrality must hold on *every* diagnosis branch.
+
+    The existing relabel test covers one branch (completed + validation
+    failure). The red line "no source == everrun branch" is easiest to violate
+    on the FAILED branch, where a producer-specific vendor cause would be most
+    tempting -- and that branch had no neutrality coverage. Verified by
+    mutation: injecting `if projection.source == "everrun": sub_cause =
+    "volcengine_api_error"` into the FAILED branch left the suite green before
+    this test existed.
+    """
+
+    # (label, kwargs, signal factory) covering each root_cause branch.
+    _CASES = [
+        (
+            "process_supervision",
+            {"lifecycle": Lifecycle.FAILED, "outcome": Outcome.FAILED,
+             "validation": Validation.NOT_RUN},
+            [],
+        ),
+        (
+            "scope_boundary",
+            {"lifecycle": Lifecycle.COMPLETED, "outcome": Outcome.BLOCKED,
+             "scope": Scope.VIOLATED},
+            [],
+        ),
+        (
+            "validation",
+            {"lifecycle": Lifecycle.COMPLETED, "outcome": Outcome.FAILED,
+             "validation": Validation.FAILED},
+            [SignalType.VALIDATION_FAILURE],
+        ),
+        (
+            "unproven_completion",
+            {"lifecycle": Lifecycle.COMPLETED, "outcome": Outcome.SUCCESS,
+             "validation": Validation.NOT_RUN},
+            [],
+        ),
+        (
+            "running_lifecycle",
+            {"lifecycle": Lifecycle.RUNNING, "outcome": Outcome.UNKNOWN,
+             "validation": Validation.NOT_RUN, "completed_at": None},
+            [],
+        ),
+        (
+            "clean",
+            {},
+            [],
+        ),
+    ]
+
+    @staticmethod
+    def _diagnose(source: str, kwargs: dict, signal_types: list) -> dict:
+        ref = _make_ref("evt-1")
+        proj = _make_projection(
+            run_id="run-neutral", source=source, evidence_refs=[ref], **kwargs
+        )
+        signals = [
+            _make_signal(
+                signal_type=st,
+                severity=Severity.HIGH,
+                subject="s",
+                evidence_refs=[ref],
+                created_at=FIXED_NOW,
+            )
+            for st in signal_types
+        ]
+        d = diagnose_run(proj, signals)
+        return {
+            "incomplete": d.incomplete.value,
+            "root_cause": d.root_cause.value,
+            "root_cause_detail": d.root_cause_detail,
+            "risk": d.risk.value,
+            "next_action": d.next_action.value,
+            "next_action_note": d.next_action_note,
+        }
+
+    def test_every_branch_is_identical_under_relabel(self) -> None:
+        for label, kwargs, signal_types in self._CASES:
+            everrun = self._diagnose("everrun", kwargs, signal_types)
+            other = self._diagnose("zzz-unseen-producer", kwargs, signal_types)
+            neutral = self._diagnose("test", kwargs, signal_types)
+            assert everrun == other == neutral, (
+                f"branch {label!r} is not source-neutral: "
+                f"everrun={everrun} other={other}"
+            )
+
+    def test_no_branch_ever_emits_an_unproven_vendor_cause(self) -> None:
+        """No diagnosis output may name a vendor/API/hardware cause unless a
+        canonical signal put it there. None of these cases carry such a signal."""
+        forbidden = (
+            "volcengine", "openai", "anthropic", "oom", "rate limit",
+            "quota", "429", "500", "timeout", "gpu", "cuda",
+        )
+        for label, kwargs, signal_types in self._CASES:
+            for source in ("everrun", "zzz-unseen-producer"):
+                rendered = json.dumps(
+                    self._diagnose(source, kwargs, signal_types)
+                ).lower()
+                for token in forbidden:
+                    assert token not in rendered, (
+                        f"branch {label!r} (source={source!r}) emitted an "
+                        f"unproven vendor cause {token!r}: {rendered}"
+                    )
+
+
 class TestCleanAndOtherStates:
     def test_clean_run_has_no_failure(self) -> None:
         proj = _make_projection()
