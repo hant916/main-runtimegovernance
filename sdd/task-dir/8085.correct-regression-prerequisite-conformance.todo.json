@@ -1,0 +1,202 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "production-evidence-activation",
+    "id": "8085.correct-regression-prerequisite-conformance",
+    "sequence": 8085,
+    "slug": "correct-regression-prerequisite-conformance",
+    "title": "Correct regression prerequisite evidence conformance",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "8083 introduced producer-facing capability conformance, but review proved regression_prerequisites is currently indistinguishable from lifecycle: run_started alone marks both evaluable. That is correct for lifecycle because a running lifecycle is evaluable, but misleading for ordered governance regression because improved/regressed requires comparable non-unknown ordered values and real EverRun packages without terminal outcome evidence remain unknown. Correct only the regression_prerequisites contract so producers are told that terminal outcome evidence is still missing. Preserve lifecycle semantics, comparator semantics, source neutrality, package validity behavior and all other capability rules.",
+    "why_now": "The conformance layer exists specifically to tell producers what evidence blocks governance judgments. Reporting regression_prerequisites=evaluable while outcome is missing_evidence sends the opposite operational signal and prevents the producer contract from closing the long-standing real regression proof gap.",
+    "do_not_misread": [
+      "Lifecycle and regression prerequisites are intentionally different concepts.",
+      "A package with run_started only can validly evaluate lifecycle=running while still lacking evidence needed for ordered regression comparison.",
+      "This pack does not change the regression comparator or define new transition ordering.",
+      "This pack does not require authority, approval, budget, scope or validation evidence for regression prerequisites."
+    ],
+    "red_lines": [
+      "Do not change lifecycle evidence requirements.",
+      "Do not change src/ailuros/regression/** or projection semantics.",
+      "Do not infer terminal outcome from run_started, free-form text, producer identity or unrelated events.",
+      "Do not add EverRun-specific branches.",
+      "Do not broaden this into a general capability-schema redesign."
+    ]
+  },
+  "machine_core": {
+    "goal": "Make regression_prerequisites report evaluable only when canonical terminal outcome evidence exists, so producer-facing conformance accurately identifies the evidence required for ordered governance regression.",
+    "red_lines": [
+      "Keep lifecycle evaluable from run_started, run_completed or run_failed as currently implemented.",
+      "Keep outcome evaluable from run_completed or run_failed as currently implemented.",
+      "Regression prerequisites must not be satisfied by run_started alone.",
+      "Source/agent/framework metadata must remain outside capability decision logic."
+    ],
+    "invariants": [
+      "Package structural validity remains separate from capability evidence sufficiency.",
+      "A run_started-only package reports lifecycle=evaluable and regression_prerequisites=missing_evidence.",
+      "Either run_completed or run_failed is sufficient terminal outcome evidence for regression_prerequisites.",
+      "The same canonical event set yields the same result regardless of producer label.",
+      "Comparator behavior and transition ranking remain unchanged."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "canonical evidence package"},
+        "consumer": {"component": "Ailuros evidence capability conformance", "production_path": true},
+        "observable_effect": {
+          "kind": "runtime_behavior",
+          "assertion": "Producer-facing regression_prerequisites status distinguishes lifecycle observability from evidence sufficiency for ordered governance regression."
+        },
+        "proofs": [
+          {
+            "layer": "negative",
+            "gate": "hard",
+            "assertion": "A structurally valid package containing run_started but no run_completed/run_failed reports lifecycle=evaluable, outcome=missing_evidence and regression_prerequisites=missing_evidence."
+          },
+          {
+            "layer": "positive",
+            "gate": "hard",
+            "assertion": "Adding either run_completed or run_failed changes regression_prerequisites to evaluable without requiring unrelated governance dimensions."
+          },
+          {
+            "layer": "production-derived",
+            "gate": "hard",
+            "assertion": "The accepted EverRun postfix fixture with no terminal outcome evidence reports regression_prerequisites=missing_evidence and lists run_completed/run_failed as the actionable missing evidence identifiers."
+          },
+          {
+            "layer": "boundary",
+            "gate": "hard",
+            "assertion": "No files under src/ailuros/regression/** or projection.py are changed and existing comparator transition behavior remains covered by the full suite."
+          }
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "A run_started-only package is not malformed; it remains structurally valid and lifecycle-evaluable while regression prerequisites are missing.",
+      "Missing terminal evidence is reported as missing_evidence, not unsupported and not failed.",
+      "Unknown or absent terminal outcome must not be converted to comparable success/failure.",
+      "Existing real evidence gaps remain visible rather than being hidden by permissive conformance rules."
+    ],
+    "complexity_budget": {
+      "max_new_files": 0,
+      "max_new_abstractions": 0,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": [
+        "new capability DSL",
+        "new comparator",
+        "producer adapter",
+        "ontology expansion",
+        "new persistence"
+      ]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/evidence_conformance.py",
+        "tests/test_evidence_capability_conformance.py",
+        "docs/contracts/governance-evidence-capability-conformance-v1.md",
+        "docs/architecture/governance-production-baseline.md"
+      ],
+      "create": [],
+      "forbid": [
+        "src/ailuros/regression.py",
+        "src/ailuros/regression/**",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "fixtures/**",
+        ".everrun/**",
+        "lockfiles"
+      ]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Correct the regression prerequisite specification",
+        "details": [
+          "Change only regression_prerequisites so run_completed OR run_failed satisfies the capability.",
+          "Keep precise missing evidence identifiers as run_completed and run_failed when neither is present.",
+          "Do not alter lifecycle or outcome specifications."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Replace implementation-following expectations with contract tests",
+        "details": [
+          "Update the run_started-only test to assert lifecycle=evaluable, outcome=missing_evidence and regression_prerequisites=missing_evidence.",
+          "Add/adjust focused positive cases proving run_completed and run_failed independently satisfy regression_prerequisites.",
+          "Update the EverRun postfix fixture expectation to missing_evidence without modifying the fixture itself."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Lock the test against a concrete bad mutation",
+        "details": [
+          "Ensure the focused test suite fails if run_started is reintroduced as a sufficient regression_prerequisites alternative.",
+          "The guard must exercise evaluate_capability/evaluate_evidence_conformance behavior rather than scan source text.",
+          "Do not use cwd-dependent file assertions or inspect.getsource-based checks."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Align the producer-facing contract documentation",
+        "details": [
+          "Document that lifecycle observability and ordered-regression comparability are intentionally distinct.",
+          "Remove the open issue added during review once the implementation and tests enforce the corrected rule.",
+          "Keep the statement bounded: terminal outcome evidence is a prerequisite for ordered outcome comparison, not proof that every governance dimension is comparable."
+        ]
+      }
+    ],
+    "acceptance": [
+      "run_started alone keeps lifecycle evaluable but makes regression_prerequisites missing_evidence.",
+      "run_completed alone is sufficient for regression_prerequisites.",
+      "run_failed alone is sufficient for regression_prerequisites.",
+      "EverRun postfix minimal reports regression_prerequisites missing_evidence without fixture mutation.",
+      "Missing evidence identifiers are deterministic and actionable.",
+      "A concrete reintroduction of run_started as sufficient evidence makes the focused tests fail.",
+      "Comparator, projection and other capability semantics are unchanged.",
+      "Full pytest, ruff and mypy validation pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_evidence_capability_conformance.py -q",
+      "python -m pytest tests -q",
+      "ruff check src tests",
+      "mypy src"
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "Regression prerequisites no longer accept run_started as sufficient evidence.",
+      "Lifecycle still accepts run_started and therefore remains independently evaluable for a running execution.",
+      "Either canonical terminal event run_completed or run_failed independently satisfies regression_prerequisites.",
+      "The real/production-derived EverRun postfix fixture now exposes the terminal evidence gap instead of reporting regression prerequisites evaluable.",
+      "Focused tests would fail under the concrete mutation that re-adds run_started to regression_prerequisites alternatives.",
+      "No source-specific branch, free-form inference, comparator change or projection change is introduced.",
+      "All validation commands pass and forbidden files are untouched."
+    ],
+    "reject_if": [
+      "Lifecycle is changed to require terminal evidence.",
+      "Regression prerequisites remain equivalent to lifecycle.",
+      "run_started is still sufficient for regression_prerequisites.",
+      "Terminal evidence is inferred from producer identity, free-form text or unrelated governance events.",
+      "The implementation changes regression ranking/transition semantics or projection behavior.",
+      "Tests merely mirror implementation without a focused negative case that fails when run_started sufficiency is reintroduced.",
+      "Validation fails or forbidden files are modified."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}
