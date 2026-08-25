@@ -1,0 +1,152 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "post-baseline-maintenance",
+    "id": "8084.remove-unreachable-regression-shadow-module",
+    "sequence": 8084,
+    "slug": "remove-unreachable-regression-shadow-module",
+    "title": "Remove unreachable regression shadow module",
+    "type": "maintenance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "The repository contains both src/ailuros/regression.py and the importable package src/ailuros/regression/. Python resolves ailuros.regression to the package, so the top-level regression.py is a shadowed maintenance trap: edits appear legitimate but do not affect production imports. Remove only the unreachable duplicate after proving import resolution and repo references. Do not refactor the active regression package or change comparison semantics.",
+    "why_now": "This is a high-asymmetry correctness hazard: keeping dead executable-looking code can silently mislead future changes while deletion is small and mechanically verifiable.",
+    "do_not_misread": [
+      "This is not a regression redesign.",
+      "The active implementation under src/ailuros/regression/ remains authoritative.",
+      "Deletion requires proof that no supported import/file-loader path depends on the shadow file."
+    ],
+    "red_lines": [
+      "No semantic change to governance regression ordering.",
+      "No move/rename of the active regression package.",
+      "No opportunistic cleanup outside the shadow collision."
+    ]
+  },
+  "machine_core": {
+    "goal": "Delete the unreachable src/ailuros/regression.py shadow module and lock the repository against reintroducing a module/package collision at ailuros.regression.",
+    "red_lines": [
+      "Do not modify governance delta behavior.",
+      "Do not rewrite imports unless a proven dead-file reference requires it.",
+      "Do not delete src/ailuros/regression/ or any active package member."
+    ],
+    "invariants": [
+      "import ailuros.regression resolves to src/ailuros/regression/__init__.py before and after the change.",
+      "All public exports from the active package remain unchanged.",
+      "Regression comparator behavior and golden cases remain unchanged."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "Python import resolution for ailuros.regression"},
+        "consumer": {"component": "Ailuros regression callers and maintainers", "production_path": true},
+        "observable_effect": {
+          "kind": "maintenance_safety",
+          "assertion": "There is exactly one executable import surface for ailuros.regression and edits cannot silently land in an unreachable sibling module."
+        },
+        "proofs": [
+          {"layer": "import", "gate": "hard", "assertion": "ailuros.regression.__file__ points to regression/__init__.py before deletion and still does after deletion."},
+          {"layer": "reference", "gate": "hard", "assertion": "Repo-wide references show no supported direct file-loading dependency on src/ailuros/regression.py."},
+          {"layer": "behavioral", "gate": "hard", "assertion": "Regression tests and golden cases are unchanged and pass after deletion."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If any supported path imports/loads the shadow file directly, stop and report instead of deleting it.",
+      "If deletion changes public regression exports or comparator results, reject the pack."
+    ],
+    "complexity_budget": {
+      "max_new_files": 1,
+      "max_new_abstractions": 0,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": ["regression refactor", "API redesign", "module move"]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/regression.py",
+        "tests/test_regression.py",
+        "tests/test_golden_regression.py",
+        "tests/test_import_boundaries.py"
+      ],
+      "create": [],
+      "forbid": [
+        "src/ailuros/regression/**",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "fixtures/**",
+        "docs/**",
+        ".everrun/**",
+        "lockfiles"
+      ]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Prove the collision is real",
+        "details": [
+          "Assert importlib/import resolution for ailuros.regression targets the package __init__.py, not src/ailuros/regression.py.",
+          "Search for direct path-based loads or references to the shadow file and stop if any supported production dependency exists."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Delete only the shadow module",
+        "details": [
+          "git rm src/ailuros/regression.py.",
+          "Do not copy code from the shadow file into the active package unless a failing pre-existing public API proof demonstrates something is missing."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Lock against recurrence",
+        "details": [
+          "Add the smallest test that fails if both src/ailuros/regression.py and src/ailuros/regression/ coexist again.",
+          "Prefer an existing import-boundary test file if present; otherwise add the check to tests/test_regression.py rather than creating architecture machinery."
+        ]
+      }
+    ],
+    "acceptance": [
+      "src/ailuros/regression.py is removed.",
+      "ailuros.regression still resolves to the active package.",
+      "No active public regression export changes.",
+      "A regression test prevents the module/package collision from returning.",
+      "Full tests, ruff and mypy pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_regression.py tests/test_golden_regression.py -q",
+      "python -m pytest tests -q",
+      "ruff check src tests",
+      "mypy src"
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "The shadow file is proven unreachable through normal import resolution before deletion.",
+      "No supported direct file-loading dependency on src/ailuros/regression.py exists.",
+      "Only the shadow collision is removed; the active regression package and semantics are unchanged.",
+      "A recurrence guard exists.",
+      "Full validation passes."
+    ],
+    "reject_if": [
+      "The active src/ailuros/regression/ package is modified or removed without direct necessity.",
+      "Regression rankings/transitions/public exports change.",
+      "The pack performs unrelated cleanup.",
+      "Deletion is performed despite a proven supported direct dependency on the shadow file.",
+      "Validation fails."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}
