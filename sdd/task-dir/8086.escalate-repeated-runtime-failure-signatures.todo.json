@@ -1,0 +1,182 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-diagnosis",
+    "id": "8086.escalate-repeated-runtime-failure-signatures",
+    "sequence": 8086,
+    "slug": "escalate-repeated-runtime-failure-signatures",
+    "title": "Escalate repeated runtime failure signatures",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Two consecutive runs can fail with the same structured runtime signature, yet a one-run diagnosis may still look retryable. Add a bounded correlation step over an explicitly supplied small set of canonical run diagnoses/reports so repeated infrastructure/runtime failures are escalated instead of recommending another blind coder retry. This is not long-term memory, monitoring, self-healing or a multi-agent runtime: no database, no background worker, no automatic remediation, and no cross-pack resume loop.",
+    "why_now": "Repeated coder-process loss is an example where the valuable governance signal exists across runs: recurrence changes the safe next action from retrying implementation work toward stopping and repairing the runtime boundary.",
+    "do_not_misread": [
+      "This pack does not introduce persistent repo intelligence or historical profiling.",
+      "Correlation consumes only the bounded run set explicitly provided by the caller/current workflow.",
+      "A repeated signature supports escalation of retry safety, not ACCEPT or proof of a specific vendor root cause.",
+      "Human review remains exceptional; deterministic STOP/repair-runtime guidance should be preferred when evidence is sufficient."
+    ],
+    "red_lines": [
+      "No database or durable cross-project memory.",
+      "No background polling/monitoring service.",
+      "No automatic code/pack/runtime repair.",
+      "No unbounded history scan.",
+      "No producer-specific source branches or free-form log similarity."
+    ]
+  },
+  "machine_core": {
+    "goal": "Correlate a bounded caller-supplied set of structured run failure signatures and escalate retry recommendations when the same runtime/infrastructure class recurs without evidence of meaningful state change.",
+    "files": {
+      "allow": [
+        "src/ailuros/execution_report.py",
+        "src/ailuros/analytics.py",
+        "src/ailuros/*diagnos*.py",
+        "src/ailuros/*correlat*.py",
+        "src/ailuros/cli.py",
+        "tests/test_execution_report.py",
+        "tests/test_analytics.py",
+        "tests/test_*diagnos*.py",
+        "tests/test_*correlat*.py",
+        "tests/test_cli.py",
+        "docs/contracts/**"
+      ],
+      "create": [
+        "src/ailuros/run_failure_correlation.py",
+        "tests/test_run_failure_correlation.py",
+        "docs/contracts/run-failure-correlation-v1.md"
+      ],
+      "forbid": [
+        "src/ailuros/storage/**",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/regression.py",
+        "src/ailuros/regression/**",
+        "fixtures/**",
+        ".everrun/**",
+        "lockfiles"
+      ]
+    },
+    "red_lines": [
+      "Signature construction must use closed structured fields, never embeddings or free-form message similarity.",
+      "Do not scan arbitrary repository history; correlation input must be explicitly bounded by the caller.",
+      "Do not escalate different root-cause classes merely because both runs failed.",
+      "Do not convert repeated failure into proof of an unobserved specific cause."
+    ],
+    "invariants": [
+      "One isolated failure remains distinguishable from repeated recurrence.",
+      "Only equivalent structured failure signatures count as recurrence.",
+      "Repeated runtime/process-supervision failures can make another coder retry unsafe/ineffective without changing acceptance semantics.",
+      "Correlation recommendations are advisory/read-only and cannot edit repository or runtime state.",
+      "Input cardinality is bounded and no durable memory is required."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "bounded list of canonical run diagnoses/reports"},
+        "consumer": {"component": "Ailuros repeated-failure correlation", "production_path": true},
+        "observable_effect": {
+          "kind": "retry_safety",
+          "assertion": "When the same structured runtime failure signature recurs across the supplied run set, Ailuros marks blind coder retry as unsafe/ineffective and recommends bounded stop/runtime-repair escalation without fabricating a more specific cause."
+        },
+        "proofs": [
+          {"layer": "recurrence", "gate": "hard", "assertion": "Two process-supervision failures with equivalent structured signatures produce repeated=true and a stop/repair-runtime recommendation rather than another blind coder retry."},
+          {"layer": "negative", "gate": "hard", "assertion": "A process failure followed by an unrelated scope failure is not treated as repeated identical runtime failure."},
+          {"layer": "boundedness", "gate": "hard", "assertion": "Correlation operates only on the supplied finite input and performs no persistent/history discovery."},
+          {"layer": "neutrality", "gate": "hard", "assertion": "Producer source-label changes do not affect signature equality when canonical structured facts are unchanged."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If signatures lack enough structured fields for equivalence, report recurrence=unknown/not_proven rather than matching by prose.",
+      "If later evidence proves a materially different failure class, do not carry forward an earlier escalation blindly.",
+      "If a safe deterministic recommendation cannot be derived from recurrence, surface human_review rather than inventing remediation.",
+      "Correlation never overrides validation/scope/acceptance gates and never returns ACCEPT."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Define the smallest structured failure signature",
+        "details": [
+          "Derive signature fields from the diagnosis/canonical report contract introduced by 8085 or existing equivalents.",
+          "Prefer fields such as root-cause class, failing phase, structured failure code and actor/component when present.",
+          "Exclude timestamps, run ids, vendor prose and incidental payload fields that would defeat deterministic equivalence."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Correlate only bounded supplied runs",
+        "details": [
+          "Accept a finite list/sequence from the caller and compare adjacent/relevant diagnoses deterministically.",
+          "Do not read a database, global history directory or repository memory to discover more runs.",
+          "Return recurrence count/signature plus evidence references sufficient for operator explanation."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Escalate retry safety conservatively",
+        "details": [
+          "For repeated runtime/process-supervision signatures without evidence of a corrective state change, recommend STOP/repair-runtime or the nearest existing bounded action vocabulary.",
+          "Do not spend another coder execution merely because attempts remain if the repeated evidence says implementation work cannot address the failure.",
+          "Keep different failure classes separate and do not infer a common cause from generic failure status."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Expose concise operator evidence",
+        "details": [
+          "Show that the escalation is based on N equivalent structured failures and identify the affected layer.",
+          "Keep output compatible with the four-question diagnosis/report surface where possible.",
+          "Add tests proving no persistence, no automatic action execution and source neutrality."
+        ]
+      }
+    ],
+    "acceptance": [
+      "Equivalent repeated process/runtime signatures are detected deterministically from bounded supplied inputs.",
+      "Repeated runtime failure no longer recommends a blind coder retry by default.",
+      "Different failure classes are not falsely correlated.",
+      "No DB, background monitor, history crawler, long-term memory or automatic remediation is added.",
+      "Producer labels do not affect signature equality.",
+      "Acceptance/governance gates remain unchanged and the correlation layer never returns ACCEPT.",
+      "Full tests, ruff and mypy pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_run_failure_correlation.py tests/test_run_diagnosis.py tests/test_execution_report.py -q",
+      "python -m pytest tests -q",
+      "ruff check src tests",
+      "mypy src"
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "Correlation is finite/caller-supplied and creates no long-term memory or monitoring subsystem.",
+      "Signature equality is based only on structured canonical diagnosis/report fields.",
+      "Repeated runtime failure changes retry guidance without inventing a specific vendor cause.",
+      "Different failure classes are not conflated.",
+      "No automatic remediation, repository writes or ACCEPT path is introduced.",
+      "Forbidden files are untouched and all validation passes."
+    ],
+    "reject_if": [
+      "A database, durable history index, background monitor or repo-intelligence system is added.",
+      "Free-form text similarity or embeddings determine recurrence.",
+      "The feature automatically edits/retries/fixes code instead of reporting bounded guidance.",
+      "Repeated failure is treated as proof of an unobserved API/vendor/OOM cause.",
+      "Correlation can produce ACCEPT or bypass validation/scope gates.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}
