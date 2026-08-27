@@ -54,11 +54,16 @@ source-neutral.
 | `unproven_completion` | Completion claimed without accepted validation evidence. |
 | `pack_definition` | Reserved; a pack-definition defect proven by canonical facts. No current Ailuros canonical fact emits it (structural package validation is a separate concern). |
 | `evidence_inconsistent` | Contradictory canonical facts. |
+| `governed_stop` | Run stopped by governance (governed-stop signal or `outcome == blocked`). |
+| `review_required` | Review required by governance (review signal or `outcome == review_required`). |
+| `non_terminal` | Run is not in a terminal lifecycle. |
 | `unknown` | No closed class applies or cause evidence is insufficient. |
 
 `root_cause_detail` names the explicit canonical sub-cause (for example
 `validation_failed`, `approval_denied`, `backend_unavailable`) or stays
-`unknown`/`none`.
+`unknown`/`none`. When the governed class is recovered from the projection
+outcome alone (no subtype signal), the detail is `outcome/blocked` or
+`outcome/review_required` and no specific subtype is inferred.
 
 ### Risk (`RiskLevel`)
 
@@ -78,12 +83,18 @@ Classification is precedence-based; the first matching rule wins. Precedence:
 1. Evidence inconsistent (signal or `governance_context.inconsistencies`).
 2. Scope boundary (signal or `scope == violated`).
 3. Validation failure (proven `validation == failed` or signal).
-4. Governed stop (authority violation, approval denied, budget exceeded).
-5. Review required (human review / approval / budget / authority unknown).
-6. Process supervision (`lifecycle == failed`, no governed cause).
-7. Unproven completion (`lifecycle == completed`, validation not passed).
-8. Non-terminal lifecycle.
-9. Clean fallback (no incomplete work, no failure class).
+4. Governed stop signal (authority violation, approval denied, budget exceeded).
+5. Review-required signal (human review / approval / budget / authority unknown).
+6. Governed outcome (`outcome == blocked` → `governed_stop`;
+   `outcome == review_required` → `review_required`).
+7. Process supervision (`lifecycle == failed`, no governed cause).
+8. Unproven completion (`lifecycle == completed`, validation not passed).
+9. Non-terminal lifecycle (`non_terminal`).
+10. Clean fallback (no incomplete work, no failure class).
+
+When a governed-stop or review-required signal is present it wins over the
+outcome-derived class, but the subtype-specific detail is never inferred from
+`outcome` alone.
 
 ## Red-line behavior
 

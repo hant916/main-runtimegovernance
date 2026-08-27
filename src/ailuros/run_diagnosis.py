@@ -34,6 +34,9 @@ class RootCause(StrEnum):
     UNPROVEN_COMPLETION = "unproven_completion"
     PACK_DEFINITION = "pack_definition"
     EVIDENCE_INCONSISTENT = "evidence_inconsistent"
+    GOVERNED_STOP = "governed_stop"
+    REVIEW_REQUIRED = "review_required"
+    NON_TERMINAL = "non_terminal"
     UNKNOWN = "unknown"
 
 
@@ -180,11 +183,8 @@ def _scope_violated(
 
 
 def _validation_failure_signals(
-    projection: ExecutionProjection,
     signals: list[GovernanceSignal],
 ) -> list[GovernanceSignal]:
-    if projection.validation == Validation.FAILED:
-        return [signal for signal in signals if signal.type in _VALIDATION_FAILURE_SIGNAL_TYPES]
     return _signals_of_type(signals, _VALIDATION_FAILURE_SIGNAL_TYPES)
 
 
@@ -270,9 +270,9 @@ def diagnose_run(
     """
     validation_failed = bool(
         projection.validation == Validation.FAILED
-        or _validation_failure_signals(projection, signals)
+        or _validation_failure_signals(signals)
     )
-    validation_failure_signals = _validation_failure_signals(projection, signals)
+    validation_failure_signals = _validation_failure_signals(signals)
     incomplete = _classify_incomplete(projection, validation_failed)
 
     if _signals_of_type(signals, _EVIDENCE_INCONSISTENCY_SIGNAL_TYPES) or (
@@ -355,7 +355,7 @@ def diagnose_run(
         return _build(
             projection=projection,
             incomplete=incomplete,
-            root_cause=RootCause.UNKNOWN,
+            root_cause=RootCause.GOVERNED_STOP,
             root_cause_detail=governed_stop.type,
             risk=risk,
             next_action=next_action,
@@ -368,12 +368,42 @@ def diagnose_run(
         return _build(
             projection=projection,
             incomplete=incomplete,
-            root_cause=RootCause.UNKNOWN,
+            root_cause=RootCause.REVIEW_REQUIRED,
             root_cause_detail=review_required.type,
             risk=RiskLevel.MEDIUM,
             next_action=NextAction.HUMAN_REVIEW,
             next_action_note=(
                 "Review is required by canonical facts; route to human review."
+            ),
+            signals=signals,
+        )
+
+    if projection.outcome == Outcome.BLOCKED:
+        return _build(
+            projection=projection,
+            incomplete=incomplete,
+            root_cause=RootCause.GOVERNED_STOP,
+            root_cause_detail="outcome/blocked",
+            risk=RiskLevel.HIGH,
+            next_action=NextAction.STOP,
+            next_action_note=(
+                "Run was stopped by governance per canonical outcome evidence. "
+                "No specific subtype is inferred; stop and review."
+            ),
+            signals=signals,
+        )
+
+    if projection.outcome == Outcome.REVIEW_REQUIRED:
+        return _build(
+            projection=projection,
+            incomplete=incomplete,
+            root_cause=RootCause.REVIEW_REQUIRED,
+            root_cause_detail="outcome/review_required",
+            risk=RiskLevel.MEDIUM,
+            next_action=NextAction.HUMAN_REVIEW,
+            next_action_note=(
+                "Review is required by canonical outcome evidence. "
+                "No specific subtype is inferred; route to human review."
             ),
             signals=signals,
         )
@@ -423,7 +453,7 @@ def diagnose_run(
         return _build(
             projection=projection,
             incomplete=incomplete,
-            root_cause=RootCause.UNKNOWN,
+            root_cause=RootCause.NON_TERMINAL,
             root_cause_detail=f"lifecycle/{projection.lifecycle.value}",
             risk=RiskLevel.MEDIUM,
             next_action=NextAction.INSPECT,

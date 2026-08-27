@@ -417,7 +417,7 @@ class TestCleanAndOtherStates:
         )
         diagnosis = diagnose_run(proj, [])
         assert diagnosis.incomplete.value == "run_interrupted"
-        assert diagnosis.root_cause == RootCause.UNKNOWN
+        assert diagnosis.root_cause == RootCause.NON_TERMINAL
         assert diagnosis.next_action == NextAction.INSPECT
 
     def test_approval_denied_is_governed_stop(self) -> None:
@@ -428,7 +428,7 @@ class TestCleanAndOtherStates:
             subject="approval",
         )
         diagnosis = diagnose_run(proj, [signal])
-        assert diagnosis.root_cause == RootCause.UNKNOWN
+        assert diagnosis.root_cause == RootCause.GOVERNED_STOP
         assert diagnosis.root_cause_detail == "approval_denied"
         assert diagnosis.next_action == NextAction.HUMAN_REVIEW
 
@@ -440,9 +440,95 @@ class TestCleanAndOtherStates:
             subject="authority",
         )
         diagnosis = diagnose_run(proj, [signal])
+        assert diagnosis.root_cause == RootCause.GOVERNED_STOP
         assert diagnosis.root_cause_detail == "authority_violation"
         assert diagnosis.risk.value == "critical"
         assert diagnosis.next_action == NextAction.STOP
+
+
+class TestGovernedOutcomeClassification:
+    def test_blocked_outcome_is_governed_stop_without_signal(self) -> None:
+        proj = _make_projection(
+            lifecycle=Lifecycle.FAILED,
+            outcome=Outcome.BLOCKED,
+            validation=Validation.NOT_RUN,
+        )
+        diagnosis = diagnose_run(proj, [])
+        assert diagnosis.root_cause == RootCause.GOVERNED_STOP
+        assert diagnosis.root_cause_detail == "outcome/blocked"
+        assert diagnosis.incomplete.value == "blocked_or_review"
+        assert diagnosis.next_action == NextAction.STOP
+        assert diagnosis.root_cause != RootCause.UNKNOWN
+
+    def test_review_required_outcome_is_review_required_without_signal(self) -> None:
+        proj = _make_projection(
+            lifecycle=Lifecycle.FAILED,
+            outcome=Outcome.REVIEW_REQUIRED,
+            validation=Validation.NOT_RUN,
+        )
+        diagnosis = diagnose_run(proj, [])
+        assert diagnosis.root_cause == RootCause.REVIEW_REQUIRED
+        assert diagnosis.root_cause_detail == "outcome/review_required"
+        assert diagnosis.incomplete.value == "blocked_or_review"
+        assert diagnosis.next_action == NextAction.HUMAN_REVIEW
+        assert diagnosis.root_cause != RootCause.UNKNOWN
+
+    def test_blocked_outcome_precedes_process_supervision(self) -> None:
+        proj = _make_projection(
+            lifecycle=Lifecycle.FAILED,
+            outcome=Outcome.BLOCKED,
+            validation=Validation.NOT_RUN,
+        )
+        diagnosis = diagnose_run(proj, [])
+        assert diagnosis.root_cause == RootCause.GOVERNED_STOP
+        assert diagnosis.root_cause != RootCause.EXECUTION_RUNTIME_PROCESS_SUPERVISION
+
+    def test_outcome_alone_never_infers_specific_subtype(self) -> None:
+        proj = _make_projection(lifecycle=Lifecycle.FAILED, outcome=Outcome.BLOCKED)
+        diagnosis = diagnose_run(proj, [])
+        assert diagnosis.root_cause_detail not in {
+            "authority_violation",
+            "approval_denied",
+            "budget_exceeded",
+        }
+
+    def test_explicit_governed_stop_signal_wins_over_outcome(self) -> None:
+        proj = _make_projection(lifecycle=Lifecycle.FAILED, outcome=Outcome.BLOCKED)
+        signal = _make_signal(
+            signal_type=SignalType.AUTHORITY_VIOLATION,
+            severity=Severity.CRITICAL,
+            subject="authority",
+        )
+        diagnosis = diagnose_run(proj, [signal])
+        assert diagnosis.root_cause == RootCause.GOVERNED_STOP
+        assert diagnosis.root_cause_detail == "authority_violation"
+        assert diagnosis.next_action == NextAction.STOP
+
+    def test_failed_outcome_still_process_supervision(self) -> None:
+        proj = _make_projection(
+            lifecycle=Lifecycle.FAILED,
+            outcome=Outcome.FAILED,
+            validation=Validation.NOT_RUN,
+        )
+        diagnosis = diagnose_run(proj, [])
+        assert diagnosis.root_cause == RootCause.EXECUTION_RUNTIME_PROCESS_SUPERVISION
+
+    def test_true_fallback_still_returns_unknown(self) -> None:
+        proj = _make_projection()
+        diagnosis = diagnose_run(proj, [])
+        assert diagnosis.root_cause == RootCause.UNKNOWN
+        assert diagnosis.root_cause_detail == "none"
+        assert diagnosis.incomplete.value == "none"
+
+    def test_unknown_lifecycle_uses_non_terminal_not_unknown(self) -> None:
+        proj = _make_projection(
+            lifecycle=Lifecycle.UNKNOWN,
+            outcome=Outcome.UNKNOWN,
+            completed_at=None,
+        )
+        diagnosis = diagnose_run(proj, [])
+        assert diagnosis.root_cause == RootCause.NON_TERMINAL
+        assert diagnosis.root_cause != RootCause.UNKNOWN
 
 
 class TestEvidenceTrace:
