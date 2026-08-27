@@ -1,0 +1,179 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "production-evidence-repair",
+    "id": "8090.unify-external-evidence-normalization",
+    "sequence": 8090,
+    "slug": "unify-external-evidence-normalization",
+    "title": "Unify external evidence normalization",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Projection unwraps canonical external_evidence wrappers before interpreting events, but evidence_conformance inspects the raw wrapper event_type. As a result the same valid producer evidence can project authority/approval/budget correctly while conformance reports the corresponding evidence as missing. Establish one canonical internal normalization path shared by projection and conformance so identical evidence is interpreted identically across governance capabilities. Keep this as a narrow representation repair, not a new adapter framework.",
+    "why_now": "The current split makes producer conformance lie about evidence that projection already consumes successfully. This is a cross-capability consistency defect at the evidence boundary.",
+    "do_not_misread": [
+      "Do not change the external evidence package schema.",
+      "Do not add producer-specific adapters or an adapter registry.",
+      "Do not broaden projection semantics beyond the wrapper normalization it already performs.",
+      "Do not infer missing governance facts from metadata or prose."
+    ],
+    "red_lines": [
+      "No source == everrun branch.",
+      "No producer SDK or plugin system.",
+      "No schema migration.",
+      "No new governance ontology.",
+      "No behavior change for already-unwrapped canonical events."
+    ]
+  },
+  "machine_core": {
+    "goal": "Make projection and evidence conformance consume the same canonical interpretation of external_evidence wrappers without duplicating producer-specific parsing logic.",
+    "files": {
+      "allow": [
+        "src/ailuros/projection.py",
+        "src/ailuros/evidence_conformance.py",
+        "src/ailuros/evidence/**",
+        "src/ailuros/*normaliz*.py",
+        "tests/test_evidence_capability_conformance.py",
+        "tests/test_projection.py",
+        "tests/test_*projection*.py",
+        "tests/test_*conformance*.py",
+        "docs/contracts/governance-evidence-capability-conformance-v1.md"
+      ],
+      "create": [
+        "src/ailuros/evidence_normalization.py"
+      ],
+      "forbid": [
+        "src/ailuros/signals.py",
+        "src/ailuros/regression.py",
+        "src/ailuros/regression/**",
+        "src/ailuros/run_diagnosis.py",
+        "src/ailuros/run_failure_correlation.py",
+        "src/ailuros/storage/**",
+        "fixtures/**",
+        ".everrun/**",
+        "lockfiles"
+      ]
+    },
+    "red_lines": [
+      "There must be one authoritative internal normalization function for valid external_evidence wrappers used by both projection and conformance.",
+      "Do not import a private projection helper into evidence_conformance as the long-term abstraction boundary.",
+      "Normalization must preserve existing behavior for malformed/partial wrappers by leaving them uninterpreted rather than fabricating fields.",
+      "Do not change governance judgments or capability requirements in this pack."
+    ],
+    "invariants": [
+      "A wrapped authority_evidence event with actor is interpreted equivalently to the corresponding unwrapped authority_evidence event by both projection and conformance.",
+      "The same equivalence holds for approval and budget evidence wrapper forms covered by existing projection semantics.",
+      "Already-unwrapped canonical events are unchanged by normalization.",
+      "Malformed external_evidence wrappers remain non-authoritative and do not synthesize evidence.",
+      "Producer/source metadata does not affect normalization."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "canonical timeline events including external_evidence wrappers"},
+        "consumer": {"component": "shared evidence normalization for projection and conformance", "production_path": true},
+        "observable_effect": {
+          "kind": "cross_capability_consistency",
+          "assertion": "Projection and evidence conformance observe the same normalized canonical event type/payload for valid external_evidence wrappers, eliminating false missing-evidence reports."
+        },
+        "proofs": [
+          {"layer": "authority", "gate": "hard", "assertion": "Wrapped authority_evidence with non-empty actor makes authority conformance evaluable and projects the same authority evidence as the unwrapped form."},
+          {"layer": "approval", "gate": "hard", "assertion": "Wrapped approval_evidence with subject is interpreted the same as the unwrapped form."},
+          {"layer": "budget", "gate": "hard", "assertion": "Wrapped budget_evidence with subject/unit is interpreted the same as the unwrapped form."},
+          {"layer": "negative", "gate": "hard", "assertion": "Malformed wrapper payloads remain uninterpreted and do not satisfy capability evidence requirements."},
+          {"layer": "neutrality", "gate": "hard", "assertion": "Source/producer relabeling does not change normalized interpretation."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If external_evidence payload lacks a valid nested event_type or dict payload, return/preserve the original event and do not fabricate canonical evidence.",
+      "If wrapper metadata/scope_ref is absent or malformed, preserve the existing projection-compatible fallback behavior.",
+      "Structural package validity remains the validator's responsibility; normalization must not silently repair malformed packages."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Extract the existing normalization rule",
+        "details": [
+          "Move the behavior of projection._normalize_external_evidence_event into one small shared internal module/function.",
+          "Keep the function pure and deterministic over one event dict.",
+          "Preserve projection's current wrapper behavior byte-for-byte where practical."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Make projection consume the shared normalizer",
+        "details": [
+          "Replace the projection-local private helper with the shared function.",
+          "Do not otherwise change build_execution_projection or governed outcome logic.",
+          "Existing projection tests must remain green."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Normalize conformance timeline events",
+        "details": [
+          "Apply the shared normalizer to dict events returned from timeline.json before _evidence_present evaluates capability requirements.",
+          "Do not modify _CAPABILITY_SPECS merely to make the regression pass.",
+          "Keep package structural validation behavior separate."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Lock wrapped/unwrapped equivalence",
+        "details": [
+          "Add paired wrapped/unwrapped tests for authority and at least one of approval/budget; prefer all three when compact.",
+          "Assert both projection and conformance agree on presence/evaluability.",
+          "Add a malformed-wrapper negative test proving no synthetic evidence appears."
+        ]
+      }
+    ],
+    "acceptance": [
+      "The normalization rule exists in one shared internal location used by projection and evidence conformance.",
+      "Wrapped authority_evidence no longer produces MISSING_EVIDENCE when its required actor is present.",
+      "Wrapped approval/budget evidence follows the same interpretation as unwrapped canonical events.",
+      "Malformed wrappers do not fabricate evidence.",
+      "Capability specs and governance semantics are not weakened or broadened.",
+      "Full tests, ruff and mypy pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_evidence_capability_conformance.py tests/test_projection.py -q",
+      "python -m pytest tests -q",
+      "ruff check src tests",
+      "mypy src"
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "Projection and evidence conformance use the same authoritative normalization function for external_evidence wrappers.",
+      "Wrapped and unwrapped authority/approval/budget evidence are behaviorally equivalent where their structured required fields are identical.",
+      "Malformed wrappers remain uninterpreted and cannot satisfy capability evidence requirements by accident.",
+      "No producer-specific branch, adapter registry or schema expansion is introduced.",
+      "_CAPABILITY_SPECS are not weakened merely to make wrapped evidence pass.",
+      "Projection governance semantics outside normalization remain unchanged.",
+      "All validation commands pass."
+    ],
+    "reject_if": [
+      "evidence_conformance imports and depends on a projection-private normalization helper instead of a shared evidence-boundary abstraction.",
+      "Projection and conformance still have separate normalization implementations.",
+      "Malformed wrapper payloads are silently repaired or promoted into evidence.",
+      "Producer/source identity affects normalization.",
+      "Capability requirements or governance outcome semantics are weakened or broadened without evidence.",
+      "Forbidden files change or validation fails."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}
