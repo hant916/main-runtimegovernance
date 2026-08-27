@@ -1,0 +1,190 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-governance-product-boundary",
+    "id": "8091.reframe-evidence-package-as-transitional-post-run-bridge",
+    "sequence": 8091,
+    "slug": "reframe-evidence-package-as-transitional-post-run-bridge",
+    "title": "Reframe evidence package as transitional post-run bridge",
+    "type": "boundary",
+    "pack_kind": "documentation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "The accepted Runtime Evidence Package v1 currently reads like a durable portable interchange format, but its proven production role today is narrower: it is the post-run bridge used to move completed-run evidence into Ailuros while EverRun/Ailuros dogfood validates governance semantics before runtime-native control becomes the primary path. Reframe that lifecycle explicitly without changing package shape, validation, CLI behavior, producer compatibility, or 8090 normalization. The package remains a useful transitional ingestion contract, not an Ailuros product standard or an attempted industry evidence standard. Document a retirement trigger: once equivalent evidence is consumed directly at runtime governance boundaries, new product work must not depend on this bridge and it may be retired after compatibility needs end.",
+    "why_now": "Current wording such as canonical, stable and portable unit of evidence exchange can turn a dogfood scaffold into an accidental product/API commitment and invite speculative standards work that does not improve a runtime decision.",
+    "do_not_misread": [
+      "Do not rename or delete existing EvidencePackage code, CLI commands, files or schemas in this pack.",
+      "Do not change evidence validation, event semantics, projection semantics or governance judgments.",
+      "Do not implement TRACE, SCITT, attestation import/export, signature verification or a generic exporter framework.",
+      "Do not change or weaken 8090 external_evidence normalization.",
+      "This is a lifecycle and product-boundary clarification, not an immediate breaking deprecation of the bridge."
+    ],
+    "red_lines": [
+      "No production code, tests, schemas, fixtures, examples or app assets change.",
+      "No new adapter registry, exporter interface, verifier interface or external-standard dependency.",
+      "No compatibility break for current EverRun or other source-neutral evidence-package producers.",
+      "Do not claim that Ailuros owns an industry portable evidence or attestation standard."
+    ]
+  },
+  "machine_core": {
+    "goal": "Align the evidence-package documentation with its proven transitional post-run role and define its retirement condition while preserving the current contract and behavior byte-for-byte.",
+    "files": {
+      "allow": [
+        "docs/contracts/runtime-evidence-package-v1.md",
+        "docs/contracts/evidence-package-post-run-governance-v15.md",
+        "docs/adapters/evidence-package.md",
+        "docs/architecture/everrun-dogfood-data-flow.md",
+        "docs/decisions/ADR-0006-transitional-post-run-evidence-bridge.md"
+      ],
+      "create": [
+        "docs/decisions/ADR-0006-transitional-post-run-evidence-bridge.md"
+      ],
+      "forbid": [
+        "src/**",
+        "tests/**",
+        "schemas/**",
+        "fixtures/**",
+        "examples/**",
+        "apps/**",
+        ".everrun/**",
+        "pyproject.toml",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "red_lines": [
+      "The v1 package wire shape and required fields remain unchanged.",
+      "Existing readers, writers, validators and CLI surfaces remain valid.",
+      "Use canonical only for the current internal bridge contract when necessary; do not present it as a universal or industry standard.",
+      "The documented end state is runtime-native governance evidence flow, not a richer evidence-package product."
+    ],
+    "invariants": [
+      "Evidence Package remains post-run and non-enforcing.",
+      "Current producer/source neutrality needed by dogfood is preserved.",
+      "Package provenance and deterministic identity semantics remain unchanged.",
+      "Ailuros makes no claim that package integrity or portability proves authority or permission.",
+      "Retirement is conditional on equivalent runtime-native evidence availability and compatibility needs."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {
+          "artifact": "current accepted evidence-package documentation and live post-run EverRun/Ailuros bridge"
+        },
+        "consumer": {
+          "component": "Ailuros product and architecture boundary",
+          "production_path": true
+        },
+        "observable_effect": {
+          "kind": "boundary_clarity",
+          "assertion": "Documentation consistently describes Evidence Package as a transitional post-run ingestion bridge, not the destination product or an industry evidence standard, while retaining the current contract unchanged."
+        },
+        "proofs": [
+          {
+            "layer": "lifecycle",
+            "gate": "hard",
+            "assertion": "The bridge is explicitly post-run, transitional and non-enforcing."
+          },
+          {
+            "layer": "compatibility",
+            "gate": "hard",
+            "assertion": "No package/schema/API/CLI behavior changes are introduced."
+          },
+          {
+            "layer": "retirement",
+            "gate": "hard",
+            "assertion": "A concrete retirement trigger tied to runtime-native evidence is documented."
+          },
+          {
+            "layer": "scope",
+            "gate": "hard",
+            "assertion": "No external attestation/exporter framework is introduced."
+          }
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If existing documentation relies on canonical terminology for current package validation, scope the term rather than deleting contract language that tests or consumers require.",
+      "If a proposed wording implies immediate deprecation or invalidates existing producer packages, reject that wording and preserve compatibility.",
+      "Do not resolve this boundary task by changing production code."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Record the transitional bridge decision",
+        "details": [
+          "Create ADR-0006 explaining the current proven role, why it is not the destination product, and the retirement trigger.",
+          "State that external attestation/interchange standards are outside this contract's ownership without adding vendor-specific integration work.",
+          "State that post-run evidence remains valuable as dogfood and migration scaffolding until runtime-native evidence is proven."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Scope the runtime evidence package contract",
+        "details": [
+          "Update runtime-evidence-package-v1.md so canonical/portable wording is scoped to the current Ailuros ingestion bridge rather than an industry-standard ambition.",
+          "Keep Status Accepted because the bridge is still live; add lifecycle wording rather than marking it immediately deprecated.",
+          "Do not alter fields, validation rules, naming rules, provenance rules or deterministic identity."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Align adapter and dogfood documentation",
+        "details": [
+          "Make the adapter and EverRun dogfood flow describe the package as the current post-run bridge.",
+          "Document that runtime-native governance is the target integration path and package retirement is compatibility-gated.",
+          "Keep current CLI and post-run audit descriptions intact."
+        ]
+      }
+    ],
+    "acceptance": [
+      "ADR-0006 exists and states that Evidence Package is a transitional post-run bridge, not the destination Ailuros product.",
+      "The runtime evidence contract no longer implies Ailuros intends to establish an industry evidence interchange standard.",
+      "The package remains accepted and compatible for current EverRun/Ailuros post-run dogfood.",
+      "A retirement trigger tied to equivalent runtime-native evidence is explicit.",
+      "No code, schema, test, fixture, CLI or package-format behavior changes.",
+      "No TRACE/SCITT/crypto-attestation implementation or generic adapter/exporter framework is added."
+    ],
+    "validate": [
+      "python -m pytest tests/test_docs_baseline.py -q",
+      "python -m pytest tests/test_runtime_evidence_contract_v1.py tests/test_evidence_package_contract_validator.py -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "ADR-0006 clearly records the temporary post-run bridge role and runtime-native retirement trigger.",
+      "runtime-evidence-package-v1.md keeps the existing package contract intact while removing any implication of an Ailuros-owned industry standard.",
+      "Existing EverRun/source-neutral producer compatibility and post-run audit behavior are preserved.",
+      "Canonical/portable terminology, if retained, is explicitly scoped to the current internal ingestion contract.",
+      "No source code, schema, tests, fixtures, CLI behavior or 8090 normalization semantics change.",
+      "No speculative attestation/exporter/verifier framework or external-standard dependency is introduced.",
+      "All validation commands pass."
+    ],
+    "reject_if": [
+      "The pack implementation renames, removes or breaks the current Evidence Package format or CLI.",
+      "The implementation introduces TRACE, SCITT, signing, attestation verification, a generic adapter registry, exporter or verifier interface.",
+      "The documentation still presents Ailuros Evidence Package as a universal or industry evidence standard.",
+      "The documentation marks the bridge unusable immediately despite current EverRun/Ailuros dependency on it.",
+      "Production code, schemas, tests, fixtures, examples, apps or forbidden files change.",
+      "Validation fails."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}

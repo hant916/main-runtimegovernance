@@ -1,0 +1,195 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-governance-product-boundary",
+    "id": "8092.freeze-runtime-governance-scalpel-boundary",
+    "sequence": 8092,
+    "slug": "freeze-runtime-governance-scalpel-boundary",
+    "title": "Freeze runtime governance scalpel boundary",
+    "type": "boundary",
+    "pack_kind": "documentation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Freeze Ailuros as a narrow runtime-governance decision and control layer rather than a broad AI-governance toolbox. Codify the product test: if a capability does not materially improve a runtime decision or control boundary, it is probably not Ailuros. Define how a post-run finding may graduate into runtime control only when production evidence shows the problem matters, the required evidence exists before the action, the decision semantics are deterministic enough to enforce, an intervention point exists, and the business/risk impact justifies control. Explicitly keep generic asset catalogs/registries, generic lineage/compliance dashboards/checklists, proprietary attestation standards/crypto infrastructure, connector zoos, and speculative generic adapter frameworks outside core. External context or attestation may be integrated later only after a concrete producer/consumer requirement proves the need.",
+    "why_now": "Neighboring standards and governance platforms validate the market but also create scope-creep pressure. Ailuros already has both post-run evidence paths and runtime enforcement primitives; the selection rule must be frozen before future packs turn the core into a collection of adjacent governance features.",
+    "do_not_misread": [
+      "Do not implement a new live runtime API or enforcement service in this documentation pack.",
+      "Do not remove useful post-run diagnosis, replay, projection or current evidence bridge behavior.",
+      "Do not add TRACE, OpenMetadata, Collate or any other concrete connector merely to demonstrate compatibility.",
+      "Do not prohibit all future adapters; require a real producer/consumer need before a concrete adapter is implemented and abstract only after repeated evidence.",
+      "Do not expand Ailuros into the execution-plane agent loop, planner, scheduler or workflow engine."
+    ],
+    "red_lines": [
+      "No production code, tests, schemas, fixtures, examples or app assets change.",
+      "No new runtime service, database, registry, dashboard, connector, SDK or plugin framework.",
+      "No claim that authenticity, integrity or attestation is equivalent to authority, governance or permission.",
+      "No generic AI governance platform positioning."
+    ]
+  },
+  "machine_core": {
+    "goal": "Codify a durable runtime-first product boundary and an evidence-based graduation rule so future Ailuros work remains a small governance control kernel instead of accumulating adjacent governance-platform features.",
+    "files": {
+      "allow": [
+        "docs/architecture/governance-boundary.md",
+        "docs/strategy/product-line-thesis.md",
+        "docs/decisions/ADR-0007-runtime-governance-scalpel-boundary.md"
+      ],
+      "create": [
+        "docs/decisions/ADR-0007-runtime-governance-scalpel-boundary.md"
+      ],
+      "forbid": [
+        "docs/contracts/runtime-evidence-package-v1.md",
+        "docs/contracts/evidence-package-post-run-governance-v15.md",
+        "docs/adapters/evidence-package.md",
+        "src/**",
+        "tests/**",
+        "schemas/**",
+        "fixtures/**",
+        "examples/**",
+        "apps/**",
+        ".everrun/**",
+        "pyproject.toml",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "red_lines": [
+      "Ailuros remains framework/runtime neutral and does not take ownership of the execution plane.",
+      "Runtime control is selective: guide/constrain/escalate/block only when evidence and policy justify intervention; do not default to paranoid blocking.",
+      "Post-run findings do not automatically become runtime gates.",
+      "External systems may supply context or proof, but their schemas and product domains must not become Ailuros core ontology.",
+      "Do not create an abstraction for hypothetical integrations with no real producer/consumer."
+    ],
+    "invariants": [
+      "Ailuros owns governance decisions, policy/authority evaluation, enforcement points and explainable decision evidence.",
+      "Execution orchestration remains owned by runtimes/harnesses such as EverRun.",
+      "Post-run analysis remains an evidence source and dogfood path, not the target execution model.",
+      "A runtime capability requires pre-action evidence availability and an enforceable intervention point.",
+      "Authenticity and integrity evidence can inform governance but never imply authority by themselves.",
+      "Generic asset registry, metadata catalog, lineage platform, compliance checklist/dashboard and cryptographic attestation infrastructure remain non-goals."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {
+          "artifact": "production/dogfood governance findings and existing Ailuros runtime enforcement primitives"
+        },
+        "consumer": {
+          "component": "Ailuros roadmap and future impl-pack selection",
+          "production_path": true
+        },
+        "observable_effect": {
+          "kind": "scope_selection",
+          "assertion": "Future capabilities are selected for Ailuros core only when they improve a proven runtime decision/control boundary; adjacent governance-platform features and speculative integrations remain outside core."
+        },
+        "proofs": [
+          {
+            "layer": "graduation",
+            "gate": "hard",
+            "assertion": "The post-run-to-runtime graduation criteria are explicit and evidence-based."
+          },
+          {
+            "layer": "non_goals",
+            "gate": "hard",
+            "assertion": "Registry/catalog/lineage/compliance/attestation-infrastructure non-goals are explicit."
+          },
+          {
+            "layer": "integration",
+            "gate": "hard",
+            "assertion": "External integrations require a real producer/consumer trigger before implementation."
+          },
+          {
+            "layer": "semantics",
+            "gate": "hard",
+            "assertion": "Attestation/authenticity is explicitly separated from authority/governance permission."
+          }
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If a capability is useful only after execution and lacks pre-action evidence or an intervention point, keep it post-run rather than inventing a runtime gate.",
+      "If an external integration is only a market/standards signal with no real producer or consumer, record it as a trigger-based backlog item rather than implementing an adapter.",
+      "If a future runtime gate cannot distinguish unknown from violation with deterministic evidence, it must not silently default to allow or block."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Record the scalpel boundary",
+        "details": [
+          "Create ADR-0007 stating the runtime-decision/control selection rule and why broad governance-platform ownership is rejected.",
+          "Record the distinction between proof/integrity and authority/permission.",
+          "Record external integrations as demand-triggered seams, not prebuilt connector infrastructure."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Define post-run to runtime graduation",
+        "details": [
+          "Add explicit graduation criteria: repeated production evidence, pre-action evidence availability, deterministic/evaluable semantics, enforceable intervention point, and material risk/business value.",
+          "State that findings failing these criteria stay post-run diagnostics or outside Ailuros.",
+          "State that runtime control should preserve business flow through precise allow/guide/constrain/escalate/block semantics rather than maximum blocking."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Freeze product non-goals and integration trigger",
+        "details": [
+          "Update governance-boundary.md and product-line-thesis.md with the scalpel rule and explicit non-goals.",
+          "Document that generic registry/catalog/lineage/compliance/attestation infrastructure is not Ailuros core.",
+          "Require a concrete producer/consumer need before adding a format/context adapter; prefer a concrete adapter first and generalize only after a second proven case."
+        ]
+      }
+    ],
+    "acceptance": [
+      "ADR-0007 exists and defines Ailuros as a runtime governance decision/control kernel rather than a generic AI governance platform.",
+      "The post-run-to-runtime graduation criteria are explicit, deterministic and evidence-driven.",
+      "The boundary explicitly rejects generic registry/catalog/lineage/compliance-dashboard/attestation-infrastructure ownership.",
+      "External adapters are trigger-based on real producer/consumer evidence; no speculative connector framework is proposed.",
+      "Authenticity/integrity/attestation is explicitly distinguished from authority/governance/permission.",
+      "Existing execution-plane ownership and current post-run capabilities remain intact.",
+      "No production code, test, schema, fixture, example or app behavior changes."
+    ],
+    "validate": [
+      "python -m pytest tests/test_docs_baseline.py -q",
+      "python -m pytest tests/test_core_boundary.py tests/test_import_boundaries.py -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "ADR-0007 records the runtime-decision/control scalpel rule and evidence-based graduation criteria.",
+      "governance-boundary.md and product-line-thesis.md remain consistent with ADR-0005 execution-plane separation.",
+      "Post-run capabilities graduate only with production evidence, pre-action evidence, deterministic semantics, an intervention point and material value.",
+      "Generic registries/catalogs/lineage/compliance dashboards/checklists and cryptographic attestation infrastructure are explicit non-goals.",
+      "External integrations require a concrete producer/consumer trigger and do not justify a speculative adapter/connector framework.",
+      "The documentation explicitly separates authenticity/integrity/attestation from authority/governance permission.",
+      "No source code or forbidden files change and all validation commands pass."
+    ],
+    "reject_if": [
+      "The implementation adds or proposes a new registry, catalog, generic lineage graph, compliance platform/dashboard, crypto attestation service or connector zoo as Ailuros core.",
+      "The implementation creates a generic adapter/exporter/verifier framework without a proven producer/consumer need.",
+      "Post-run findings are described as automatically becoming runtime gates.",
+      "Attestation, signature validity or source integrity is treated as sufficient authorization or permission.",
+      "Ailuros takes ownership of model loops, planners, schedulers, workflow orchestration or other execution-plane responsibilities.",
+      "Production code, tests, schemas, fixtures, examples, apps, evidence-package contract files or other forbidden files change.",
+      "Validation fails."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}
