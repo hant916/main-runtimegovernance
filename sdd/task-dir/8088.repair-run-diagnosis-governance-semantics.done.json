@@ -12,7 +12,10 @@
   },
   "scheduling": {
     "status_source_of_truth": "filename_suffix",
-    "allowed_suffixes": ["todo", "done"],
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
     "on_success": "rename_todo_to_done",
     "on_failure": "keep_todo"
   },
@@ -72,18 +75,43 @@
       {
         "id": "CV1",
         "kind": "convergence",
-        "producer": {"artifact": "canonical ExecutionProjection plus GovernanceSignal list"},
-        "consumer": {"component": "Ailuros run diagnosis", "production_path": true},
+        "producer": {
+          "artifact": "canonical ExecutionProjection plus GovernanceSignal list"
+        },
+        "consumer": {
+          "component": "Ailuros run diagnosis",
+          "production_path": true
+        },
         "observable_effect": {
           "kind": "diagnosis_semantics",
           "assertion": "Evidence-backed governed stop, review-required and non-terminal states receive explicit RootCause classes; UNKNOWN is emitted only when no known class is proven."
         },
         "proofs": [
-          {"layer": "governed_stop", "gate": "hard", "assertion": "Outcome.BLOCKED with lifecycle=FAILED and no signals does not diagnose process supervision; it yields GOVERNED_STOP with only generic detail unless a structured subtype is proven."},
-          {"layer": "structured_class", "gate": "hard", "assertion": "authority_violation, approval_denied and budget_exceeded yield RootCause.GOVERNED_STOP and preserve their structured signal type in root_cause_detail."},
-          {"layer": "review", "gate": "hard", "assertion": "review-required signals or Outcome.REVIEW_REQUIRED yield RootCause.REVIEW_REQUIRED rather than UNKNOWN."},
-          {"layer": "lifecycle", "gate": "hard", "assertion": "RUNNING/UNKNOWN lifecycle yields RootCause.NON_TERMINAL rather than UNKNOWN."},
-          {"layer": "unknown", "gate": "hard", "assertion": "UNKNOWN remains available only for the final no-known-class/insufficient-evidence fallback."}
+          {
+            "layer": "governed_stop",
+            "gate": "hard",
+            "assertion": "Outcome.BLOCKED with lifecycle=FAILED and no signals does not diagnose process supervision; it yields GOVERNED_STOP with only generic detail unless a structured subtype is proven."
+          },
+          {
+            "layer": "structured_class",
+            "gate": "hard",
+            "assertion": "authority_violation, approval_denied and budget_exceeded yield RootCause.GOVERNED_STOP and preserve their structured signal type in root_cause_detail."
+          },
+          {
+            "layer": "review",
+            "gate": "hard",
+            "assertion": "review-required signals or Outcome.REVIEW_REQUIRED yield RootCause.REVIEW_REQUIRED rather than UNKNOWN."
+          },
+          {
+            "layer": "lifecycle",
+            "gate": "hard",
+            "assertion": "RUNNING/UNKNOWN lifecycle yields RootCause.NON_TERMINAL rather than UNKNOWN."
+          },
+          {
+            "layer": "unknown",
+            "gate": "hard",
+            "assertion": "UNKNOWN remains available only for the final no-known-class/insufficient-evidence fallback."
+          }
         ]
       }
     ],
@@ -144,7 +172,8 @@
       "python -m pytest tests -q",
       "ruff check src tests",
       "mypy src"
-    ]
+    ],
+    "tasks": []
   },
   "judge": {
     "must_check": [
@@ -169,5 +198,12 @@
     "max_attempts": 2,
     "on_max_attempts": "stop_and_keep_todo"
   },
-  "evidence_matrix_requested_from_coder": true
+  "evidence_matrix_requested_from_coder": true,
+  "execution_history": {
+    "attempt_reserved": false,
+    "attempts": 2,
+    "last_attempt_at": "2026-08-27T21:31:12Z",
+    "last_result": "accept",
+    "last_summary": "iteration=1 validation=passed changed_files=0 diff_chars=22046 risks=coder_permission_gate_blocked"
+  }
 }
