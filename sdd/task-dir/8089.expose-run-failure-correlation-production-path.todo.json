@@ -12,7 +12,10 @@
   },
   "scheduling": {
     "status_source_of_truth": "filename_suffix",
-    "allowed_suffixes": ["todo", "done"],
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
     "on_success": "rename_todo_to_done",
     "on_failure": "keep_todo"
   },
@@ -71,17 +74,38 @@
       {
         "id": "CV1",
         "kind": "convergence",
-        "producer": {"artifact": "explicit finite list of stored run ids"},
-        "consumer": {"component": "Ailuros run-failure-correlation CLI", "production_path": true},
+        "producer": {
+          "artifact": "explicit finite list of stored run ids"
+        },
+        "consumer": {
+          "component": "Ailuros run-failure-correlation CLI",
+          "production_path": true
+        },
         "observable_effect": {
           "kind": "operator_reachability",
           "assertion": "An operator can invoke repeated-failure correlation for explicitly supplied runs and receive deterministic json/md output without test-only APIs, history discovery or mutation."
         },
         "proofs": [
-          {"layer": "reachability", "gate": "hard", "assertion": "A CLI invocation with at least two explicit run ids loads their stored projection/signals, diagnoses each run and renders correlate_run_failures output."},
-          {"layer": "boundedness", "gate": "hard", "assertion": "The command does not enumerate or discover any run not explicitly supplied."},
-          {"layer": "governed_recurrence", "gate": "hard", "assertion": "Two equivalent budget_exceeded diagnoses produce recurrence=RECURRENT with one structured group and are not placed in unproven_run_ids."},
-          {"layer": "cross_class", "gate": "hard", "assertion": "authority_violation plus budget_exceeded produces separate groups and is not escalated merely because both are GOVERNED_STOP."}
+          {
+            "layer": "reachability",
+            "gate": "hard",
+            "assertion": "A CLI invocation with at least two explicit run ids loads their stored projection/signals, diagnoses each run and renders correlate_run_failures output."
+          },
+          {
+            "layer": "boundedness",
+            "gate": "hard",
+            "assertion": "The command does not enumerate or discover any run not explicitly supplied."
+          },
+          {
+            "layer": "governed_recurrence",
+            "gate": "hard",
+            "assertion": "Two equivalent budget_exceeded diagnoses produce recurrence=RECURRENT with one structured group and are not placed in unproven_run_ids."
+          },
+          {
+            "layer": "cross_class",
+            "gate": "hard",
+            "assertion": "authority_violation plus budget_exceeded produces separate groups and is not escalated merely because both are GOVERNED_STOP."
+          }
         ]
       }
     ],
@@ -140,7 +164,8 @@
       "python -m pytest tests -q",
       "ruff check src tests",
       "mypy src"
-    ]
+    ],
+    "tasks": []
   },
   "judge": {
     "must_check": [
@@ -166,5 +191,12 @@
     "max_attempts": 2,
     "on_max_attempts": "stop_and_keep_todo"
   },
-  "evidence_matrix_requested_from_coder": true
+  "evidence_matrix_requested_from_coder": true,
+  "execution_history": {
+    "attempt_reserved": false,
+    "attempts": 0,
+    "last_attempt_at": "",
+    "last_result": "",
+    "last_summary": ""
+  }
 }
