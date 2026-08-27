@@ -42,7 +42,6 @@
         "src/ailuros/evidence/**",
         "src/ailuros/*normaliz*.py",
         "tests/test_evidence_capability_conformance.py",
-        "tests/test_projection.py",
         "tests/test_*projection*.py",
         "tests/test_*conformance*.py",
         "docs/contracts/governance-evidence-capability-conformance-v1.md"
@@ -146,7 +145,7 @@
       "Full tests, ruff and mypy pass."
     ],
     "validate": [
-      "python -m pytest tests/test_evidence_capability_conformance.py tests/test_projection.py -q",
+      "python -m pytest tests/test_evidence_capability_conformance.py -q",
       "python -m pytest tests -q",
       "ruff check src tests",
       "mypy src"
