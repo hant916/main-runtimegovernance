@@ -1,0 +1,173 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-diagnosis-repair",
+    "id": "8088.repair-run-diagnosis-governance-semantics",
+    "sequence": 8088,
+    "slug": "repair-run-diagnosis-governance-semantics",
+    "title": "Repair run diagnosis governance semantics",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "8085 currently overloads RootCause.UNKNOWN with evidence-backed governance stops, review-required states and non-terminal lifecycle states. It can also diagnose outcome=BLOCKED plus lifecycle=FAILED as process supervision failure when governance signals are absent. Repair the diagnosis contract so UNKNOWN means genuinely unclassified/insufficient evidence only, known governance states remain structured, and governed outcomes are classified before generic lifecycle failure. Keep the repair small and advisory; do not change projection or signal semantics.",
+    "why_now": "8086 consumes RootCause structurally. The current UNKNOWN overload turns proven governance facts into unproven failures, breaks recurrence grouping and can downgrade a critical authority STOP into generic human review.",
+    "do_not_misread": [
+      "Do not invent more specific authority/approval/budget causes when only a generic governed outcome is available.",
+      "Do not parse root_cause_detail to recover classification; classification must live in RootCause.",
+      "Do not change governance projection semantics to make diagnosis easier.",
+      "Do not add remediation execution; diagnosis remains read-only and advisory."
+    ],
+    "red_lines": [
+      "No source == everrun branch.",
+      "No free-form log parsing.",
+      "No projection/signals semantic rewrite.",
+      "No automatic remediation or pack mutation.",
+      "Do not weaken existing authority, approval, budget, scope or validation gates."
+    ]
+  },
+  "machine_core": {
+    "goal": "Make structured run diagnosis preserve proven governance semantics and reserve RootCause.UNKNOWN for genuinely insufficient or unclassified evidence.",
+    "files": {
+      "allow": [
+        "src/ailuros/run_diagnosis.py",
+        "tests/test_run_diagnosis.py",
+        "tests/test_run_failure_correlation.py",
+        "docs/contracts/run-diagnosis-v1.md"
+      ],
+      "create": [],
+      "forbid": [
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/run_failure_correlation.py",
+        "src/ailuros/storage/**",
+        "fixtures/**",
+        ".everrun/**",
+        "lockfiles"
+      ]
+    },
+    "red_lines": [
+      "RootCause.UNKNOWN must not represent a known governance stop, known review-required state, or known non-terminal lifecycle state.",
+      "Do not infer a specific governance subtype from Outcome.BLOCKED or Outcome.REVIEW_REQUIRED when no structured subtype evidence exists.",
+      "Governed outcome evidence must be considered before generic lifecycle==FAILED process-supervision classification.",
+      "Do not make root_cause_detail authoritative for class recovery."
+    ],
+    "invariants": [
+      "UNKNOWN means genuinely unclassified or insufficient root-cause evidence only.",
+      "Explicit authority_violation, approval_denied and budget_exceeded remain distinguishable by structured failure signature detail.",
+      "A generic Outcome.BLOCKED is classified as a governed stop, not execution_runtime/process_supervision.",
+      "Outcome.REVIEW_REQUIRED is classified as review required when no stronger conflicting diagnosis applies.",
+      "Lifecycle.RUNNING or Lifecycle.UNKNOWN is represented as NON_TERMINAL rather than UNKNOWN.",
+      "Scope, validation and evidence-inconsistency precedence remains unchanged.",
+      "Diagnosis remains source-neutral and read-only."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "canonical ExecutionProjection plus GovernanceSignal list"},
+        "consumer": {"component": "Ailuros run diagnosis", "production_path": true},
+        "observable_effect": {
+          "kind": "diagnosis_semantics",
+          "assertion": "Evidence-backed governed stop, review-required and non-terminal states receive explicit RootCause classes; UNKNOWN is emitted only when no known class is proven."
+        },
+        "proofs": [
+          {"layer": "governed_stop", "gate": "hard", "assertion": "Outcome.BLOCKED with lifecycle=FAILED and no signals does not diagnose process supervision; it yields GOVERNED_STOP with only generic detail unless a structured subtype is proven."},
+          {"layer": "structured_class", "gate": "hard", "assertion": "authority_violation, approval_denied and budget_exceeded yield RootCause.GOVERNED_STOP and preserve their structured signal type in root_cause_detail."},
+          {"layer": "review", "gate": "hard", "assertion": "review-required signals or Outcome.REVIEW_REQUIRED yield RootCause.REVIEW_REQUIRED rather than UNKNOWN."},
+          {"layer": "lifecycle", "gate": "hard", "assertion": "RUNNING/UNKNOWN lifecycle yields RootCause.NON_TERMINAL rather than UNKNOWN."},
+          {"layer": "unknown", "gate": "hard", "assertion": "UNKNOWN remains available only for the final no-known-class/insufficient-evidence fallback."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If canonical evidence is contradictory, keep EVIDENCE_INCONSISTENT and human review rather than selecting a convenient governance class.",
+      "If a generic governed outcome is known but its subtype is not, classify the broad governed state and keep subtype detail generic.",
+      "If no known class is proven, keep UNKNOWN; do not invent a cause from lifecycle prose, producer metadata or logs."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Repair the closed RootCause vocabulary",
+        "details": [
+          "Add GOVERNED_STOP, REVIEW_REQUIRED and NON_TERMINAL to RootCause.",
+          "Keep UNKNOWN only as the genuine insufficient/unclassified fallback.",
+          "Do not remove existing root causes unless a test proves they are unreachable; PACK_DEFINITION cleanup is allowed only if it is demonstrably unreferenced and does not expand scope."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Classify governed outcomes before runtime failure",
+        "details": [
+          "After inconsistency/scope/validation and explicit governed-stop/review signal handling, inspect projection.outcome before lifecycle==FAILED.",
+          "Outcome.BLOCKED must yield GOVERNED_STOP even without a subtype signal.",
+          "Outcome.REVIEW_REQUIRED must yield REVIEW_REQUIRED even without a subtype signal.",
+          "Do not infer authority/approval/budget subtype from outcome alone."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Remove local dead branch and lock UNKNOWN invariant",
+        "details": [
+          "Simplify _validation_failure_signals so identical branches are removed without changing behavior.",
+          "Add regression tests that fail if known governance states return UNKNOWN.",
+          "Add a test that the true fallback still returns UNKNOWN."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Prove downstream compatibility without modifying correlation",
+        "details": [
+          "Add focused correlation regression tests only if needed to prove two budget_exceeded diagnoses are no longer unproven and authority_violation remains structurally separate from budget_exceeded.",
+          "Do not modify run_failure_correlation.py in this pack."
+        ]
+      }
+    ],
+    "acceptance": [
+      "RootCause includes GOVERNED_STOP, REVIEW_REQUIRED and NON_TERMINAL.",
+      "Outcome.BLOCKED plus lifecycle=FAILED cannot fall through to execution_runtime/process_supervision.",
+      "Known governed-stop/review/non-terminal facts never emit RootCause.UNKNOWN.",
+      "Explicit authority_violation and budget_exceeded remain distinct via structured detail and are groupable by 8086.",
+      "The duplicate _validation_failure_signals branch is removed without semantic expansion.",
+      "Projection, signals and correlation production code are unchanged.",
+      "Full tests, ruff and mypy pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_run_diagnosis.py tests/test_run_failure_correlation.py -q",
+      "python -m pytest tests -q",
+      "ruff check src tests",
+      "mypy src"
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "UNKNOWN is used only for genuinely unclassified/insufficient root-cause evidence.",
+      "Governed stop, review required and non-terminal states have explicit RootCause members.",
+      "Outcome.BLOCKED is considered before lifecycle FAILED and cannot be mislabeled as process supervision without stronger contradictory evidence.",
+      "Generic outcome evidence does not fabricate an authority/approval/budget subtype.",
+      "authority_violation, approval_denied and budget_exceeded remain structurally distinguishable.",
+      "No root_cause_detail parsing becomes necessary for recovering the broad root-cause class.",
+      "Projection/signals/correlation production semantics remain untouched and all validation passes."
+    ],
+    "reject_if": [
+      "Any known governed-stop, review-required or non-terminal state still returns RootCause.UNKNOWN.",
+      "Outcome.BLOCKED plus lifecycle FAILED can return execution_runtime/process_supervision without contradictory structured evidence.",
+      "The implementation invents a specific governance subtype from outcome alone.",
+      "Free-form logs, producer identity or root_cause_detail string parsing becomes authoritative classification evidence.",
+      "run_failure_correlation.py, projection.py or signals.py is modified.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}
