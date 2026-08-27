@@ -1,0 +1,170 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-diagnosis-repair",
+    "id": "8089.expose-run-failure-correlation-production-path",
+    "sequence": 8089,
+    "slug": "expose-run-failure-correlation-production-path",
+    "title": "Expose run failure correlation production path",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "8086 declares production_path=true but run_failure_correlation currently has no production consumer or operator entrypoint. Add the smallest reachable CLI path over explicitly supplied run ids, using the existing stored projection/signals plus diagnose_run, then correlate those diagnoses. Also lock the regressions exposed by the 8085 UNKNOWN repair: equivalent governed failures must correlate and different governed subtypes must remain separate. Do not add persistence, monitoring, history discovery or remediation.",
+    "why_now": "A capability claimed as production-reachable but only exercised by unit tests creates false green evidence. The operator must be able to invoke correlation without introducing a new service or runtime subsystem.",
+    "do_not_misread": [
+      "The command may consume multiple explicitly supplied run ids; it must not discover history automatically.",
+      "This is a read-only operator surface, not monitoring or retry orchestration.",
+      "Do not redesign the correlation algorithm just because diagnosis semantics changed in 8088.",
+      "Do not persist correlation results."
+    ],
+    "red_lines": [
+      "No database schema changes.",
+      "No background jobs, cron, polling or history crawler.",
+      "No automatic retry or runtime repair.",
+      "No free-form text similarity.",
+      "No ACCEPT or governance bypass path."
+    ]
+  },
+  "machine_core": {
+    "goal": "Make bounded run failure correlation genuinely production-reachable through the existing CLI and prove structured governed failures are correlated without UNKNOWN collapse.",
+    "files": {
+      "allow": [
+        "src/ailuros/cli.py",
+        "src/ailuros/run_failure_correlation.py",
+        "tests/test_cli.py",
+        "tests/test_run_failure_correlation.py",
+        "docs/contracts/run-failure-correlation-v1.md"
+      ],
+      "create": [],
+      "forbid": [
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/run_diagnosis.py",
+        "src/ailuros/storage/**",
+        "fixtures/**",
+        ".everrun/**",
+        "lockfiles"
+      ]
+    },
+    "red_lines": [
+      "Correlation input must be exactly the finite run ids supplied by the caller.",
+      "Do not scan storage for recent/related runs.",
+      "Do not parse root_cause_detail prose or note text as a substitute for structured RootCause.",
+      "Do not broaden runtime escalation beyond repeated runtime/process-supervision groups already defined by 8086."
+    ],
+    "invariants": [
+      "The CLI invokes existing projection/signals -> diagnose_run -> correlate_run_failures semantics instead of reimplementing them.",
+      "Two equivalent budget_exceeded diagnoses produce a recurrent structured group rather than UNPROVEN.",
+      "authority_violation and budget_exceeded remain separate signatures even when both are governed stops.",
+      "Correlation remains bounded, advisory and read-only.",
+      "No storage discovery, durable correlation memory or automatic remediation is introduced."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "explicit finite list of stored run ids"},
+        "consumer": {"component": "Ailuros run-failure-correlation CLI", "production_path": true},
+        "observable_effect": {
+          "kind": "operator_reachability",
+          "assertion": "An operator can invoke repeated-failure correlation for explicitly supplied runs and receive deterministic json/md output without test-only APIs, history discovery or mutation."
+        },
+        "proofs": [
+          {"layer": "reachability", "gate": "hard", "assertion": "A CLI invocation with at least two explicit run ids loads their stored projection/signals, diagnoses each run and renders correlate_run_failures output."},
+          {"layer": "boundedness", "gate": "hard", "assertion": "The command does not enumerate or discover any run not explicitly supplied."},
+          {"layer": "governed_recurrence", "gate": "hard", "assertion": "Two equivalent budget_exceeded diagnoses produce recurrence=RECURRENT with one structured group and are not placed in unproven_run_ids."},
+          {"layer": "cross_class", "gate": "hard", "assertion": "authority_violation plus budget_exceeded produces separate groups and is not escalated merely because both are GOVERNED_STOP."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "A missing run, missing projection or corrupt stored evidence must fail the command clearly using existing CLI error conventions.",
+      "A single supplied run remains a valid bounded input if current correlation API permits it; it must not be reported as recurrence.",
+      "If a diagnosis truly remains UNKNOWN and incomplete, keep recurrence unproven rather than fabricating a match."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Add the smallest CLI entrypoint",
+        "details": [
+          "Add one command such as correlate-failures that accepts repeated RUN_ID arguments/options and --format json|md.",
+          "Reuse open_storage, ExecutionProjection, GovernanceSignal, diagnose_run and existing correlation renderers.",
+          "Do not add a new service, API route or storage table."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Preserve existing correlation semantics",
+        "details": [
+          "Avoid broad algorithm changes; 8088 should make governed diagnoses structurally groupable without special-case parsing.",
+          "Only change run_failure_correlation.py if a focused bug remains after 8088 and the new regression proves it.",
+          "Keep _RUNTIME_CAUSES limited to explicit runtime/process-supervision classes."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Lock operator reachability",
+        "details": [
+          "Add CLI tests covering json output and explicit finite input.",
+          "Prove an omitted/nonexistent run fails rather than being silently ignored.",
+          "Prove no automatic run discovery occurs."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Lock governed recurrence regressions",
+        "details": [
+          "Add tests for two budget_exceeded diagnoses and for authority_violation versus budget_exceeded.",
+          "Assert grouping uses RootCause plus structured detail and never diagnosis prose."
+        ]
+      }
+    ],
+    "acceptance": [
+      "A production CLI command can invoke run failure correlation for explicitly supplied runs.",
+      "The command renders deterministic json or markdown using existing correlation renderers.",
+      "Two budget_exceeded failures are structurally recurrent rather than unproven.",
+      "authority_violation and budget_exceeded remain separate failure signatures.",
+      "No run discovery, persistence, background monitoring or automatic remediation is added.",
+      "Full tests, ruff and mypy pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_run_failure_correlation.py tests/test_cli.py -q",
+      "python -m pytest tests -q",
+      "ruff check src tests",
+      "mypy src"
+    ]
+  },
+  "judge": {
+    "must_check": [
+      "8086 is reachable from a real CLI/operator path rather than only library tests.",
+      "The CLI consumes exactly caller-supplied run ids and does not discover history.",
+      "The command reuses existing diagnosis/correlation functions instead of duplicating semantics.",
+      "Equivalent governed failures correlate after 8088 while different governed subtypes remain separate.",
+      "Runtime escalation remains limited to repeated runtime/process-supervision failures.",
+      "No persistence, monitoring, mutation or ACCEPT path is introduced.",
+      "All validation commands pass."
+    ],
+    "reject_if": [
+      "production_path is satisfied only by adding another test or unused wrapper.",
+      "The command scans storage/repository history to discover runs.",
+      "Free-form diagnosis prose or log text determines recurrence.",
+      "Different governed-stop details are collapsed into one recurrence solely because RootCause is GOVERNED_STOP.",
+      "A new database table, daemon, background worker, REST service or automatic retry path is added.",
+      "run_diagnosis.py, projection.py or signals.py is modified.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "evidence_matrix_requested_from_coder": true
+}
