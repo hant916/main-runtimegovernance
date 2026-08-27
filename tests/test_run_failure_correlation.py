@@ -97,10 +97,10 @@ def _unproven_cause_diagnosis(run_id: str) -> RunDiagnosis:
         run_id=run_id,
         incomplete=IncompleteWork.RUN_FAILED,
         root_cause=RootCause.UNKNOWN,
-        root_cause_detail="approval_denied",
+        root_cause_detail="unknown",
         risk="medium",
         next_action=NextAction.HUMAN_REVIEW,
-        next_action_note="Respect the denial; route to human review.",
+        next_action_note="Insufficient structured evidence to prove a class.",
         evidence_refs=[],
     )
 
@@ -385,3 +385,78 @@ class TestCorrelationInputShape:
         assert correlation.retry_safety == RetrySafety.UNSAFE
         assert correlation.recommendation == NextAction.REPAIR_RUNTIME
         assert correlation.run_ids == ["run-a", "run-b"]
+
+
+def _governed_stop_diagnosis(
+    run_id: str,
+    detail: str,
+    *,
+    risk: str = "high",
+    next_action: NextAction = NextAction.STOP,
+) -> RunDiagnosis:
+    return RunDiagnosis(
+        run_id=run_id,
+        incomplete=IncompleteWork.BLOCKED_OR_REVIEW,
+        root_cause=RootCause.GOVERNED_STOP,
+        root_cause_detail=detail,
+        risk=risk,
+        next_action=next_action,
+        next_action_note="Run stopped by governance.",
+        evidence_refs=[],
+    )
+
+
+class TestGovernedStopCorrelation:
+    def test_two_budget_exceeded_diagnoses_group_as_recurrent(self) -> None:
+        diagnoses = [
+            _governed_stop_diagnosis("run-1", "budget_exceeded"),
+            _governed_stop_diagnosis("run-2", "budget_exceeded"),
+        ]
+        correlation = correlate_run_failures(diagnoses)
+        assert correlation.recurrence == RecurrenceState.RECURRENT
+        assert len(correlation.groups) == 1
+        group = correlation.groups[0]
+        assert group.count == 2
+        assert group.signature.root_cause == RootCause.GOVERNED_STOP
+        assert group.signature.root_cause_detail == "budget_exceeded"
+        assert group.signature.root_cause != RootCause.UNKNOWN
+
+    def test_governed_grouping_ignores_diagnosis_prose(self) -> None:
+        first = _governed_stop_diagnosis("run-1", "budget_exceeded")
+        second = _governed_stop_diagnosis("run-2", "budget_exceeded").model_copy(
+            update={
+                "next_action_note": "Unrelated prose must not alter structured grouping."
+            }
+        )
+        correlation = correlate_run_failures([first, second])
+        assert correlation.recurrence == RecurrenceState.RECURRENT
+        assert correlation.groups[0].signature.root_cause == RootCause.GOVERNED_STOP
+        assert correlation.groups[0].signature.root_cause_detail == "budget_exceeded"
+        assert correlation.groups[0].count == 2
+
+    def test_authority_violation_stays_structurally_separate(self) -> None:
+        diagnoses = [
+            _governed_stop_diagnosis("run-1", "budget_exceeded"),
+            _governed_stop_diagnosis("run-2", "authority_violation"),
+        ]
+        correlation = correlate_run_failures(diagnoses)
+        assert correlation.recurrence == RecurrenceState.SINGLE
+        assert len(correlation.groups) == 2
+        assert {g.signature.root_cause_detail for g in correlation.groups} == {
+            "budget_exceeded",
+            "authority_violation",
+        }
+        assert all(g.signature.root_cause == RootCause.GOVERNED_STOP for g in correlation.groups)
+
+    def test_governed_stop_never_matches_unknown_unproven(self) -> None:
+        diagnoses = [
+            _governed_stop_diagnosis("run-1", "budget_exceeded"),
+            _unproven_cause_diagnosis("run-2"),
+        ]
+        correlation = correlate_run_failures(diagnoses)
+        assert correlation.recurrence == RecurrenceState.UNPROVEN
+        assert correlation.unproven_run_ids == ["run-2"]
+        group = correlation.groups[0]
+        assert group.signature.root_cause == RootCause.GOVERNED_STOP
+        assert group.signature.root_cause_detail == "budget_exceeded"
+        assert group.count == 1

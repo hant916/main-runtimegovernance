@@ -114,6 +114,22 @@ structured failures at a named layer*.
 - Human: `render_correlation_markdown(correlation)` — recurrence table plus the
   failure-signature groups and advisory note.
 
+## Operator entrypoint
+
+`correlate-failures` (`src/ailuros/cli.py`) is the production-reachable CLI path.
+It accepts a finite list of `RUN_ID` arguments plus `--format json|md`, projects
+each supplied run to a canonical diagnosis via `diagnose_run`, and correlates the
+diagnoses with `correlate_run_failures`. Correlation input is exactly the run ids
+supplied on the command line:
+
+- No run discovery. The command reads only the named runs' stored projection and
+  signals; it never scans storage for recent or related runs.
+- Fail loud. An omitted argument or a nonexistent run id fails the command
+  instead of being silently ignored.
+- No new surface. It reuses `open_storage`, `ExecutionProjection`,
+  `GovernanceSignal`, `diagnose_run`, and the existing correlation renderers; no
+  new service, API route, or storage table is introduced.
+
 ## Example
 
 Two process-supervision failures with equivalent `unknown` sub-cause across

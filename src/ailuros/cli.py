@@ -407,6 +407,104 @@ def diagnose(
     typer.echo(rendered)
 
 
+@app.command("correlate-failures")
+def correlate_failures(
+    run_ids: Annotated[
+        list[str],
+        typer.Argument(
+            help=(
+                "Finite run ids to correlate. Correlation consumes exactly the "
+                "supplied runs; no storage scan discovers related runs."
+            ),
+        ),
+    ],
+    format: Annotated[
+        ReportFormat,
+        typer.Option("--format", "-f", help="Output format: json or md."),
+    ] = ReportFormat.json,
+    rebuild: Annotated[
+        bool,
+        typer.Option(
+            "--rebuild",
+            help="Rebuild each run's projection before diagnosing and correlating.",
+        ),
+    ] = False,
+) -> None:
+    """Correlate bounded run failures across a caller-supplied finite run set.
+
+    Each supplied run id is projected to a canonical diagnosis via ``diagnose_run``
+    and the diagnoses are correlated with ``correlate_run_failures``. The input is
+    exactly the run ids supplied: no history scan discovers related runs, and an
+    omitted or nonexistent run fails rather than being silently dropped. The result
+    is advisory and read-only; it never returns ``accept`` or mutates runtime state.
+    """
+    from ailuros.core.execution import ExecutionProjection
+    from ailuros.projection import rebuild_projections_and_signals
+    from ailuros.run_diagnosis import RunDiagnosis, diagnose_run
+    from ailuros.run_failure_correlation import (
+        correlate_run_failures,
+        render_correlation_json,
+        render_correlation_markdown,
+    )
+    from ailuros.signals import GovernanceSignal
+
+    if not run_ids:
+        typer.echo("at least one RUN_ID is required", err=True)
+        raise typer.Exit(1)
+
+    try:
+        storage = open_storage()
+    except typer.BadParameter as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    diagnoses: list[RunDiagnosis] = []
+    for run_id in run_ids:
+        try:
+            storage.get_run(run_id)
+        except (AilurosNotFoundError, typer.BadParameter) as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(1) from exc
+
+        if rebuild:
+            try:
+                rebuild_projections_and_signals(storage, run_id)
+            except (AilurosNotFoundError, AilurosDataCorruptionError) as exc:
+                typer.echo(str(exc), err=True)
+                raise typer.Exit(1) from exc
+
+        stored = storage.get_projection(run_id)
+        if stored is None:
+            typer.echo(
+                f"No projection found for run {run_id}. "
+                "Rebuild it with --rebuild or run the projection step separately.",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        projection = ExecutionProjection.model_validate(stored["projection"])
+
+        signal_dicts = storage.get_signals(run_id)
+        signal_rule_version = (
+            signal_dicts[0].get("rule_version", "1.0.0") if signal_dicts else "1.0.0"
+        )
+        signals = [
+            GovernanceSignal.model_validate({**s, "rule_version": signal_rule_version})
+            for s in signal_dicts
+        ]
+
+        diagnoses.append(diagnose_run(projection, signals))
+
+    correlation = correlate_run_failures(diagnoses)
+
+    if format == ReportFormat.md:
+        rendered = render_correlation_markdown(correlation)
+    else:
+        rendered = render_correlation_json(correlation)
+
+    typer.echo(rendered)
+
+
 @app.command("evidence-audit")
 def evidence_audit(
     package_path: Path,
