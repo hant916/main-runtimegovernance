@@ -12,10 +12,36 @@ runtime into the Ailuros governance timeline. It encodes no EverRun-specific
 fields, no framework-specific core taxonomy, and no central closed enum for
 runtime-specific evidence types.
 
-The package is designed to be the **portable unit of evidence exchange** between
-a runtime producer and Ailuros governance consumers. It supports post-run
-validation, timeline projection, and deterministic identity without requiring
-the producer to adopt Ailuros internal abstractions.
+Today the package serves as the **current post-run ingestion bridge** between a
+runtime producer and Ailuros governance consumers. It is the proven contract
+that carries a completed run's evidence into Ailuros for dogfood, post-run
+validation, timeline projection, and deterministic identity, without requiring
+the producer to adopt Ailuros internal abstractions. "Canonical" and "portable"
+in this contract are scoped to this internal Ailuros ingestion bridge; this
+contract is not an industry evidence interchange or attestation standard. The
+target integration path is runtime-native governance evidence flow; see
+Lifecycle below.
+
+## Lifecycle
+
+**Status:** Accepted — the post-run bridge is live and remains the current
+integration contract for EverRun and other source-neutral producers.
+
+The evidence package v1 is a **transitional post-run bridge**, not the
+destination Ailuros product and not a universal or industry evidence standard
+(see [ADR-0006](../decisions/ADR-0006-transitional-post-run-evidence-bridge.md)).
+
+- **Current role:** post-run ingestion into Ailuros for dogfood and governance
+  validation. The package is post-run and non-enforcing.
+- **Target integration path:** runtime-native governance evidence flow, where
+  equivalent evidence is consumed directly at runtime governance boundaries.
+- **Retirement trigger:** once runtime-native evidence is proven and the bridge's
+  compatibility needs have ended, new product work MUST NOT depend on this
+  bridge and it may be retired after that compatibility gate is met.
+
+Until then the wire shape, required fields, validation rules, naming rules,
+provenance rules, and deterministic identity defined below are unchanged and
+remain valid for existing producers, readers, writers, and validators.
 
 ## Package Envelope
 
@@ -263,3 +289,7 @@ itself remains valid unless other contract violations exist.
   semantics — those are separate governance layers.
 - Provenance fields are **optional advisory metadata**, not required dimensions
   for every runtime.
+- This contract does **not** claim to own or set an industry portable evidence
+  or attestation standard (e.g. TRACE, SCITT, or vendor-specific interchange).
+  External attestation/interchange standards are outside this contract's
+  ownership (see [ADR-0006](../decisions/ADR-0006-transitional-post-run-evidence-bridge.md)).

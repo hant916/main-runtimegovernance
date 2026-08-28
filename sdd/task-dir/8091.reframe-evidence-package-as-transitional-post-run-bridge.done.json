@@ -161,7 +161,8 @@
       "python -m pytest tests/test_runtime_evidence_contract_v1.py tests/test_evidence_package_contract_validator.py -q",
       "git diff --check"
     ],
-    "evidence_matrix_required": true
+    "evidence_matrix_required": true,
+    "tasks": []
   },
   "judge": {
     "must_check": [
@@ -186,5 +187,12 @@
     "max_attempts": 2,
     "on_max_attempts": "stop_and_keep_todo"
   },
-  "evidence_matrix_requested_from_coder": true
+  "evidence_matrix_requested_from_coder": true,
+  "execution_history": {
+    "attempt_reserved": true,
+    "attempts": 1,
+    "last_attempt_at": "2026-08-28T11:16:19Z",
+    "last_result": "in_progress",
+    "last_summary": "iteration=1 coder dispatched; outcome not yet recorded"
+  }
 }

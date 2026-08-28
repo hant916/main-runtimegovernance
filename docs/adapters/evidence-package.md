@@ -5,6 +5,13 @@ package** and reports a post-run governance decision. It is source-neutral: it
 reads a generic manifest + timeline contract and encodes no producer-specific
 semantics.
 
+It is the current **transitional post-run bridge** into Ailuros, not a generic
+adapter framework or an industry evidence standard. The target integration path
+is runtime-native governance evidence flow. This adapter remains supported for
+current producer compatibility and dogfood until equivalent runtime-native
+evidence is available and bridge compatibility needs end; see
+[ADR-0006](../decisions/ADR-0006-transitional-post-run-evidence-bridge.md).
+
 This is **post-run governance validation before HTTP ingestion and runtime
 decision APIs.** It inspects evidence after a run has finished; it performs no
 runtime allow/review/block control.

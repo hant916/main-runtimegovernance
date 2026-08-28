@@ -10,6 +10,12 @@ This contract defines **v1.5 post-run governance**: a minimal, source-neutral
 audit that consumes a completed run's canonical evidence package and produces a
 single pass/warn/fail decision describing the quality of the captured evidence.
 
+The Evidence Package is the current **transitional post-run ingestion bridge**
+for this audit. It remains accepted and compatible for existing producers while
+runtime-native governance evidence is proven. It is not the destination product
+or a universal evidence interchange standard; see
+[ADR-0006](../decisions/ADR-0006-transitional-post-run-evidence-bridge.md).
+
 v1.5 is **post-run validation, not runtime governance.** It runs *after* a run
 has finished and only inspects the evidence the run left behind. It never sees,
 intercepts, or controls live execution.
@@ -25,6 +31,8 @@ The audit deliberately has no runtime control surface:
 
 The output is an after-the-fact judgement, equivalent to a lint result for an
 evidence package. Acting on the decision (if at all) is left to the caller.
+It remains useful for dogfood and migration scaffolding until equivalent
+evidence is available at a runtime governance boundary.
 
 ## Decision Semantics
 

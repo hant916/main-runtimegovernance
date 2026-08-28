@@ -1,9 +1,13 @@
 # EverRun Dogfood Data Flow
 
 EverRun is a reference application and proof path for automated agent-run
-governance. This document describes the data flow from EverRun execution through
-Ailuros governance interpretation to Console presentation, for the MVP dogfood
-phase.
+governance. This document describes the current post-run data flow from EverRun
+execution through Ailuros governance interpretation to Console presentation.
+The Evidence Package is a transitional, source-neutral ingestion bridge: it
+remains the supported compatibility path while equivalent evidence is proven at
+runtime governance boundaries. It is not the destination runtime integration
+model; see
+[ADR-0006](../decisions/ADR-0006-transitional-post-run-evidence-bridge.md).
 
 ## Ownership Model
 
@@ -36,10 +40,12 @@ Levels 3–5 are rebuildable. Given the same raw package, re-running the Ailuros
 pipeline produces identical governance signals. Console re-rendering from those
 signals produces identical reports.
 
-## MVP Flow
+## Current Post-Run Bridge
 
-The MVP phase implements post-run import only. Realtime event ingestion and
-distributed platform infrastructure are deferred.
+The current dogfood phase implements post-run import only. Realtime event
+ingestion and distributed platform infrastructure are deferred. New product work
+must not depend on this bridge once equivalent evidence is consumed directly at
+runtime governance boundaries and the remaining compatibility needs have ended.
 
 ### Implemented (MVP)
 
@@ -74,7 +80,7 @@ EverRun Run Completes
 5. Console renders the signal as a report with problems and evidence drill-down
    links.
 
-### Deferred (Not in MVP)
+### Deferred (Not in the Current Bridge)
 
 | Feature | Reason |
 |---|---|
@@ -128,5 +134,6 @@ applies. Specifically for EverRun:
 - [Product Line Thesis](../strategy/product-line-thesis.md)
 - [Phase 1 Dogfood](../strategy/phase1-dogfood.md)
 - [Evidence Package Post-Run Governance Contract v1.5](../contracts/evidence-package-post-run-governance-v15.md)
+- [ADR-0006: Transitional Post-Run Evidence Bridge](../decisions/ADR-0006-transitional-post-run-evidence-bridge.md)
 - [Phase 1 Evidence-Only Contract](../contracts/phase1-evidence-only-contract.md)
 - [Clarify Reference Architecture](clarify-reference-architecture.md)
