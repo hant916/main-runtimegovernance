@@ -12,7 +12,10 @@
   },
   "scheduling": {
     "status_source_of_truth": "filename_suffix",
-    "allowed_suffixes": ["todo", "done"],
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
     "on_success": "rename_todo_to_done",
     "on_failure": "keep_todo"
   },
@@ -78,18 +81,43 @@
       {
         "id": "CV1",
         "kind": "convergence",
-        "producer": {"artifact": "canonical timeline events including external_evidence wrappers"},
-        "consumer": {"component": "shared evidence normalization for projection and conformance", "production_path": true},
+        "producer": {
+          "artifact": "canonical timeline events including external_evidence wrappers"
+        },
+        "consumer": {
+          "component": "shared evidence normalization for projection and conformance",
+          "production_path": true
+        },
         "observable_effect": {
           "kind": "cross_capability_consistency",
           "assertion": "Projection and evidence conformance observe the same normalized canonical event type/payload for valid external_evidence wrappers, eliminating false missing-evidence reports."
         },
         "proofs": [
-          {"layer": "authority", "gate": "hard", "assertion": "Wrapped authority_evidence with non-empty actor makes authority conformance evaluable and projects the same authority evidence as the unwrapped form."},
-          {"layer": "approval", "gate": "hard", "assertion": "Wrapped approval_evidence with subject is interpreted the same as the unwrapped form."},
-          {"layer": "budget", "gate": "hard", "assertion": "Wrapped budget_evidence with subject/unit is interpreted the same as the unwrapped form."},
-          {"layer": "negative", "gate": "hard", "assertion": "Malformed wrapper payloads remain uninterpreted and do not satisfy capability evidence requirements."},
-          {"layer": "neutrality", "gate": "hard", "assertion": "Source/producer relabeling does not change normalized interpretation."}
+          {
+            "layer": "authority",
+            "gate": "hard",
+            "assertion": "Wrapped authority_evidence with non-empty actor makes authority conformance evaluable and projects the same authority evidence as the unwrapped form."
+          },
+          {
+            "layer": "approval",
+            "gate": "hard",
+            "assertion": "Wrapped approval_evidence with subject is interpreted the same as the unwrapped form."
+          },
+          {
+            "layer": "budget",
+            "gate": "hard",
+            "assertion": "Wrapped budget_evidence with subject/unit is interpreted the same as the unwrapped form."
+          },
+          {
+            "layer": "negative",
+            "gate": "hard",
+            "assertion": "Malformed wrapper payloads remain uninterpreted and do not satisfy capability evidence requirements."
+          },
+          {
+            "layer": "neutrality",
+            "gate": "hard",
+            "assertion": "Source/producer relabeling does not change normalized interpretation."
+          }
         ]
       }
     ],
@@ -149,7 +177,8 @@
       "python -m pytest tests -q",
       "ruff check src tests",
       "mypy src"
-    ]
+    ],
+    "tasks": []
   },
   "judge": {
     "must_check": [
@@ -174,5 +203,12 @@
     "max_attempts": 2,
     "on_max_attempts": "stop_and_keep_todo"
   },
-  "evidence_matrix_requested_from_coder": true
+  "evidence_matrix_requested_from_coder": true,
+  "execution_history": {
+    "attempt_reserved": false,
+    "attempts": 1,
+    "last_attempt_at": "2026-08-28T11:15:19Z",
+    "last_result": "unresolved",
+    "last_summary": "iteration=1 validation=not_run changed_files=4 diff_chars=12355 risks=scope_contamination_validation_suppressed, tests_not_run"
+  }
 }

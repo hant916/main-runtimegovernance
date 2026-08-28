@@ -508,3 +508,74 @@ def test_cli_markdown_output() -> None:
     )
     assert result.exit_code == 0
     assert "| approval | missing_evidence |" in result.stdout
+
+
+def _wrap(event: dict) -> dict:
+    """Represent a canonical event as an ``external_evidence`` wrapper."""
+    wrapper = {
+        "event_type": event["event_type"],
+        "payload": event.get("payload", {}),
+        "metadata": event.get("metadata", {}),
+    }
+    if event.get("scope_ref"):
+        wrapper["scope_ref"] = event["scope_ref"]
+    return {
+        "event_id": event.get("event_id", ""),
+        "event_type": "external_evidence",
+        "timestamp": event.get("timestamp", "2026-08-25T00:00:00+00:00"),
+        "payload": wrapper,
+    }
+
+
+def _make_wrapped_package(
+    tmp_path: Path,
+    *,
+    run_id: str = "run-wrapped-001",
+    source: str = "unit-producer",
+) -> Path:
+    """Build a valid package with its canonical events stored as wrappers."""
+    unwrapped_pkg = _make_package(tmp_path / "unwrapped", run_id=run_id, source=source)
+    raw_timeline = json.loads(
+        (unwrapped_pkg / "timeline.json").read_text(encoding="utf-8")
+    )
+    raw_timeline["events"] = [_wrap(event) for event in raw_timeline["events"]]
+    package_dir = tmp_path / "wrapped"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    _write_json(package_dir / "manifest.json", _make_manifest(run_id, source))
+    _write_json(package_dir / "timeline.json", raw_timeline)
+    return package_dir
+
+
+def test_wrapped_and_unwrapped_packages_agree_on_evaluability(tmp_path: Path) -> None:
+    unwrapped = _make_package(tmp_path / "unwrapped")
+    wrapped = _make_wrapped_package(tmp_path / "wrapped")
+
+    unwrapped_statuses = _statuses(evaluate_evidence_conformance(unwrapped))
+    wrapped_statuses = _statuses(evaluate_evidence_conformance(wrapped))
+
+    assert unwrapped_statuses == ALL_EVALUABLE
+    assert wrapped_statuses == unwrapped_statuses
+    for capability in ("authority", "approval", "budget"):
+        assert wrapped_statuses[capability] == "evaluable"
+
+
+def test_malformed_external_wrapper_produces_no_synthetic_evidence() -> None:
+    malformed = [
+        {
+            "event_id": "evt-malformed",
+            "event_type": "external_evidence",
+            "timestamp": "2026-08-25T00:00:00+00:00",
+            "payload": {"event_type": "authority_evidence", "payload": []},
+        },
+        {
+            "event_id": "evt-missing-type",
+            "event_type": "external_evidence",
+            "timestamp": "2026-08-25T00:00:00+00:00",
+            "payload": {"payload": {}},
+        },
+    ]
+
+    for capability in ("authority", "approval", "budget"):
+        result = evaluate_capability(malformed, capability)
+        assert result.status == CapabilityStatus.MISSING_EVIDENCE
+        assert result.missing_evidence

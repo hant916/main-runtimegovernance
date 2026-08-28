@@ -23,6 +23,7 @@ from ailuros.core.execution import (
     Scope,
     Validation,
 )
+from ailuros.evidence_normalization import normalize_external_evidence_event
 
 if TYPE_CHECKING:
     from ailuros.signals import GovernanceSignal
@@ -42,31 +43,6 @@ _VALIDATION_AGGREGATION_PRIORITY: dict[str, int] = {
 }
 
 _AUDIT_DECISIONS: frozenset[str] = frozenset({"pass", "warn", "fail"})
-
-
-def _normalize_external_evidence_event(event: dict[str, Any]) -> dict[str, Any]:
-    """Return a projection-only view of a valid external evidence wrapper."""
-    if event.get("event_type") != "external_evidence":
-        return event
-
-    wrapper = event.get("payload")
-    if not isinstance(wrapper, dict):
-        return event
-
-    event_type = wrapper.get("event_type")
-    payload = wrapper.get("payload")
-    if not isinstance(event_type, str) or not event_type or not isinstance(payload, dict):
-        return event
-
-    normalized = event.copy()
-    normalized["event_type"] = event_type
-    normalized["payload"] = payload
-    metadata = wrapper.get("metadata")
-    normalized["metadata"] = metadata if isinstance(metadata, dict) else {}
-    scope_ref = wrapper.get("scope_ref")
-    if isinstance(scope_ref, str) and scope_ref:
-        normalized["scope_ref"] = scope_ref
-    return normalized
 
 
 def _project_decision_domain(payload: dict[str, Any], decision: str) -> str:
@@ -377,7 +353,7 @@ def build_execution_projection(
     *,
     schema_version: str = "1.0",
 ) -> ExecutionProjection:
-    projection_events = [_normalize_external_evidence_event(event) for event in events]
+    projection_events = [normalize_external_evidence_event(event) for event in events]
     started_at: datetime | None = None
     completed_at: datetime | None = None
     lifecycle = Lifecycle.UNKNOWN

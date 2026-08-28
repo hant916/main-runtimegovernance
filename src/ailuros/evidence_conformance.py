@@ -25,6 +25,7 @@ from ailuros._compat import StrEnum
 from ailuros.adapters.evidence_package.validator import (
     validate_evidence_package_contract,
 )
+from ailuros.evidence_normalization import normalize_external_evidence_event
 
 
 class CapabilityStatus(StrEnum):
@@ -181,7 +182,8 @@ def _events_from_timeline(package_dir: str | Path) -> list[dict[str, Any]]:
     events = raw.get("events")
     if not isinstance(events, list):
         return []
-    return [event for event in events if isinstance(event, dict)]
+    raw_events = [event for event in events if isinstance(event, dict)]
+    return [normalize_external_evidence_event(event) for event in raw_events]
 
 
 def _evidence_present(events: list[dict[str, Any]], evidence_id: str) -> bool:
