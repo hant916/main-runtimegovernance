@@ -31,6 +31,39 @@ another harness). Ailuros provides governance/control-plane semantics plus
 optional enforcement points; it is not an agent orchestrator. See
 ADR-0005 for the frozen control-context boundary.
 
+## Runtime-Governance Scalpel
+
+Ailuros is a narrow runtime governance decision/control kernel, not a generic
+AI-governance platform. A proposed core capability belongs here only when it
+materially improves a proven runtime decision or control boundary. Otherwise it
+belongs in a runtime/harness, remains a post-run diagnostic, or stays outside
+the product.
+
+Post-run evidence may graduate into runtime control only when all of these are
+proven:
+
+1. Repeated production evidence shows a material risk or business need.
+2. The required evidence is available before the affected action.
+3. The decision semantics are deterministic enough to evaluate, including a
+   conservative distinction between unknown and violation.
+4. A justified, enforceable intervention point exists.
+5. The expected risk or business value warrants the intervention.
+
+Capabilities that fail any criterion remain post-run evidence/diagnostics; a
+finding never becomes a runtime gate automatically. When justified, control is
+selective and preserves business flow with precise `allow`, `guide`,
+`constrain`, `escalate`, or `block` semantics rather than maximum blocking.
+
+The following are outside Ailuros core: generic asset registries and metadata
+catalogs, lineage platforms, compliance dashboards or checklists, generic
+attestation/cryptographic infrastructure, and connector or plugin zoos.
+Authenticity, integrity, or attestation can be context for a governance
+decision, but never proves authority or permission by itself.
+
+An external format or context integration requires a concrete producer and
+consumer need. Implement that concrete seam first; generalize only after a
+second proven case demonstrates a shared abstraction.
+
 ## Forbidden Coupling
 
 The following are **never** allowed in `src/ailuros/`:

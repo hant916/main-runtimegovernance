@@ -30,6 +30,32 @@ independent products of their own (ADR-0005).
 The control-context fields `principal_ref`, `workflow_ref`, and `invocation_ref`
 are opaque provenance/control references, not auth, session, or IAM primitives.
 
+## Product Selection Rule
+
+The product test is simple: if a capability does not materially improve a
+proven runtime governance decision or control boundary, it is probably not
+Ailuros core. Ailuros owns explainable governance decisions, policy/authority
+evaluation, and justified enforcement points; execution orchestration remains
+with harnesses such as EverRun.
+
+Post-run findings are evidence, not automatic runtime gates. They graduate only
+with repeated production evidence, pre-action evidence availability,
+deterministic/evaluable semantics, an enforceable intervention point, and
+material risk or business value. This keeps runtime behavior proportionate:
+allow, guide, constrain, escalate, or block only when evidence and policy
+justify it.
+
+Accordingly, generic registries, asset/metadata catalogs, lineage graphs,
+compliance dashboards/checklists, cryptographic attestation infrastructure, and
+speculative connector frameworks are not Ailuros core. External systems may
+supply context or proof, but integrity or authenticity is never authority or
+permission. A format or context adapter begins only with a concrete
+producer/consumer need and should remain concrete until repeated evidence
+justifies generalization.
+
+See [ADR-0007](../decisions/ADR-0007-runtime-governance-scalpel-boundary.md)
+for the durable boundary and graduation rule.
+
 ## Three Proofs
 
 The following are **reference applications or proof paths** that consume Ailuros but
