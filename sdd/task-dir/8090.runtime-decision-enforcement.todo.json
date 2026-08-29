@@ -1,0 +1,57 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-governance-core",
+    "id": "8090.runtime-decision-enforcement",
+    "sequence": 8090,
+    "slug": "runtime-decision-enforcement",
+    "title": "Make runtime governance decisions executable rather than observational",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {"status_source_of_truth": "filename_suffix", "allowed_suffixes": ["todo", "done"], "on_success": "rename_todo_to_done", "on_failure": "keep_todo"},
+  "human_pressure": {
+    "one_screen_brief": "Move Ailuros one step from post-run explanation toward real runtime governance. Using the existing runtime/policy-gate/wrapped-tool path, prove every consequential tool/action request receives an explicit governance decision before execution. ALLOW executes once, BLOCK executes zero times, and review/authority-required executes zero times until separately resolved. Record truthful timeline evidence for every branch. Do not build orchestration infrastructure.",
+    "why_now": "Ailuros already records runs, policy decisions, evidence, replay and audit. The product boundary now needs an executable pre-action gate rather than another diagnostic surface.",
+    "do_not_misread": ["Reuse existing decision names/states when equivalent semantics already exist.", "This pack does not add an authority workflow UI or scheduler."],
+    "red_lines": ["No dashboard, server write API, MCP Gateway, scheduler, agent orchestrator, adapter marketplace, workflow engine or new database.", "Replay stays read-only and audit must not recompute policy."]
+  },
+  "machine_core": {
+    "goal": "Establish one canonical pre-execution governance path where execution is impossible until the existing policy/runtime boundary has produced an explicit decision.",
+    "invariants": [
+      "BLOCK invokes the tool zero times.",
+      "Review/authority-required invokes the tool zero times before separate authorization/review resolution.",
+      "ALLOW invokes the tool exactly once.",
+      "Execution never precedes its governance decision.",
+      "Timeline evidence represents decision and execution/non-execution truthfully.",
+      "Replay remains read-only and audit remains evidence-reading rather than policy recomputation."
+    ],
+    "contracts": [
+      {"id": "RUNTIME-ENFORCEMENT", "kind": "runtime_gate", "producer": {"component": "existing Ailuros policy/runtime decision path"}, "consumer": {"component": "wrapped consequential tool/action invocation", "production_path": true}, "observable_effect": {"kind": "runtime_behavior", "assertion": "Execution occurs exactly once only for an explicit allow-equivalent decision; deny/block and pending-review/authority decisions cause zero tool calls and produce auditable evidence."}}
+    ],
+    "failure_semantics": ["Unknown is never treated as allow.", "A policy block is not a tool execution failure.", "Pending review/authority is not success.", "An allowed tool failure remains distinct from policy denial."],
+    "complexity_budget": {"max_new_files": 2, "max_new_abstractions": 1, "prefer_modify_over_create": true, "prefer_adapt_over_rewrite": true, "forbidden_complexity": ["workflow engine", "new policy framework", "new event store", "orchestrator", "server platform"]},
+    "files": {
+      "allow": ["src/ailuros/**", "tests/**", "examples/**", "docs/**"],
+      "create": ["tests/test_runtime_decision_enforcement.py"],
+      "forbid": [".everrun/**", "sdd/task-dir/**", "*.sqlite", "runtime artifacts", "generated audit packages", "dashboard/**", "server/**"]
+    },
+    "steps": [
+      {"id": "T1", "title": "Characterize current enforcement semantics", "details": ["Locate the existing canonical wrapped-tool / before-tool-call / policy-gate path and existing decision vocabulary.", "Write deterministic regressions for allow, block and any existing review/authority-required equivalent before changing production code."]},
+      {"id": "T2", "title": "Close only the missing pre-execution gate", "details": ["Ensure the tool cannot run before the governance decision.", "Reuse existing decision and timeline primitives; add at most one narrow abstraction only if the current path lacks a clean seam."]},
+      {"id": "T3", "title": "Prove all branches", "details": ["ALLOW executes exactly once and records outcome.", "BLOCK executes zero times and records denial/non-execution.", "Pending review/authority executes zero times and records pending governance truthfully."]},
+      {"id": "T4", "title": "Protect read-only views", "details": ["Pin that replay invokes no tools and audit does not recompute policy as a side effect of this change."]}
+    ],
+    "acceptance": ["One deterministic executable test/demo proves all supported decision branches.", "No execution can occur before decision evidence exists.", "Block/pending branches execute zero tool calls.", "Allow executes exactly once.", "Existing replay/audit semantics remain unchanged.", "ruff, mypy and pytest pass."],
+    "validate": ["python -m pytest tests/test_runtime_decision_enforcement.py -q", "python -m ruff check .", "python -m mypy src", "python -m pytest tests -q"]
+  },
+  "judge": {
+    "must_check": ["The production execution path, not only a helper, is gated.", "No unknown/pending state falls through to execution.", "Timeline evidence distinguishes policy outcome from tool outcome.", "No platform/orchestration scope creep."],
+    "reject_if": ["A new workflow/orchestration framework is introduced.", "BLOCK or pending review executes a tool.", "ALLOW can execute more than once through the same request path.", "Replay invokes tools or audit recomputes policy.", "Validation fails."]
+  },
+  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "validation_notes": {"validation_profile": "focused_plus_full", "commands_are_profile_based": false, "targeted_contract_coverage": "Canonical pre-execution runtime governance decision enforcement.", "missing_targets": ["tests/test_runtime_decision_enforcement.py may be created by this pack"], "completion_needed": false, "completion_reason": null},
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations", "## Suggested next pack"]
+}
