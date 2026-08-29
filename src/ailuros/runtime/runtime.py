@@ -128,11 +128,19 @@ class AilurosRuntime:
         result: Any,
         arguments: dict[str, Any] | None = None,
         step_id: str | None = None,
+        decision_id: str | None = None,
+        error: str | None = None,
     ) -> RuntimeEvent:
         return self.record_event(
             run_id,
             RuntimeEventType.TOOL_RESULT_RECEIVED,
-            {"tool_name": tool_name, "arguments": arguments or {}, "result": result},
+            {
+                "tool_name": tool_name,
+                "arguments": arguments or {},
+                "result": result,
+                "decision_id": decision_id,
+                "error": error,
+            },
             step_id,
         )
 
@@ -204,6 +212,7 @@ class AilurosRuntime:
                 {
                     "tool_name": tool_name,
                     "decision": decision.decision.value,
+                    "decision_id": decision.decision_id,
                     "reason": decision.reason,
                 },
             )
@@ -216,13 +225,27 @@ class AilurosRuntime:
         arguments: dict[str, Any] | None = None,
         result: Any = None,
         metadata: dict[str, Any] | None = None,
+        decision_id: str | None = None,
+        error: str | None = None,
     ) -> None:
         self.record_event(
             run_id,
             RuntimeEventType.TOOL_CALL_EXECUTED,
-            {"tool_name": tool_name, "arguments": arguments or {}, "metadata": metadata or {}},
+            {
+                "tool_name": tool_name,
+                "arguments": arguments or {},
+                "metadata": metadata or {},
+                "decision_id": decision_id,
+            },
         )
-        self.record_tool_result(run_id, tool_name, result, arguments)
+        self.record_tool_result(
+            run_id,
+            tool_name,
+            result,
+            arguments,
+            decision_id=decision_id,
+            error=error,
+        )
 
     def wrap_tool(self, name: str, fn: Callable[..., Any]) -> WrappedTool:
         def wrapped(*args: Any, **kwargs: Any) -> ToolExecutionResult:
@@ -236,10 +259,24 @@ class AilurosRuntime:
             try:
                 result = fn(*args, **kwargs)
             except Exception as exc:
-                return ToolExecutionResult(
-                    blocked=False, decision=decision, error=f"{type(exc).__name__}: {exc}"
+                error = f"{type(exc).__name__}: {exc}"
+                self.after_tool_call(
+                    run_id,
+                    name,
+                    tool_arguments,
+                    decision_id=decision.decision_id,
+                    error=error,
                 )
-            self.after_tool_call(run_id, name, tool_arguments, result)
+                return ToolExecutionResult(
+                    blocked=False, decision=decision, error=error
+                )
+            self.after_tool_call(
+                run_id,
+                name,
+                tool_arguments,
+                result,
+                decision_id=decision.decision_id,
+            )
             return ToolExecutionResult(blocked=False, decision=decision, result=result)
 
         return wrapped

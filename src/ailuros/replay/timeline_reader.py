@@ -11,7 +11,7 @@ DECISION_FIELDS = {
     "decision", "allowed", "reason", "severity", "matched_policy_ids",
     "risk_level", "evidence_refs", "input_hash", "tool_name",
 }
-TOOL_FIELDS = {"tool_name", "arguments", "result"}
+TOOL_FIELDS = {"tool_name", "arguments", "result", "decision_id", "error"}
 
 
 class ReplayService:
