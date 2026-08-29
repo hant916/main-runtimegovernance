@@ -1,0 +1,56 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-governance-core",
+    "id": "8091.execution-evidence-binding",
+    "sequence": 8091,
+    "slug": "execution-evidence-binding",
+    "title": "Bind governance decisions to actual execution outcomes",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {"status_source_of_truth": "filename_suffix", "allowed_suffixes": ["todo", "done"], "on_success": "rename_todo_to_done", "on_failure": "keep_todo"},
+  "human_pressure": {
+    "one_screen_brief": "After 8090 establishes the pre-execution gate, make the evidence chain explicit and queryable: request -> governance decision -> execution or non-execution -> execution outcome. Reuse existing IDs/timeline/evidence normalization. Do not add a tracing subsystem.",
+    "why_now": "A runtime governance kernel is only useful if audit can distinguish policy denial, pending authority, successful execution and allowed-but-failed execution without inference from prose.",
+    "do_not_misread": ["Correlation is not distributed tracing.", "Do not invent another event store or persistence model."],
+    "red_lines": ["No second timeline/event store, OpenTelemetry platform work, tracing backend, workflow engine or new database.", "Do not collapse policy outcome and execution outcome into one status."]
+  },
+  "machine_core": {
+    "depends_on": ["8090.runtime-decision-enforcement"],
+    "goal": "Make every governed execution/non-execution outcome traceable to the governance decision that authorized, denied or deferred it using existing evidence primitives.",
+    "invariants": [
+      "An executed call references the decision that authorized it.",
+      "Blocked and pending calls explicitly prove that no execution occurred.",
+      "Allowed execution failure remains distinct from policy denial.",
+      "Replay/export preserve the correlation without invoking tools or recomputing policy.",
+      "Existing evidence normalization remains canonical."
+    ],
+    "contracts": [
+      {"id": "DECISION-EXECUTION-EVIDENCE", "kind": "evidence_lineage", "producer": {"component": "runtime decision + execution path"}, "consumer": {"component": "timeline/replay/audit/evidence export", "production_path": true}, "observable_effect": {"kind": "auditability", "assertion": "A stored run can deterministically distinguish request, decision, execution/non-execution and execution result using stable correlation evidence."}}
+    ],
+    "failure_semantics": ["ALLOW plus tool failure is execution_failure, not policy block.", "BLOCK is non-execution by governance decision, not tool failure.", "Pending authority/review is non-execution pending governance, not success.", "Missing correlation never defaults to success."],
+    "complexity_budget": {"max_new_files": 1, "max_new_abstractions": 1, "prefer_modify_over_create": true, "prefer_adapt_over_rewrite": true, "forbidden_complexity": ["distributed tracing", "second event store", "new persistence layer", "correlation service", "workflow engine"]},
+    "files": {
+      "allow": ["src/ailuros/**", "tests/**", "examples/**", "docs/**"],
+      "create": ["tests/test_execution_evidence_binding.py"],
+      "forbid": [".everrun/**", "sdd/task-dir/**", "*.sqlite", "runtime artifacts", "generated audit packages"]
+    },
+    "steps": [
+      {"id": "T1", "title": "Reuse existing correlation identifiers", "details": ["Inventory current run/request/decision/event identifiers introduced or exercised by 8090.", "Choose the smallest existing identifier chain that can bind decision to execution outcome."]},
+      {"id": "T2", "title": "Record execution/non-execution lineage", "details": ["For allow, record the actual returned/failed execution outcome linked to its decision.", "For block/pending, record explicit non-execution linked to the governing decision without fabricating a tool result."]},
+      {"id": "T3", "title": "Prove replay/export fidelity", "details": ["Demonstrate the same lineage is visible through existing read-only replay/audit/evidence views.", "Do not add a new read model when an existing one can expose the correlation."]}
+    ],
+    "acceptance": ["Decision-to-execution lineage is deterministic.", "Policy denial, pending governance and execution failure remain distinct.", "Blocked/pending branches prove zero execution.", "Existing replay/export paths preserve lineage.", "ruff, mypy and pytest pass."],
+    "validate": ["python -m pytest tests/test_execution_evidence_binding.py -q", "python -m ruff check .", "python -m mypy src", "python -m pytest tests -q"]
+  },
+  "judge": {
+    "must_check": ["8090 is completed before this pack executes.", "Correlation uses existing evidence primitives where possible.", "Policy and execution statuses remain semantically separate.", "No tracing/persistence subsystem was added."],
+    "reject_if": ["Decision and execution outcome are collapsed into one ambiguous status.", "A second event store/tracing framework is introduced.", "Blocked or pending calls appear as execution failures.", "Validation fails."]
+  },
+  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "validation_notes": {"validation_profile": "focused_plus_full", "commands_are_profile_based": false, "targeted_contract_coverage": "Decision -> execution/non-execution -> outcome evidence lineage.", "missing_targets": ["tests/test_execution_evidence_binding.py may be created by this pack"], "completion_needed": false, "completion_reason": null},
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations", "## Suggested next pack"]
+}
