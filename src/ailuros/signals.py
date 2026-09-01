@@ -225,7 +225,11 @@ def _evidence_inconsistency_rule(
 def _missing_run_terminal_evidence_rule(
     projection: ExecutionProjection,
 ) -> list[GovernanceSignal]:
-    if projection.lifecycle != Lifecycle.RUNNING:
+    # ``Lifecycle.RUNNING`` alone is not evidence that a run started: callers
+    # may construct partial projections without lifecycle events.  The
+    # projection path adds a reference for explicit ``run_started`` evidence,
+    # so require that provenance before surfacing a missing-terminal finding.
+    if projection.lifecycle != Lifecycle.RUNNING or not projection.evidence_refs:
         return []
     return [
         GovernanceSignal.build(

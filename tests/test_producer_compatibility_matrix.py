@@ -101,7 +101,10 @@ PRODUCERS: dict[str, dict] = {
             "authority_records": [],
             "approval_records": [],
             "budget_records": [],
-            "signal_types": [],
+            "signal_types": [
+                "missing_run_terminal_evidence",
+                "temporal_integrity",
+            ],
             "evidence_refs": [
                 "096c61058c4836c11123ae65c44d46e8f95bd79290d33a1d522f1ca7c4d4b97c",
                 "26bd6b9f28326958c886af9abc2a9bb59ef2c4ff72ac55a5687fd7059e8f8707",

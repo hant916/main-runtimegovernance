@@ -318,9 +318,16 @@ def test_only_excluded_field_is_governance_signal_created_at(tmp_path) -> None:
             }
             assert signal.created_at is not None
 
-    # The fixture's canonical signal set is empty, but the comparison contract
-    # is pinned regardless: created_at is the single excluded field.
-    assert all(signals == [] for _, signals, _, _, _ in (replay_a, replay_b))
+    # Both evidence-integrity findings are canonical; only their incidental
+    # creation timestamps differ between otherwise identical replays.
+    expected_signal_types = [
+        "missing_run_terminal_evidence",
+        "temporal_integrity",
+    ]
+    assert all(
+        [signal.type for signal in signals] == expected_signal_types
+        for _, signals, _, _, _ in (replay_a, replay_b)
+    )
 
     def _dump_excluding_created_at(proj, signals, report) -> dict:
         return {

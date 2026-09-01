@@ -12,6 +12,7 @@ from ailuros.adapters.evidence_package import (
 )
 from ailuros.execution_report import build_run_report
 from ailuros.projection import build_execution_projection, rebuild_projections_and_signals
+from ailuros.signals import SignalType
 from ailuros.storage.sqlite_storage import SQLiteStorage
 
 HERE = Path(__file__).resolve().parent
@@ -356,4 +357,7 @@ def test_everrun_postfix_minimal_package_acceptance_regression(tmp_path):
     assert projection.governance_coverage.budget.value == "unknown"
     assert report.governed_outcome == "unknown"
     assert report.why_stopped == "execution_control: human_review"
-    assert signals == []
+    assert {signal.type for signal in signals} == {
+        SignalType.MISSING_RUN_TERMINAL_EVIDENCE,
+        SignalType.TEMPORAL_INTEGRITY,
+    }
