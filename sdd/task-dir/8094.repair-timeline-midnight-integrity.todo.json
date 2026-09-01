@@ -1,0 +1,157 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "claimhelper-dogfood-regression-repair",
+    "id": "8094.repair-timeline-midnight-integrity",
+    "sequence": 8094,
+    "slug": "repair-timeline-midnight-integrity",
+    "title": "Repair timeline midnight integrity",
+    "type": "evidence_integrity",
+    "pack_kind": "convergence"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "ClaimHelper dogfood found 22/84 Ailuros timelines with timestamp rollback; a cross-midnight run was rendered as same-day 23:53 -> 00:53. Fix only date derivation/temporal integrity in the existing normalization/timeline path. Preserve event order and explicit timestamps. When chronology cannot be repaired deterministically from existing evidence, surface a warning instead of inventing dates.",
+    "why_now": "A governance timeline cannot support audit or replay if event chronology is silently wrong. This is an integrity repair, not a new temporal model.",
+    "do_not_misread": [
+      "Do not reorder events merely to make timestamps monotonic.",
+      "Do not rewrite explicit full timestamps.",
+      "Do not add timezone inference or a new clock service unless existing evidence already supplies the required value."
+    ],
+    "red_lines": [
+      "No event reordering, synthetic timestamps, global timeline engine or producer-specific date rules.",
+      "Only infer next-day rollover where the existing source format/order makes that inference deterministic.",
+      "Ambiguous non-monotonic chronology must remain visible as a warning."
+    ]
+  },
+  "machine_core": {
+    "depends_on": ["8093.surface-missing-run-terminal-evidence"],
+    "goal": "Correct deterministic cross-midnight date rollover and surface remaining non-monotonic timeline evidence without changing explicit timestamps or event order.",
+    "invariants": [
+      "Explicit full timestamps are preserved exactly.",
+      "Input/source event ordering is preserved.",
+      "A deterministic midnight rollover increments the date rather than rendering time backwards on the same day.",
+      "Ambiguous chronology is warned, not silently normalized.",
+      "Equivalent normalized evidence remains source neutral."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "normalized timeline events and source timestamp evidence"},
+        "consumer": {"component": "timeline/replay/evidence export", "production_path": true},
+        "observable_effect": {
+          "kind": "temporal_integrity",
+          "assertion": "Deterministic midnight rollover produces correct next-day chronology; unresolved non-monotonic chronology remains explicitly warned without event reordering or timestamp fabrication."
+        },
+        "proofs": [
+          {"layer": "midnight", "gate": "hard", "assertion": "23:xx followed by 00:xx in the supported partial-time source path derives the next calendar day deterministically."},
+          {"layer": "explicit_timestamp", "gate": "hard", "assertion": "Explicit dated timestamps are never rewritten to force monotonicity."},
+          {"layer": "ordering", "gate": "hard", "assertion": "Event order is preserved."},
+          {"layer": "ambiguity", "gate": "hard", "assertion": "Remaining chronology regressions produce a warning rather than silent correction."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If rollover is not deterministically supported by existing source evidence, do not guess the date.",
+      "If explicit timestamps are non-monotonic, preserve them and surface temporal-integrity warning evidence.",
+      "Temporal warning does not imply execution failure or root cause."
+    ],
+    "complexity_budget": {
+      "max_new_files": 1,
+      "max_new_abstractions": 0,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": ["timeline engine", "clock service", "event sorter", "timezone inference framework", "producer-specific parser fork"]
+    },
+    "files": {
+      "allow": ["src/ailuros/evidence_normalization.py", "src/ailuros/projection.py", "src/ailuros/timeline.py", "src/ailuros/signals.py", "src/ailuros/adapters/**", "tests/**"],
+      "create": ["tests/test_timeline_temporal_integrity.py"],
+      "forbid": [".everrun/**", "sdd/task-dir/**", "schemas/**", "docs/**", "apps/**", "*.sqlite", "runtime artifacts"]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Locate the current partial timestamp derivation",
+        "details": [
+          "Identify the exact existing path that attaches a date to source events lacking a full date.",
+          "Modify that path only; do not introduce a parallel timeline representation."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Repair deterministic midnight rollover",
+        "details": [
+          "Carry the previous derived date forward and increment one day only when the existing ordered partial-time evidence deterministically represents midnight rollover.",
+          "Preserve explicit full timestamps unchanged."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Expose unresolved chronology regression",
+        "details": [
+          "Detect remaining non-monotonic timeline timestamps after deterministic normalization.",
+          "Reuse the existing warning/finding mechanism; do not reorder events to hide the condition."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Lock regression coverage",
+        "details": [
+          "Cover same-day monotonic events, deterministic cross-midnight rollover, explicit non-monotonic dated timestamps, and ambiguous partial-time chronology.",
+          "Assert event ordering remains identical to input ordering."
+        ]
+      }
+    ],
+    "acceptance": [
+      "A supported cross-midnight partial-time sequence is rendered on consecutive dates rather than as same-day backward time.",
+      "Explicit full timestamps are unchanged.",
+      "Event order is unchanged.",
+      "Unresolved non-monotonic chronology produces a warning/finding.",
+      "No execution outcome/root cause inference is added.",
+      "ruff, mypy and the full pytest suite pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_timeline_temporal_integrity.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "The repair modifies the existing timestamp normalization/timeline path rather than adding another timeline model.",
+      "Deterministic cross-midnight rollover increments the date correctly.",
+      "Explicit full timestamps are preserved unchanged.",
+      "Event order is never changed to manufacture monotonicity.",
+      "Ambiguous or explicit non-monotonic chronology remains visible through an existing warning/finding mechanism.",
+      "The full regression suite, ruff and mypy pass."
+    ],
+    "reject_if": [
+      "Events are sorted/reordered to hide timestamp regressions.",
+      "Explicit timestamps are rewritten without source evidence.",
+      "A new timeline engine, clock service, timezone framework or producer-specific date branch is introduced.",
+      "Temporal inconsistency is silently discarded.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "Deterministic midnight rollover plus non-monotonic warning without event reordering.",
+    "missing_targets": ["tests/test_timeline_temporal_integrity.py may be created by this pack"],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations"]
+}
