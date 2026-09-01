@@ -42,6 +42,7 @@ class SignalType(StrEnum):
     BUDGET_UNKNOWN = "budget_unknown"
     AUTHORITY_VIOLATION = "authority_violation"
     AUTHORITY_UNKNOWN = "authority_unknown"
+    TEMPORAL_INTEGRITY = "temporal_integrity"
 
 
 RULE_VERSION = "1.0.0"
@@ -694,3 +695,38 @@ def derive_signals(projection: ExecutionProjection) -> list[GovernanceSignal]:
     for rule in _RULES:
         signals.extend(rule(projection))
     return signals
+
+
+def build_temporal_integrity_signals(
+    run_id: str,
+    regressions: list[dict[str, Any]],
+) -> list[GovernanceSignal]:
+    """Surface unresolved timeline chronology regressions as a warning finding.
+
+    ``regressions`` are produced by
+    :func:`ailuros.evidence_normalization.normalize_timeline_timestamps` and cover
+    non-monotonic explicit timestamps and ambiguous partial-time chronology that
+    could not be deterministically repaired.  This reuses the existing
+    :class:`GovernanceSignal` finding mechanism; it does not reorder events or
+    fabricate timestamps, and a temporal warning does not imply execution
+    failure or root cause.
+    """
+    if not regressions:
+        return []
+    evidence_refs = _dedupe_evidence_refs(
+        [
+            EvidenceRef(event_id=r["event_id"])
+            for r in regressions
+            if r.get("event_id")
+        ]
+    )
+    return [
+        GovernanceSignal.build(
+            run_id=run_id,
+            signal_type=SignalType.TEMPORAL_INTEGRITY,
+            severity=Severity.MEDIUM,
+            subject="timeline",
+            details={"regressions": regressions},
+            evidence_refs=evidence_refs,
+        )
+    ]

@@ -23,7 +23,10 @@ from ailuros.core.execution import (
     Scope,
     Validation,
 )
-from ailuros.evidence_normalization import normalize_external_evidence_event
+from ailuros.evidence_normalization import (
+    normalize_external_evidence_event,
+    normalize_timeline_timestamps,
+)
 
 if TYPE_CHECKING:
     from ailuros.signals import GovernanceSignal
@@ -354,6 +357,7 @@ def build_execution_projection(
     schema_version: str = "1.0",
 ) -> ExecutionProjection:
     projection_events = [normalize_external_evidence_event(event) for event in events]
+    projection_events, _ = normalize_timeline_timestamps(projection_events)
     started_at: datetime | None = None
     completed_at: datetime | None = None
     lifecycle = Lifecycle.UNKNOWN
@@ -610,7 +614,7 @@ def rebuild_projections_and_signals(
     source: str = "rebuild",
     schema_version: str = "1.0",
 ) -> tuple[ExecutionProjection, list[GovernanceSignal]]:
-    from ailuros.signals import derive_signals
+    from ailuros.signals import build_temporal_integrity_signals, derive_signals
 
     events = storage.list_events(run_id)
     event_dicts: list[dict[str, Any]] = [
@@ -633,6 +637,10 @@ def rebuild_projections_and_signals(
     )
 
     signals = derive_signals(projection)
+
+    normalized_events = [normalize_external_evidence_event(e) for e in event_dicts]
+    _, timeline_regressions = normalize_timeline_timestamps(normalized_events)
+    signals.extend(build_temporal_integrity_signals(run_id, timeline_regressions))
 
     projection_dict = projection.model_dump(mode="json")
     storage.upsert_projection(
