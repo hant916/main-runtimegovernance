@@ -1,0 +1,149 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "claimhelper-dogfood-regression-repair",
+    "id": "8095.preserve-export-artifact-references",
+    "sequence": 8095,
+    "slug": "preserve-export-artifact-references",
+    "title": "Preserve artifact references in evidence export",
+    "type": "evidence_export",
+    "pack_kind": "convergence"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "ClaimHelper dogfood exported artifact_count=0 for all 84 runs even when iteration artifacts already existed. Fix only reference preservation: when normalized/imported evidence already carries an artifact reference, keep that reference in the Ailuros evidence export. Do not copy artifacts, read artifact contents, collect new logs, create storage, or invent missing references.",
+    "why_now": "Ailuros cannot support evidence-level audit if export drops references that already exist upstream. The smallest repair is reference fidelity, not artifact ownership.",
+    "do_not_misread": [
+      "This is not artifact collection.",
+      "This is not an artifact repository or retention feature.",
+      "Do not scrape coder stdout/stderr or diff files to synthesize references."
+    ],
+    "red_lines": [
+      "No file copying, blob storage, artifact persistence, retention, upload/download or content ingestion.",
+      "No generated reference for artifacts that lack an upstream reference.",
+      "Do not make Ailuros own EverRun iteration artifacts."
+    ]
+  },
+  "machine_core": {
+    "depends_on": ["8094.repair-timeline-midnight-integrity"],
+    "goal": "Preserve already-existing artifact references through normalization/projection/export so audit packages can point to upstream evidence without taking ownership of artifact storage.",
+    "invariants": [
+      "Existing artifact references survive the Ailuros export path unchanged unless current canonical normalization explicitly requires a deterministic representation change.",
+      "Missing artifact references remain missing; they are never invented.",
+      "Artifact contents are not copied, opened or persisted by this feature.",
+      "Existing exports without artifact references remain valid.",
+      "Behavior remains producer/runtime neutral."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "normalized/imported evidence containing an upstream artifact reference"},
+        "consumer": {"component": "evidence export/audit package", "production_path": true},
+        "observable_effect": {
+          "kind": "reference_fidelity",
+          "assertion": "An upstream artifact reference already present in accepted evidence remains visible in exported Ailuros evidence without copying or owning the referenced artifact."
+        },
+        "proofs": [
+          {"layer": "positive", "gate": "hard", "assertion": "A supplied artifact reference survives export."},
+          {"layer": "absence", "gate": "hard", "assertion": "No reference is fabricated when upstream evidence has none."},
+          {"layer": "ownership", "gate": "hard", "assertion": "The implementation does not copy/read/store artifact contents."},
+          {"layer": "compatibility", "gate": "hard", "assertion": "Existing evidence exports without artifact references continue to pass."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If upstream evidence has no artifact reference, export must not invent one.",
+      "If a reference is malformed under an existing canonical contract, preserve current validation behavior rather than silently repairing it.",
+      "Reference absence does not itself imply run failure."
+    ],
+    "complexity_budget": {
+      "max_new_files": 1,
+      "max_new_abstractions": 0,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": ["artifact store", "blob service", "retention manager", "artifact collector", "filesystem crawler", "producer-specific artifact scraper"]
+    },
+    "files": {
+      "allow": ["src/ailuros/evidence_normalization.py", "src/ailuros/projection.py", "src/ailuros/audit_package/**", "src/ailuros/adapters/**", "src/ailuros/core/execution.py", "tests/**"],
+      "create": ["tests/test_artifact_reference_export.py"],
+      "forbid": [".everrun/**", "sdd/task-dir/**", "schemas/**", "docs/**", "apps/**", "*.sqlite", "runtime artifacts", "artifact blobs"]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Trace the existing artifact reference field",
+        "details": [
+          "Identify where accepted normalized evidence already represents artifact references and where the export currently drops them.",
+          "Use the current canonical evidence/reference structures; do not create a second artifact model."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Preserve references through export",
+        "details": [
+          "Pass existing artifact references through the minimum normalization/projection/export path required for evidence packages.",
+          "Do not dereference or validate remote/local artifact contents beyond existing contract validation."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Lock no-ownership behavior",
+        "details": [
+          "Test reference-present and reference-absent evidence.",
+          "Assert no artifact file is copied/generated and no storage subsystem is introduced."
+        ]
+      }
+    ],
+    "acceptance": [
+      "An artifact reference already present in accepted evidence is present in the exported evidence package/audit representation.",
+      "artifact_count or equivalent export metadata reflects preserved references when such references exist.",
+      "No artifact reference is generated when none exists upstream.",
+      "No artifact content is copied, read, stored or retained by the new behavior.",
+      "Existing exports without artifact references remain compatible.",
+      "ruff, mypy and the full pytest suite pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_artifact_reference_export.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "The implementation reuses the existing evidence/reference model and export path.",
+      "Existing upstream artifact references survive export and contribute to existing artifact metadata/counting semantics where applicable.",
+      "No reference is fabricated for evidence that lacks one.",
+      "No artifact content is copied, read, persisted or retained as part of this repair.",
+      "No producer-specific artifact collector/scraper is added.",
+      "The full regression suite, ruff and mypy pass."
+    ],
+    "reject_if": [
+      "The implementation creates artifact storage, collection, retention, copying or dereferencing behavior.",
+      "References are synthesized from guessed file paths/log names when upstream evidence has no explicit reference.",
+      "A second artifact/evidence model is introduced instead of reusing current primitives.",
+      "Existing reference-free exports regress.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "Preserve existing artifact references without artifact ownership.",
+    "missing_targets": ["tests/test_artifact_reference_export.py may be created by this pack"],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations"]
+}
