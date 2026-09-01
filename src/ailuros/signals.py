@@ -17,6 +17,7 @@ from ailuros.core.execution import (
     DecisionSummary,
     EvidenceRef,
     ExecutionProjection,
+    Lifecycle,
     Scope,
     Validation,
 )
@@ -27,6 +28,7 @@ class SignalType(StrEnum):
     VALIDATION_FAILURE = "validation_failure"
     REPEATED_VALIDATION_FAILURE = "repeated_validation_failure"
     EVIDENCE_INCONSISTENCY = "evidence_inconsistency"
+    MISSING_RUN_TERMINAL_EVIDENCE = "missing_run_terminal_evidence"
     SCOPE_VIOLATION = "scope_violation"
     FORBIDDEN_PATH_TOUCHED = "forbidden_path_touched"
     BACKEND_FALLBACK = "backend_fallback"
@@ -214,6 +216,26 @@ def _evidence_inconsistency_rule(
             severity=Severity.MEDIUM,
             subject="evidence",
             details={"conflicts": conflicts},
+            evidence_refs=list(projection.evidence_refs),
+        )
+    ]
+
+
+def _missing_run_terminal_evidence_rule(
+    projection: ExecutionProjection,
+) -> list[GovernanceSignal]:
+    if projection.lifecycle != Lifecycle.RUNNING:
+        return []
+    return [
+        GovernanceSignal.build(
+            run_id=projection.run_id,
+            signal_type=SignalType.MISSING_RUN_TERMINAL_EVIDENCE,
+            severity=Severity.MEDIUM,
+            subject="run",
+            details={
+                "lifecycle": projection.lifecycle.value,
+                "terminal_evidence": "missing",
+            },
             evidence_refs=list(projection.evidence_refs),
         )
     ]
@@ -650,6 +672,7 @@ _RULES: list[Callable[[ExecutionProjection], list[GovernanceSignal]]] = [
     _validation_failure_rule,
     _repeated_validation_failure_rule,
     _evidence_inconsistency_rule,
+    _missing_run_terminal_evidence_rule,
     _scope_violation_rule,
     _forbidden_path_touched_rule,
     _backend_fallback_rule,
