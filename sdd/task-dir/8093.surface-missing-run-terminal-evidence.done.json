@@ -1,0 +1,214 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "claimhelper-dogfood-regression-repair",
+    "id": "8093.surface-missing-run-terminal-evidence",
+    "sequence": 8093,
+    "slug": "surface-missing-run-terminal-evidence",
+    "title": "Surface missing run terminal evidence",
+    "type": "evidence_integrity",
+    "pack_kind": "convergence"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "ClaimHelper dogfood found 65/84 exported runs with run_started but no run_completed/run_failed; 39 produced no consistency warning. Fix only this semantic hole: when a run has explicit start evidence but no terminal lifecycle evidence, Ailuros must deterministically surface an incomplete/unknown finding instead of appearing clean. Do not infer failure, timeout, root cause, or producer-specific behavior.",
+    "why_now": "A governance export must not equate missing terminal evidence with absence of a problem. This is a direct production-evidence repair, not a new lifecycle subsystem.",
+    "do_not_misread": [
+      "Do not convert missing terminal evidence into run_failed.",
+      "Do not add time-based stale-run heuristics.",
+      "Do not diagnose EverRun/backend/coder/planner causes from missing terminal evidence."
+    ],
+    "red_lines": [
+      "No new lifecycle engine, watcher, scheduler, timeout monitor, persistence layer or producer-specific branch.",
+      "Do not change completed/failed semantics for runs that already have terminal evidence.",
+      "Unknown/incomplete must remain evidence semantics, not inferred business failure."
+    ]
+  },
+  "machine_core": {
+    "goal": "Make explicit run_started-without-terminal evidence visible as an incomplete/unknown governance finding while preserving all existing terminal lifecycle behavior.",
+    "invariants": [
+      "run_completed remains completed and run_failed remains failed.",
+      "run_started without run_completed/run_failed never appears clean solely because no other warning exists.",
+      "Missing terminal evidence never fabricates failure, success, timeout or root cause.",
+      "Runs without run_started are not reclassified by this pack.",
+      "Behavior remains runtime/source neutral."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {
+          "artifact": "normalized run lifecycle evidence"
+        },
+        "consumer": {
+          "component": "projection/findings/evidence export",
+          "production_path": true
+        },
+        "observable_effect": {
+          "kind": "evidence_integrity",
+          "assertion": "Explicit start evidence without terminal lifecycle evidence deterministically produces an incomplete/unknown finding and cannot be silently represented as clean."
+        },
+        "proofs": [
+          {
+            "layer": "positive",
+            "gate": "hard",
+            "assertion": "run_started without terminal evidence surfaces the finding."
+          },
+          {
+            "layer": "terminal_regression",
+            "gate": "hard",
+            "assertion": "completed and failed runs retain their existing lifecycle/outcome behavior."
+          },
+          {
+            "layer": "non_inference",
+            "gate": "hard",
+            "assertion": "the repair does not infer failure/root cause/timeout from absence of terminal evidence."
+          },
+          {
+            "layer": "source_neutrality",
+            "gate": "hard",
+            "assertion": "the result is identical for equivalent normalized evidence from different source labels."
+          }
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "Missing terminal evidence means incomplete/unknown evidence, not failed execution.",
+      "If start evidence itself is absent, preserve existing semantics rather than guessing a lifecycle.",
+      "If terminal evidence exists, it takes precedence over this missing-terminal condition."
+    ],
+    "complexity_budget": {
+      "max_new_files": 1,
+      "max_new_abstractions": 0,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": [
+        "lifecycle service",
+        "watchdog",
+        "timeout inference",
+        "producer-specific diagnosis",
+        "new persistence"
+      ]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/run_diagnosis.py",
+        "src/ailuros/core/execution.py",
+        "tests/**"
+      ],
+      "create": [
+        "tests/test_missing_run_terminal_evidence.py"
+      ],
+      "forbid": [
+        ".everrun/**",
+        "sdd/task-dir/**",
+        "schemas/**",
+        "docs/**",
+        "apps/**",
+        "*.sqlite",
+        "runtime artifacts"
+      ]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Locate the existing lifecycle consistency path",
+        "details": [
+          "Reuse the current ExecutionProjection/Lifecycle and existing signal/finding path.",
+          "Do not introduce a parallel lifecycle representation."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Surface missing terminal evidence",
+        "details": [
+          "When normalized evidence proves run_started and proves neither run_completed nor run_failed, emit the smallest existing-compatible incomplete/unknown finding.",
+          "Keep the finding deterministic and source neutral."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Lock regression semantics",
+        "details": [
+          "Test started->completed, started->failed, started->missing-terminal and no-start cases.",
+          "Test equivalent evidence under at least two source labels to prevent EverRun-specific branching."
+        ]
+      }
+    ],
+    "acceptance": [
+      "A run with run_started and no run_completed/run_failed surfaces an incomplete/unknown finding.",
+      "The same run is not reclassified as failed, successful, timed out or assigned a root cause without evidence.",
+      "Existing completed and failed lifecycle behavior is unchanged.",
+      "Runs with no start evidence preserve existing behavior.",
+      "Source-neutrality regression coverage exists.",
+      "ruff, mypy and the full pytest suite pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_missing_run_terminal_evidence.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true,
+    "tasks": [],
+    "red_lines": []
+  },
+  "judge": {
+    "must_check": [
+      "The implementation reuses existing lifecycle/projection/finding primitives rather than creating a parallel lifecycle model.",
+      "run_started without terminal evidence produces a visible incomplete/unknown finding.",
+      "Completed and failed runs retain existing semantics.",
+      "No absence-based inference creates run_failed, timeout or a producer-specific root cause.",
+      "Equivalent normalized evidence yields equivalent results across source labels.",
+      "The full regression suite, ruff and mypy pass."
+    ],
+    "reject_if": [
+      "Missing terminal evidence is converted to run_failed or success.",
+      "A stale-time threshold, watchdog, scheduler or lifecycle service is introduced.",
+      "The code branches on EverRun/ClaimHelper/vendor identity for this finding.",
+      "Existing completed/failed lifecycle behavior regresses.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "Missing run terminal evidence without failure inference.",
+    "missing_targets": [
+      "tests/test_missing_run_terminal_evidence.py may be created by this pack"
+    ],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": [
+    "## Implementation Summary",
+    "## Files modified",
+    "## Validation",
+    "## Evidence Matrix",
+    "## Known limitations"
+  ],
+  "execution_history": {
+    "attempt_reserved": true,
+    "attempts": 1,
+    "last_attempt_at": "2026-09-01T07:54:47Z",
+    "last_result": "in_progress",
+    "last_summary": "iteration=1 coder dispatched; outcome not yet recorded"
+  }
+}
