@@ -12,7 +12,10 @@
   },
   "scheduling": {
     "status_source_of_truth": "filename_suffix",
-    "allowed_suffixes": ["todo", "done"],
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
     "on_success": "rename_todo_to_done",
     "on_failure": "keep_todo"
   },
@@ -31,7 +34,9 @@
     ]
   },
   "machine_core": {
-    "depends_on": ["8094.repair-timeline-midnight-integrity"],
+    "depends_on": [
+      "8094.repair-timeline-midnight-integrity"
+    ],
     "goal": "Preserve already-existing artifact references through normalization/projection/export so audit packages can point to upstream evidence without taking ownership of artifact storage.",
     "invariants": [
       "Existing artifact references survive the Ailuros export path unchanged unless current canonical normalization explicitly requires a deterministic representation change.",
@@ -44,17 +49,38 @@
       {
         "id": "CV1",
         "kind": "convergence",
-        "producer": {"artifact": "normalized/imported evidence containing an upstream artifact reference"},
-        "consumer": {"component": "evidence export/audit package", "production_path": true},
+        "producer": {
+          "artifact": "normalized/imported evidence containing an upstream artifact reference"
+        },
+        "consumer": {
+          "component": "evidence export/audit package",
+          "production_path": true
+        },
         "observable_effect": {
           "kind": "reference_fidelity",
           "assertion": "An upstream artifact reference already present in accepted evidence remains visible in exported Ailuros evidence without copying or owning the referenced artifact."
         },
         "proofs": [
-          {"layer": "positive", "gate": "hard", "assertion": "A supplied artifact reference survives export."},
-          {"layer": "absence", "gate": "hard", "assertion": "No reference is fabricated when upstream evidence has none."},
-          {"layer": "ownership", "gate": "hard", "assertion": "The implementation does not copy/read/store artifact contents."},
-          {"layer": "compatibility", "gate": "hard", "assertion": "Existing evidence exports without artifact references continue to pass."}
+          {
+            "layer": "positive",
+            "gate": "hard",
+            "assertion": "A supplied artifact reference survives export."
+          },
+          {
+            "layer": "absence",
+            "gate": "hard",
+            "assertion": "No reference is fabricated when upstream evidence has none."
+          },
+          {
+            "layer": "ownership",
+            "gate": "hard",
+            "assertion": "The implementation does not copy/read/store artifact contents."
+          },
+          {
+            "layer": "compatibility",
+            "gate": "hard",
+            "assertion": "Existing evidence exports without artifact references continue to pass."
+          }
         ]
       }
     ],
@@ -68,12 +94,37 @@
       "max_new_abstractions": 0,
       "prefer_modify_over_create": true,
       "prefer_adapt_over_rewrite": true,
-      "forbidden_complexity": ["artifact store", "blob service", "retention manager", "artifact collector", "filesystem crawler", "producer-specific artifact scraper"]
+      "forbidden_complexity": [
+        "artifact store",
+        "blob service",
+        "retention manager",
+        "artifact collector",
+        "filesystem crawler",
+        "producer-specific artifact scraper"
+      ]
     },
     "files": {
-      "allow": ["src/ailuros/evidence_normalization.py", "src/ailuros/projection.py", "src/ailuros/audit_package/**", "src/ailuros/adapters/**", "src/ailuros/core/execution.py", "tests/**"],
-      "create": ["tests/test_artifact_reference_export.py"],
-      "forbid": [".everrun/**", "sdd/task-dir/**", "schemas/**", "docs/**", "apps/**", "*.sqlite", "runtime artifacts", "artifact blobs"]
+      "allow": [
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/audit_package/**",
+        "src/ailuros/adapters/**",
+        "src/ailuros/core/execution.py",
+        "tests/**"
+      ],
+      "create": [
+        "tests/test_artifact_reference_export.py"
+      ],
+      "forbid": [
+        ".everrun/**",
+        "sdd/task-dir/**",
+        "schemas/**",
+        "docs/**",
+        "apps/**",
+        "*.sqlite",
+        "runtime artifacts",
+        "artifact blobs"
+      ]
     },
     "steps": [
       {
@@ -116,7 +167,9 @@
       "python -m pytest tests -q",
       "git diff --check"
     ],
-    "evidence_matrix_required": true
+    "evidence_matrix_required": true,
+    "tasks": [],
+    "red_lines": []
   },
   "judge": {
     "must_check": [
@@ -135,15 +188,33 @@
       "Validation fails or forbidden files change."
     ]
   },
-  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
   "validation_notes": {
     "validation_profile": "focused_plus_full",
     "commands_are_profile_based": false,
     "targeted_contract_coverage": "Preserve existing artifact references without artifact ownership.",
-    "missing_targets": ["tests/test_artifact_reference_export.py may be created by this pack"],
+    "missing_targets": [
+      "tests/test_artifact_reference_export.py may be created by this pack"
+    ],
     "completion_needed": false,
     "completion_reason": null
   },
   "evidence_matrix_requested_from_coder": true,
-  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations"]
+  "expected_coder_final_response": [
+    "## Implementation Summary",
+    "## Files modified",
+    "## Validation",
+    "## Evidence Matrix",
+    "## Known limitations"
+  ],
+  "execution_history": {
+    "attempt_reserved": false,
+    "attempts": 1,
+    "last_attempt_at": "2026-09-01T08:27:30Z",
+    "last_result": "human_review",
+    "last_summary": "iteration=1 validation=not_run changed_files=2 diff_chars=29997 risks=scope_contamination_validation_suppressed, tests_not_run"
+  }
 }

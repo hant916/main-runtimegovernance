@@ -204,6 +204,27 @@ def _as_number(value: Any) -> float | None:
     return None
 
 
+def _event_evidence_ref(event_id: str, event: dict[str, Any]) -> EvidenceRef:
+    """Preserve an existing upstream artifact reference for one event.
+
+    Canonical evidence keeps producer-supplied metadata as an open channel.
+    When that metadata already contains an artifact reference, carry it into
+    the existing ``EvidenceRef`` model without dereferencing, validating, or
+    materializing the reference.  Missing or non-string values remain absent.
+    """
+    artifact: str | None = None
+    pointer: str | None = None
+    metadata = event.get("metadata")
+    if isinstance(metadata, dict):
+        raw_artifact = metadata.get("artifact")
+        if isinstance(raw_artifact, str) and raw_artifact:
+            artifact = raw_artifact
+        raw_pointer = metadata.get("pointer")
+        if isinstance(raw_pointer, str) and raw_pointer:
+            pointer = raw_pointer
+    return EvidenceRef(event_id=event_id, artifact=artifact, pointer=pointer)
+
+
 def _project_record_scope_ref(
     event_scope_ref: str | None,
     payload: dict[str, Any],
@@ -391,23 +412,25 @@ def build_execution_projection(
         if scope_ref is None and event_scope_ref is not None:
             scope_ref = event_scope_ref
 
+        event_ref = _event_evidence_ref(event_id, event)
+
         if step_id:
             step_ids.add(step_id)
 
         if event_type == "run_started":
             started_at = timestamp
             lifecycle = Lifecycle.RUNNING
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type == "run_completed":
             completed_at = timestamp
             lifecycle = Lifecycle.COMPLETED
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type == "run_failed":
             completed_at = timestamp
             lifecycle = Lifecycle.FAILED
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type == "governance_decision":
             decision_count += 1
@@ -423,13 +446,13 @@ def build_execution_projection(
                     scope_ref=event_scope_ref,
                 )
             )
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type == "project_validation":
             status = payload.get("status", "")
             if status:
                 validation_presence.add(status)
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type == "project_scope":
             scope_status = payload.get("status", "")
@@ -443,16 +466,16 @@ def build_execution_projection(
                 for f in changed_files:
                     change_descriptions.append(str(f))
 
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type == "runtime_role":
             role_name = payload.get("name", "")
             if role_name:
                 role_names.add(role_name)
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type == "governance_context":
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type in _APPROVAL_EVENT_TYPES:
             subject = payload.get("subject")
@@ -481,13 +504,11 @@ def build_execution_projection(
                             event_scope_ref, payload
                         ),
                         timestamp=timestamp,
-                        evidence_refs=[EvidenceRef(event_id=event_id)]
-                        if event_id
-                        else [],
+                        evidence_refs=[event_ref] if event_id else [],
                         source={"event_id": event_id, "event_type": event_type},
                     )
                 )
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type in _BUDGET_EVENT_TYPES:
             subject = payload.get("subject")
@@ -507,13 +528,11 @@ def build_execution_projection(
                         remaining=_as_number(payload.get("remaining")),
                         status=status if isinstance(status, str) and status else "unknown",
                         required=required if isinstance(required, bool) else None,
-                        evidence_refs=[EvidenceRef(event_id=event_id)]
-                        if event_id
-                        else [],
+                        evidence_refs=[event_ref] if event_id else [],
                         source={"event_id": event_id, "event_type": event_type},
                     )
                 )
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
         elif event_type in _AUTHORITY_EVENT_TYPES:
             actor = payload.get("actor")
@@ -550,13 +569,11 @@ def build_execution_projection(
                             status if isinstance(status, str) and status else None
                         ),
                         required=required if isinstance(required, bool) else None,
-                        evidence_refs=[EvidenceRef(event_id=event_id)]
-                        if event_id
-                        else [],
+                        evidence_refs=[event_ref] if event_id else [],
                         source={"event_id": event_id, "event_type": event_type},
                     )
                 )
-            evidence_refs.append(EvidenceRef(event_id=event_id))
+            evidence_refs.append(event_ref)
 
     validation = _resolve_validation(validation_presence)
     governance_context = _project_governance_context(projection_events)
