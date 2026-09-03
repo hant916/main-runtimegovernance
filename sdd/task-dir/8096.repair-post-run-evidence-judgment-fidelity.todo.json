@@ -1,0 +1,285 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "everrun-dogfood-judgment-repair",
+    "id": "8096.repair-post-run-evidence-judgment-fidelity",
+    "sequence": 8096,
+    "slug": "repair-post-run-evidence-judgment-fidelity",
+    "title": "Repair post-run evidence judgment fidelity",
+    "type": "post_run_governance",
+    "pack_kind": "convergence"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "EverRun dogfood produced a structurally valid Ailuros evidence package where evidence-audit warned on 13 of 17 events as unknown even though evidence_conformance already treats several of those governance event types (for example project_scope and structured authority/approval/budget evidence) as canonical capability evidence. The same dogfood also exposed a stronger failure class: already-present structured evidence can disagree about the same governance fact, yet the post-run analyzer can still return a tolerated WARN instead of surfacing that its judgment is unreliable. Repair only the post-run judgment core: use one canonical governance-evidence recognition boundary, distinguish unsupported/missing evidence from contradictory evidence, and ground any new contradiction finding in the exact evidence references used. Do not add telemetry, runtime interception, approval/budget enforcement, package migration or a generic adapter framework.",
+    "why_now": "This is production dogfood evidence, not architecture speculation. Ailuros is currently being used as a post-run evidence analyzer; before moving more decisions into runtime, the same judgment core must stop being semantically blind to evidence it already consumes and must refuse to treat contradictory evidence as an ordinary tolerated anomaly.",
+    "do_not_misread": [
+      "Do not make all EverRun event types canonical merely to eliminate warnings.",
+      "Do not parse coder-error.raw.txt, stderr, prose summaries or guessed paths to manufacture governance facts.",
+      "Do not implement approval, budget, authority or out-of-tree runtime gates in this pack.",
+      "Do not change validate-package into an EverRun compatibility shim and do not create the missing legacy package files just to make validation green.",
+      "Do not add a universal policy engine, adapter registry, telemetry framework or runtime service."
+    ],
+    "red_lines": [
+      "Only already-structured evidence available through existing canonical normalization/audit paths may participate in new consistency checks.",
+      "Unknown/unsupported evidence must remain distinguishable from missing required evidence and from contradictory evidence.",
+      "Contradictory evidence must never be downgraded to a generic tolerated unknown-event warning.",
+      "No runtime allow/review/block enforcement behavior changes in this pack."
+    ]
+  },
+  "machine_core": {
+    "goal": "Make Ailuros post-run evidence analysis semantically consistent and evidence-grounded by sharing one canonical governance-evidence recognition boundary across validation/conformance and by surfacing deterministic contradictions between already-ingested structured claims as an explicit non-clean judgment state.",
+    "invariants": [
+      "RuntimeEventType remains an execution/runtime event vocabulary; it is not silently expanded into a catch-all governance evidence ontology unless existing repo contracts already require that exact change.",
+      "Canonical governance evidence recognized by conformance must not be reported as unknown solely because validator uses a narrower runtime event enum.",
+      "Producer/source identity does not affect whether evidence is recognized or whether a contradiction exists.",
+      "Missing evidence remains unevaluable/missing; unsupported evidence remains unsupported/unknown; only incompatible structured claims about the same fact become inconsistent_evidence.",
+      "Every new inconsistency finding identifies the evidence ids/refs that were compared and the deterministic rule that found the conflict.",
+      "No contradiction is inferred from free-form text, stderr, filenames alone or absent fields.",
+      "Existing post-run structural validation remains separate from capability evaluability and governance judgment."
+    ],
+    "complexity_budget": {
+      "max_new_files": 1,
+      "max_new_abstractions": 1,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": [
+        "generic policy engine",
+        "adapter registry",
+        "producer-specific parser tree",
+        "telemetry subsystem",
+        "runtime interceptor",
+        "approval workflow",
+        "budget ledger",
+        "artifact crawler",
+        "legacy package synthesizer"
+      ]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/evidence_conformance.py",
+        "src/ailuros/adapters/evidence_package/validator.py",
+        "src/ailuros/adapters/evidence_package/audit.py",
+        "src/ailuros/adapters/evidence_package/json_report.py",
+        "src/ailuros/adapters/evidence_package/markdown_report.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "tests/test_evidence_capability_conformance.py",
+        "tests/test_evidence_package*.py",
+        "tests/test_*evidence*audit*.py",
+        "tests/test_*projection*.py",
+        "tests/test_*signal*.py",
+        "tests/test_post_run_evidence_consistency.py"
+      ],
+      "create": [
+        "tests/test_post_run_evidence_consistency.py"
+      ],
+      "forbid": [
+        "src/ailuros/models/event.py",
+        "src/ailuros/core/execution.py",
+        "src/ailuros/policy/**",
+        "src/ailuros/storage/**",
+        "src/ailuros/run_diagnosis.py",
+        "src/ailuros/run_failure_correlation.py",
+        "schemas/**",
+        "fixtures/**",
+        "apps/**",
+        "docs/contracts/runtime-evidence-package-v1.md",
+        "docs/contracts/evidence-package-post-run-governance-v15.md",
+        ".everrun/**",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {
+          "artifact": "existing normalized/canonical evidence events consumed by evidence package validation and capability conformance"
+        },
+        "consumer": {
+          "component": "post-run evidence audit/conformance judgment",
+          "production_path": true
+        },
+        "observable_effect": {
+          "kind": "semantic_recognition_consistency",
+          "assertion": "A canonical governance evidence type already supported by Ailuros capability evaluation is not reported as an unknown event merely because the structural validator consults a narrower runtime event vocabulary. Truly unsupported event types continue to produce a warning rather than being silently accepted as canonical."
+        },
+        "proofs": [
+          {
+            "layer": "canonical",
+            "gate": "hard",
+            "assertion": "At minimum project_scope and every structured governance evidence type already required by _CAPABILITY_SPECS are recognized consistently by validation/conformance when present in canonical form."
+          },
+          {
+            "layer": "unknown",
+            "gate": "hard",
+            "assertion": "An unrelated unknown event type still produces the existing tolerated warning behavior."
+          },
+          {
+            "layer": "neutrality",
+            "gate": "hard",
+            "assertion": "Source/producer relabeling does not change recognition."
+          }
+        ]
+      },
+      {
+        "id": "CV2",
+        "kind": "convergence",
+        "producer": {
+          "artifact": "two or more already-ingested structured evidence items that make deterministic claims about the same governance fact"
+        },
+        "consumer": {
+          "component": "post-run evidence audit/judgment",
+          "production_path": true
+        },
+        "observable_effect": {
+          "kind": "evidence_consistency",
+          "assertion": "When already-structured evidence makes incompatible claims about the same fact, Ailuros emits an explicit inconsistent_evidence finding with the compared evidence references and does not present the package as merely clean-with-tolerated-unknowns."
+        },
+        "proofs": [
+          {
+            "layer": "positive",
+            "gate": "hard",
+            "assertion": "A compact deterministic contradiction fixture yields inconsistent_evidence and includes both supporting evidence refs/ids."
+          },
+          {
+            "layer": "consistent",
+            "gate": "hard",
+            "assertion": "Equivalent or non-conflicting structured claims do not yield inconsistent_evidence."
+          },
+          {
+            "layer": "missing",
+            "gate": "hard",
+            "assertion": "A missing side of a comparison is not promoted into contradiction; existing missing-evidence semantics remain intact."
+          },
+          {
+            "layer": "unsupported",
+            "gate": "hard",
+            "assertion": "Unsupported event types are not interpreted to manufacture a contradiction."
+          },
+          {
+            "layer": "grounding",
+            "gate": "hard",
+            "assertion": "The contradiction output records the deterministic rule id plus exact evidence refs/ids used for comparison."
+          }
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "If the current normalized evidence model does not expose both sides of a proposed contradiction as structured facts, do not parse raw stderr/prose to recover them; leave that case unevaluable and report the limitation in the coder evidence matrix.",
+      "If a canonical governance event vocabulary cannot be shared without changing RuntimeEventType, introduce at most one small evidence-boundary recognition primitive; do not broaden the runtime event enum just to silence audit warnings.",
+      "If evidence refs cannot be preserved using existing ids/refs, do not invent opaque synthetic provenance ids; use the closest existing canonical event/artifact identifier and keep the change narrow.",
+      "Structural package errors remain errors; semantic recognition must not hide malformed events or relax timestamp/payload/path safety validation."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Unify canonical governance evidence recognition",
+        "details": [
+          "Trace the current event vocabulary used by evidence_conformance, projection and evidence-package validator.",
+          "Remove the false assumption that RuntimeEventType alone is the complete canonical governance-evidence vocabulary.",
+          "Reuse or extract one small source-neutral recognition primitive so validator/conformance agree on governance evidence types already supported by current capability specs.",
+          "Keep genuinely unknown event types as warnings."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Add one deterministic consistency path",
+        "details": [
+          "Identify the smallest existing structured claim pair from current projection/audit evidence that can be compared without new telemetry or raw-text parsing.",
+          "Implement one generic-enough consistency rule over canonical facts, but do not create a policy/rules framework.",
+          "Represent the result explicitly as inconsistent_evidence (or the closest existing typed finding/status if repo truth already provides one) rather than a generic unknown-event warning."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Ground contradiction findings",
+        "details": [
+          "Attach the compared evidence ids/refs and deterministic rule id to each new contradiction finding.",
+          "Do not require every historical signal in Ailuros to be redesigned in this pack; grounding scope is the new consistency path plus any directly touched reporting structure."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Lock KISS semantics with regression tests",
+        "details": [
+          "Add tests proving canonical governance events no longer create false unknown-event warnings while a truly unsupported event still does.",
+          "Add contradiction, consistent, missing-side and unsupported-side cases.",
+          "Prove producer/source neutrality.",
+          "Run focused tests followed by full pytest, ruff and mypy."
+        ]
+      }
+    ],
+    "acceptance": [
+      "The evidence package validator and capability conformance no longer disagree about event types already established as canonical governance evidence in the current repo.",
+      "At least project_scope and all structured governance evidence types required by the current _CAPABILITY_SPECS are not falsely reported as unknown when structurally valid.",
+      "A truly unsupported event type still produces a warning and remains uninterpreted.",
+      "At least one deterministic contradiction between already-ingested structured evidence is surfaced as inconsistent_evidence (or an equivalent existing typed non-clean state) rather than tolerated unknown noise.",
+      "The contradiction finding carries exact evidence ids/refs and a deterministic rule id.",
+      "Missing evidence is not mislabeled as contradiction; unsupported evidence is not mislabeled as contradiction; explicit policy violation semantics are not weakened.",
+      "No raw stderr/prose parsing, new telemetry, runtime enforcement, approval/budget subsystem, package-format shim or generic adapter/policy framework is introduced.",
+      "Full tests, ruff, mypy and git diff --check pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_evidence_capability_conformance.py -q",
+      "python -m pytest tests/test_post_run_evidence_consistency.py -q",
+      "python -m pytest tests -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "The implementation is driven by the EverRun dogfood defect: false semantic blindness plus missed contradiction in already-present structured evidence.",
+      "Validator/conformance share one evidence-boundary definition for canonical governance evidence already supported by current Ailuros capability specs; RuntimeEventType is not repurposed into an unbounded governance ontology merely to silence warnings.",
+      "project_scope and current structured authority/approval/budget/project_validation evidence forms are recognized consistently when structurally valid.",
+      "Genuinely unsupported event types still warn and remain uninterpreted.",
+      "The new consistency path uses only already-ingested structured evidence; it does not parse stderr, prose or guessed files and does not request new telemetry.",
+      "Contradictory evidence produces an explicit non-clean inconsistency result and includes the exact evidence refs/ids plus deterministic rule id.",
+      "Missing evidence, unsupported evidence, contradictory evidence and explicit violation remain semantically distinct.",
+      "No runtime allow/review/block enforcement, approval workflow, budget ledger, generic policy engine, adapter registry or package compatibility layer is introduced.",
+      "All focused and full validation commands pass and no forbidden file changes."
+    ],
+    "reject_if": [
+      "The implementation fixes the 13 warnings by blindly whitelisting every EverRun event type or adding producer/source-specific branches.",
+      "RuntimeEventType is broadened into a catch-all evidence ontology solely to make evidence-audit quiet.",
+      "Raw coder-error.raw.txt, stderr, free-form summaries or inferred filesystem paths are parsed to fabricate governance facts or contradictions.",
+      "Missing evidence is treated as contradictory evidence or contradictory evidence is reduced to an ordinary tolerated warning.",
+      "Contradiction findings lack evidence refs/ids or cannot explain which deterministic rule produced them.",
+      "Capability requirements are weakened simply to make conformance evaluable.",
+      "The implementation adds runtime enforcement, approval/budget subsystems, new telemetry, a generic adapter/policy framework, or synthesizes legacy validate-package files.",
+      "Forbidden files change or any validation command fails."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "Align post-run canonical evidence recognition and surface grounded contradictions without widening telemetry or runtime enforcement.",
+    "missing_targets": ["tests/test_post_run_evidence_consistency.py may be created by this pack"],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": [
+    "## Implementation Summary",
+    "## Files modified",
+    "## Validation",
+    "## Evidence Matrix",
+    "## Known limitations"
+  ]
+}
