@@ -153,15 +153,14 @@ def test_replay_uses_the_8070_8071_production_derived_fixture(tmp_path) -> None:
 
 
 def test_fixture_unknown_event_type_warnings_are_not_suppressed(tmp_path) -> None:
-    """The accepted fixture keeps the `unknown event_type` registry-gap warnings
-    the raw accepted package produced (project_validation x2, project_scope x1).
-    Suppressing them to make outputs match is a red line and must not happen."""
+    """Canonical governance evidence (project_validation x2, project_scope x1)
+    is no longer reported unknown; the fixture now validates clean. A genuinely
+    unsupported event type would still warn (locked by the consistency tests)."""
     result = validate_evidence_package_contract(FIXTURE)
     assert result.ok is True
     unknown = [w for w in result.warnings if "unknown event_type" in w]
-    assert len(unknown) == 3
-    assert any("project_validation" in w for w in unknown)
-    assert any("project_scope" in w for w in unknown)
+    assert len(unknown) == 0
+    assert result.warnings == []
 
 
 def test_replay_does_not_mutate_source_evidence(tmp_path) -> None:
@@ -236,7 +235,7 @@ def test_replay_keeps_unknowns_stable_across_both_replays(tmp_path) -> None:
         assert proj.governance_coverage.budget.value == "unknown"
         assert report.why_stopped == "execution_control: human_review"
         assert report.governed_outcome != "clean_success"
-        assert audit.decision == "warn"
+        assert audit.decision == "pass"
 
 
 # ── T3: intentional exclusion is limited to incidental non-semantic fields ──

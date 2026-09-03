@@ -311,11 +311,11 @@ def test_projection_source_label_is_inert_to_regression_interpretation(
 def test_unknown_events_survive_without_promoting_clean_across_canonical_fixtures(
     tmp_path: Path,
 ) -> None:
-    """T3: producer-private unknown events in BOTH canonical fixtures survive
-    ingestion as raw evidence and are never promoted into a clean_success
-    governed outcome. The EverRun fixture carries project_validation/
-    project_scope outside the canonical vocabulary; the second-producer carries
-    mcp.tool.result_received. Neither run may be reported as clean."""
+    """T3: producer-private unknown events survive ingestion as raw evidence and
+    are never promoted into a clean_success governed outcome. The EverRun
+    fixture's governance events are canonical now; the second-producer carries
+    the unsupported mcp.tool.result_received. Neither run may be reported as
+    clean."""
     fixtures = {
         "everrun": (EVERRUN_POSTFIX_MINIMAL, "run-20260824-004751", "unknown"),
         "second": (SECOND_PRODUCER, "run-second-producer-001", "failed"),
@@ -323,7 +323,11 @@ def test_unknown_events_survive_without_promoting_clean_across_canonical_fixture
     for name, (fixture, run_id, expected_outcome) in fixtures.items():
         validation = validate_evidence_package_contract(fixture)
         assert validation.ok is True
-        assert any("unknown event_type" in w for w in validation.warnings)
+        if name == "everrun":
+            # EverRun's evidence is fully canonical now; no unknown warnings.
+            assert validation.warnings == []
+        else:
+            assert any("unknown event_type" in w for w in validation.warnings)
 
         package = load_evidence_package(fixture)
         storage = _new_storage(tmp_path / name)

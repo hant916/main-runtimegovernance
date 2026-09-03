@@ -1,9 +1,48 @@
-"""Shared normalization of valid external evidence wrapper events."""
+"""Shared normalization and recognition of canonical governance evidence.
+
+This module is the single source-neutral interpretation boundary for evidence:
+it turns valid ``external_evidence`` wrapper events into their canonical form
+and exposes the one small recognition primitive that tells callers which event
+types are already established as canonical governance evidence by Ailuros
+capability evaluation and projection.
+"""
 
 from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 from typing import Any
+
+# Canonical governance-evidence event types already consumed by capability
+# conformance (``_CAPABILITY_SPECS``) and by the execution projection. This is a
+# *recognition* boundary, not an execution/runtime vocabulary: RuntimeEventType
+# remains the runtime event enum, and these additional governance evidence types
+# are recognized separately so the structural validator and capability
+# conformance agree instead of the validator calling canonical evidence unknown.
+_CANONICAL_GOVERNANCE_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "run_started",
+        "run_completed",
+        "run_failed",
+        "governance_decision",
+        "project_scope",
+        "project_validation",
+        "runtime_role",
+        "governance_context",
+        "authority_evidence",
+        "approval_evidence",
+        "budget_evidence",
+    }
+)
+
+
+def canonical_governance_event_types() -> frozenset[str]:
+    """Return the shared, source-neutral recognition boundary for canonical
+    governance evidence already supported by Ailuros capability evaluation.
+
+    Producer/source identity never enters this boundary: a type is recognized
+    or not solely on its canonical event_type name.
+    """
+    return _CANONICAL_GOVERNANCE_EVENT_TYPES
 
 
 def normalize_external_evidence_event(event: dict[str, Any]) -> dict[str, Any]:

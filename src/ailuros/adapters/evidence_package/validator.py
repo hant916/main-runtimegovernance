@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ailuros.core.validation import ValidationResult
+from ailuros.evidence_normalization import canonical_governance_event_types
 from ailuros.models.event import RuntimeEventType
 
 _V1_SCHEMA = "ailuros.timeline.v1"
@@ -13,8 +14,13 @@ _DIGEST_HEX_LENGTHS = {"sha256": 64, "sha512": 128, "sha1": 40, "md5": 32}
 _HEX_CHARS = frozenset("0123456789abcdef")
 
 # Canonical event-type vocabulary. Well-formed events whose type is outside this
-# set are preserved as warnings rather than errors.
-_KNOWN_EVENT_TYPES = {member.value for member in RuntimeEventType}
+# set are preserved as warnings rather than errors. The vocabulary is the union
+# of the runtime event enum and the shared canonical governance-evidence
+# recognition boundary, so the structural validator and capability conformance
+# agree on governance evidence already supported by Ailuros evaluation.
+_KNOWN_EVENT_TYPES = (
+    {member.value for member in RuntimeEventType} | canonical_governance_event_types()
+)
 
 # Manifest fields that must be present and non-empty.
 _REQUIRED_MANIFEST_FIELDS = (

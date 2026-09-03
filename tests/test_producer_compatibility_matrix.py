@@ -79,7 +79,8 @@ PRODUCERS: dict[str, dict] = {
         "run_id": "run-20260824-004751",
         "schema_version": "ailuros.timeline.v1",
         "events": 5,
-        "unknown_event_warnings": 3,
+        "unknown_event_warnings": 0,
+        "audit_decision": "pass",
         "expected": {
             "lifecycle": "running",
             "outcome": "unknown",
@@ -120,7 +121,8 @@ PRODUCERS: dict[str, dict] = {
         "run_id": "run-second-producer-001",
         "schema_version": "ailuros.timeline.v1",
         "events": 6,
-        "unknown_event_warnings": 4,
+        "unknown_event_warnings": 1,
+        "audit_decision": "warn",
         "expected": {
             "lifecycle": "completed",
             "outcome": "failed",
@@ -279,7 +281,7 @@ def test_each_producer_audit_acceptance(name: str) -> None:
 
     audit = audit_evidence_package(meta["path"])
     assert audit.ok is True
-    assert audit.decision == "warn"
+    assert audit.decision == meta["audit_decision"]
     assert audit.rules_evaluated == 2
     assert audit.events_count == meta["events"]
     assert audit.run_id == meta["run_id"]
@@ -405,8 +407,8 @@ def test_projection_stage_is_neutral_even_when_handed_a_producer_name(
 def test_each_producer_governed_outcome_is_never_promoted_to_clean(
     tmp_path, name: str
 ) -> None:
-    """Both fixtures carry registry-gap (unknown event_type) warnings. Neither
-    may be reported as a clean governed outcome; unknowns/violations stay."""
+    """Governed outcomes must not be promoted to clean on unknown/violation
+    evidence alone; unknowns/violations stay."""
     meta = PRODUCERS[name]
     outcomes = _run_shared_pipeline(tmp_path, meta["path"])
     assert outcomes["report"].governed_outcome != "clean_success"

@@ -500,7 +500,7 @@ def test_everrun_postfix_minimal_fixture_replays_8066_facts(
     assert result.errors == []
     assert result.source == "everrun"
     assert result.run_id == "run-20260824-004751"
-    assert any("unknown event_type" in w for w in result.warnings)
+    assert result.warnings == []
 
     package = load_evidence_package(EVERRUN_POSTFIX_MINIMAL)
     storage = SQLiteStorage(tmp_path / "everrun-replay.db")
