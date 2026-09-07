@@ -22,12 +22,14 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from ailuros._compat import StrEnum
-from ailuros.evidence_normalization import normalize_external_evidence_event
+from ailuros.evidence_normalization import (
+    DecisionDisposition,
+    classify_decision_token,
+    normalize_external_evidence_event,
+)
 from ailuros.projection import (
-    _APPROVED_DECISIONS,
     _AUTHORITY_AUTHORIZED_STATUSES,
     _AUTHORITY_VIOLATION_STATUSES,
-    _DENIED_DECISIONS,
 )
 
 
@@ -318,16 +320,17 @@ def _inconsistencies_for(
         decision = _normalize_token(payload.get("decision"))
         if subject is None or decision is None:
             continue
-        approved = decision in _APPROVED_DECISIONS
-        denied = decision in _DENIED_DECISIONS
-        if not approved and not denied:
+        disposition = classify_decision_token(decision)
+        if disposition is DecisionDisposition.UNKNOWN:
+            # Outside the shared vocabulary: unknown stays unknown and never
+            # contradicts anything on its own.
             continue
         event_id = event.get("event_id")
         if not isinstance(event_id, str) or not event_id:
             continue
         key = (subject, action if action is not None else "")
         slot = approval.setdefault(key, {})
-        state = "approved" if approved else "denied"
+        state = disposition.value
         slot.setdefault(state, []).append(event_id)
 
     for (subject, action), states in approval.items():

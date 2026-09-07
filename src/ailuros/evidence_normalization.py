@@ -12,6 +12,8 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
+from ailuros._compat import StrEnum
+
 # Canonical governance-evidence event types already consumed by capability
 # conformance (``_CAPABILITY_SPECS``) and by the execution projection. This is a
 # *recognition* boundary, not an execution/runtime vocabulary: RuntimeEventType
@@ -33,6 +35,55 @@ _CANONICAL_GOVERNANCE_EVENT_TYPES: frozenset[str] = frozenset(
         "budget_evidence",
     }
 )
+
+
+class DecisionDisposition(StrEnum):
+    """What a structured governance decision token means, if anything.
+
+    ``UNKNOWN`` is the honest answer for a token outside the closed vocabulary,
+    for a missing field and for any non-string value.  It never stands in for a
+    contradiction: two claims only disagree when both classify.
+    """
+
+    APPROVED = "approved"
+    DENIED = "denied"
+    UNKNOWN = "unknown"
+
+
+# The closed governance decision vocabulary, shared by every Ailuros surface
+# that interprets a decision token.  These sets are the union of the vocabularies
+# the signals and conformance surfaces previously maintained separately; nothing
+# beyond that union is recognized, because a synonym Ailuros invents is a claim
+# no producer made.
+_APPROVED_DECISION_TOKENS: frozenset[str] = frozenset(
+    {"allow", "approved", "approve", "granted"}
+)
+
+_DENIED_DECISION_TOKENS: frozenset[str] = frozenset(
+    {"block", "fail", "blocked", "deny", "denied", "rejected", "reject", "declined"}
+)
+
+
+def classify_decision_token(value: Any) -> DecisionDisposition:
+    """Classify one structured decision token as approved, denied or unknown.
+
+    This is the single semantic boundary for decision disposition: signals-side
+    inconsistency detection, post-run conformance and projection approval-state
+    normalization all read it, so the same structured token cannot mean
+    different things on different Ailuros surfaces.
+
+    Only structured strings participate, compared after trim+lowercase.  No
+    prose is parsed, no synonym is inferred, and booleans and other non-string
+    values are never decisions.
+    """
+    if not isinstance(value, str):
+        return DecisionDisposition.UNKNOWN
+    token = value.strip().lower()
+    if token in _APPROVED_DECISION_TOKENS:
+        return DecisionDisposition.APPROVED
+    if token in _DENIED_DECISION_TOKENS:
+        return DecisionDisposition.DENIED
+    return DecisionDisposition.UNKNOWN
 
 
 def canonical_governance_event_types() -> frozenset[str]:

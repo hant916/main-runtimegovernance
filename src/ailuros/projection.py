@@ -24,6 +24,8 @@ from ailuros.core.execution import (
     Validation,
 )
 from ailuros.evidence_normalization import (
+    DecisionDisposition,
+    classify_decision_token,
     normalize_external_evidence_event,
     normalize_timeline_timestamps,
 )
@@ -176,22 +178,16 @@ def _normalize_authority_state(status: str | None) -> AuthorityState:
         return AuthorityState.AUTHORIZED
     return AuthorityState.UNKNOWN
 
-_APPROVED_DECISIONS: frozenset[str] = frozenset(
-    {"approved", "approve", "granted"}
-)
-
-_DENIED_DECISIONS: frozenset[str] = frozenset(
-    {"denied", "deny", "rejected", "reject", "declined"}
-)
-
-
 def _normalize_approval_state(decision: str | None) -> ApprovalState:
-    if decision is None:
-        return ApprovalState.UNKNOWN
-    lowered = decision.strip().lower()
-    if lowered in _APPROVED_DECISIONS:
+    """Map a structured approval decision onto the projection approval state.
+
+    Disposition comes from the one shared governance classifier so this surface
+    cannot drift from signals-side and conformance-side interpretation.
+    """
+    disposition = classify_decision_token(decision)
+    if disposition is DecisionDisposition.APPROVED:
         return ApprovalState.APPROVED
-    if lowered in _DENIED_DECISIONS:
+    if disposition is DecisionDisposition.DENIED:
         return ApprovalState.DENIED
     return ApprovalState.UNKNOWN
 

@@ -21,6 +21,10 @@ from ailuros.core.execution import (
     Scope,
     Validation,
 )
+from ailuros.evidence_normalization import (
+    DecisionDisposition,
+    classify_decision_token,
+)
 from ailuros.models.common import Severity
 
 
@@ -196,8 +200,9 @@ def _evidence_inconsistency_rule(
 
     conflicts: list[dict[str, Any]] = []
     for (scope_ref, domain_key), decisions in domains.items():
-        has_allow = "allow" in decisions
-        has_deny = bool({"block", "fail", "blocked", "deny"} & decisions)
+        dispositions = {classify_decision_token(d) for d in decisions}
+        has_allow = DecisionDisposition.APPROVED in dispositions
+        has_deny = DecisionDisposition.DENIED in dispositions
         if has_allow and has_deny:
             conflicts.append(
                 {
