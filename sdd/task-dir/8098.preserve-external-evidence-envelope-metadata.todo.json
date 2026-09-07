@@ -1,0 +1,155 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "post-run-evidence-review-repair",
+    "id": "8098.preserve-external-evidence-envelope-metadata",
+    "sequence": 8098,
+    "slug": "preserve-external-evidence-envelope-metadata",
+    "title": "Preserve external evidence envelope metadata",
+    "type": "evidence_integrity",
+    "pack_kind": "convergence"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Review found that normalize_external_evidence_event unconditionally replaces normalized metadata with the inner wrapper metadata or {}, which erases producer-supplied outer metadata when the inner wrapper omits metadata. This directly defeats the existing artifact-reference preservation path: an outer metadata.artifact can disappear before _event_evidence_ref sees it. Repair only the proven erasure case. Preserve current behavior when inner metadata is a dict; when inner metadata is absent/non-dict, retain valid outer metadata. Do not invent a general metadata merge policy.",
+    "why_now": "Commit 737e1f2 explicitly preserves export artifact references, but the external_evidence normalization path can still erase those references. Evidence normalization must not destroy provenance already present in the source envelope.",
+    "do_not_misread": [
+      "Do not recursively merge arbitrary nested metadata.",
+      "Do not dereference, validate, fetch or materialize artifact URIs.",
+      "Do not change payload, event_type, scope_ref or event_id semantics.",
+      "Do not add producer-specific metadata rules."
+    ],
+    "red_lines": [
+      "If inner metadata is absent/non-dict and outer metadata is a dict, normalized metadata must preserve the outer dict.",
+      "If inner metadata is a dict, preserve the existing inner-metadata precedence behavior in this pack.",
+      "No synthetic artifact/pointer values may be created."
+    ]
+  },
+  "machine_core": {
+    "depends_on": ["8095.preserve-export-artifact-references"],
+    "goal": "Stop external_evidence normalization from erasing valid envelope metadata, so existing artifact/pointer provenance survives normalization without expanding metadata semantics.",
+    "invariants": [
+      "Normalization never invents metadata fields.",
+      "Outer metadata survives when the valid inner wrapper has no dict metadata.",
+      "Existing inner dict metadata retains precedence and is not merged with outer metadata in this MVP.",
+      "Artifact/pointer extraction remains the responsibility of the existing EvidenceRef path.",
+      "Behavior is producer/source neutral."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "valid external_evidence wrapper with optional outer and inner metadata"},
+        "consumer": {"component": "normalize_external_evidence_event -> projection EvidenceRef creation", "production_path": true},
+        "observable_effect": {
+          "kind": "provenance_preservation",
+          "assertion": "A valid outer metadata.artifact or metadata.pointer remains visible after normalization when the inner wrapper does not supply a metadata dict; existing inner metadata precedence remains unchanged when it does."
+        },
+        "proofs": [
+          {"layer": "outer_fallback", "gate": "hard", "assertion": "Outer metadata containing artifact survives normalization when inner metadata is missing."},
+          {"layer": "artifact_ref", "gate": "hard", "assertion": "The preserved metadata reaches the existing EvidenceRef path so artifact is not lost."},
+          {"layer": "inner_precedence", "gate": "hard", "assertion": "When inner metadata is a dict, normalized metadata remains exactly that inner dict; no new merge semantics are introduced."},
+          {"layer": "non_dict", "gate": "hard", "assertion": "Invalid/non-dict outer metadata still does not produce fabricated metadata values."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "Absent inner metadata means fall back to already-present valid outer metadata, not {}.",
+      "Absent metadata on both layers remains empty/absent according to existing normalized output behavior.",
+      "This repair does not claim an artifact is valid or reachable; it only preserves the reference."
+    ],
+    "complexity_budget": {
+      "max_new_files": 1,
+      "max_new_abstractions": 0,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": ["metadata merge framework", "artifact resolver", "artifact downloader", "producer-specific normalizer", "schema migration"]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/evidence_normalization.py",
+        "tests/test_external_evidence_metadata_preservation.py",
+        "tests/test_*projection*.py",
+        "tests/test_*evidence*.py"
+      ],
+      "create": ["tests/test_external_evidence_metadata_preservation.py"],
+      "forbid": ["src/ailuros/core/execution.py", "src/ailuros/storage/**", "schemas/**", "docs/**", "apps/**", ".everrun/**", "*.lock", "**/*.lock"]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Characterize metadata erasure",
+        "details": [
+          "Add the exact review case: outer metadata.artifact on external_evidence, valid inner event/payload, no inner metadata.",
+          "Assert normalized metadata retains the artifact value."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Repair only the fallback",
+        "details": [
+          "When wrapper.metadata is a dict, keep current behavior.",
+          "Otherwise use event.metadata only when it is already a dict; do not merge the two dicts."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Prove EvidenceRef preservation",
+        "details": [
+          "Exercise the existing projection/reference path and prove the outer artifact reference remains observable after normalization.",
+          "Do not modify EvidenceRef semantics to make the test pass."
+        ]
+      }
+    ],
+    "acceptance": [
+      "Outer metadata.artifact survives a valid external_evidence wrapper with no inner metadata.",
+      "Outer metadata.pointer survives under the same fallback rule.",
+      "Inner dict metadata still wins exactly as before and is not recursively/implicitly merged.",
+      "No artifact URI is dereferenced or validated.",
+      "ruff, mypy, focused tests and the full pytest suite pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_external_evidence_metadata_preservation.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true,
+    "tasks": [],
+    "red_lines": []
+  },
+  "judge": {
+    "must_check": [
+      "The exact review case preserves outer metadata.artifact through normalization.",
+      "The existing EvidenceRef path sees the preserved artifact without changes to artifact resolution semantics.",
+      "Inner dict metadata retains precedence; the implementation does not introduce a general merge policy.",
+      "No metadata/artifact fields are synthesized.",
+      "Focused tests, full pytest, ruff and mypy pass."
+    ],
+    "reject_if": [
+      "Outer valid metadata is still replaced by {} solely because inner metadata is missing.",
+      "The implementation recursively or generically merges arbitrary metadata.",
+      "Artifact references are fetched, validated or materialized.",
+      "Producer-specific branches or schema migrations are added.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "Outer metadata fallback plus artifact-reference preservation without merge-policy expansion.",
+    "missing_targets": ["tests/test_external_evidence_metadata_preservation.py may be created by this pack"],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations"]
+}
