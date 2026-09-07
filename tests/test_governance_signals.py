@@ -945,11 +945,15 @@ def test_governance_signal_model_dump_scope_ref_none() -> None:
 
 def test_empty_projection_yields_no_signals() -> None:
     now = datetime.now(UTC)
+    # ``Lifecycle.UNKNOWN`` is what an evidence-free projection actually
+    # carries: the projection reaches ``RUNNING`` only from an explicit
+    # ``run_started`` event, which is itself a finding when no terminal
+    # evidence follows (see tests/test_missing_run_terminal_evidence.py).
     proj = ExecutionProjection(
         run_id="minimal",
         source="test",
         schema_version="1.0",
-        lifecycle=Lifecycle.RUNNING,
+        lifecycle=Lifecycle.UNKNOWN,
         outcome=Outcome.UNKNOWN,
         validation=Validation.NOT_RUN,
         scope=Scope.UNKNOWN,

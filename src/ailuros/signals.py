@@ -230,11 +230,15 @@ def _evidence_inconsistency_rule(
 def _missing_run_terminal_evidence_rule(
     projection: ExecutionProjection,
 ) -> list[GovernanceSignal]:
-    # ``Lifecycle.RUNNING`` alone is not evidence that a run started: callers
-    # may construct partial projections without lifecycle events.  The
-    # projection path adds a reference for explicit ``run_started`` evidence,
-    # so require that provenance before surfacing a missing-terminal finding.
-    if projection.lifecycle != Lifecycle.RUNNING or not projection.evidence_refs:
+    # ``Lifecycle.RUNNING`` *is* the projected run-start semantic: the
+    # projection sets it only from an explicit ``run_started`` event, alongside
+    # ``started_at``.  Evidence references are not a usable proxy for that fact
+    # in either direction -- unrelated governance events populate them without
+    # any run having started, and a ``run_started`` event with an empty
+    # ``event_id`` yields no usable reference despite the start being observed.
+    # Provenance quality must not erase an already-observed lifecycle fact, so
+    # the guard reads the lifecycle projection itself.
+    if projection.lifecycle != Lifecycle.RUNNING:
         return []
     return [
         GovernanceSignal.build(
