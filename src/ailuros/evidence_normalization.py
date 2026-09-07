@@ -93,6 +93,28 @@ def _partial_time(event: dict[str, Any]) -> time | None:
     return None
 
 
+# Only a backward wall-clock movement larger than this can be read as crossing
+# midnight.  A smaller (or exactly equal) step back is ordinary evidence
+# disorder: reporting it is honest, dating it a day later would be invented.
+_MIDNIGHT_WRAP_MIN_BACKWARD = timedelta(hours=12)
+
+
+def _is_midnight_wrap(prev_tod: time, current_tod: time) -> bool:
+    """Return whether ``prev_tod`` -> ``current_tod`` is a deterministic wrap.
+
+    The only partial-time movement treated as a midnight crossing is a backward
+    wall-clock jump strictly greater than 12 hours (e.g. ``23:53`` -> ``00:53``).
+    Anything else — including an exact 12-hour step back — remains ambiguous and
+    is surfaced as a chronology regression instead of a new calendar day.
+    """
+    if current_tod >= prev_tod:
+        return False
+    backward = datetime.combine(date.min, prev_tod) - datetime.combine(
+        date.min, current_tod
+    )
+    return backward > _MIDNIGHT_WRAP_MIN_BACKWARD
+
+
 def normalize_timeline_timestamps(
     events: list[dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -108,12 +130,16 @@ def normalize_timeline_timestamps(
       through unchanged and anchors the derived calendar date for any following
       partial-time evidence.
     * An event carrying only ``partial_time`` has a date attached by carrying the
-      previous derived date forward.  When ordered partial-time evidence steps
-      backwards in wall-clock time (e.g. ``23:53`` followed by ``00:53``) that
-      deterministically represents a midnight rollover, so the derived date is
-      incremented by one day.
+      previous derived date forward.  The date is incremented only for a
+      *large* backward wall-clock wrap (more than 12 hours, e.g. ``23:53``
+      followed by ``00:53``), which is the sole partial-time movement that
+      deterministically represents crossing midnight.  Ordinary backward jitter
+      (a 12-hour or smaller step back, e.g. ``10:00:05`` -> ``10:00:03`` or
+      ``00:53`` -> ``00:10``) stays on the carried date and is reported as a
+      chronology regression rather than fabricating a later calendar day.
     * A partial-time event with no preceding date anchor is ambiguous: no date is
-      fabricated and the condition is reported as a regression.
+      fabricated, the condition is reported as a regression, and the event never
+      becomes trusted inference state for later events.
     * Any remaining non-monotonic timestamp after deterministic normalization
       (for example explicit dated timestamps that move backwards) is reported as
       a regression without being rewritten or reordered.
@@ -157,9 +183,10 @@ def normalize_timeline_timestamps(
                         "reason": "ambiguous_partial_time_no_anchor",
                     }
                 )
-                prev_tod = partial_tod
+                # Unanchored evidence stays ambiguous: it must not become the
+                # trusted state that later anchored derivation reasons from.
                 continue
-            if prev_tod is not None and partial_tod < prev_tod:
+            if prev_tod is not None and _is_midnight_wrap(prev_tod, partial_tod):
                 # Deterministic midnight rollover: increment the derived date.
                 carried_date = carried_date + timedelta(days=1)
             tzinfo = partial.tzinfo or carried_tz

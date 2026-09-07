@@ -181,3 +181,73 @@ def test_string_partial_time_is_supported() -> None:
 
     assert regressions == []
     assert normalized[1]["timestamp"] == _ts(0, 15, day=2)
+
+
+# ── Conservative rollover boundary (pack 8097) ───────────────────────────
+
+
+def test_small_backward_jitter_stays_on_same_day() -> None:
+    events = [
+        {"event_id": "e1", "timestamp": datetime(2026, 9, 1, 10, 0, 5, tzinfo=UTC)},
+        {"event_id": "e2", "partial_time": time(10, 0, 3)},
+    ]
+    normalized, regressions = normalize_timeline_timestamps(events)
+
+    # A 2-second backward movement is disorder, not a new calendar day.
+    assert normalized[1]["timestamp"] == datetime(2026, 9, 1, 10, 0, 3, tzinfo=UTC)
+    assert [r["reason"] for r in regressions] == ["non_monotonic_timestamp"]
+    assert regressions[0]["event_id"] == "e2"
+
+
+def test_post_midnight_disorder_never_fabricates_a_third_day() -> None:
+    events = [
+        {"event_id": "e1", "timestamp": _ts(23, 53)},
+        {"event_id": "e2", "partial_time": time(0, 53)},
+        {"event_id": "e3", "partial_time": time(0, 10)},
+    ]
+    normalized, regressions = normalize_timeline_timestamps(events)
+
+    assert normalized[0]["timestamp"] == _ts(23, 53, day=1)
+    assert normalized[1]["timestamp"] == _ts(0, 53, day=2)
+    # 00:53 -> 00:10 is a 43-minute regression, not a second midnight crossing.
+    assert normalized[2]["timestamp"] == _ts(0, 10, day=2)
+    assert [r["reason"] for r in regressions] == ["non_monotonic_timestamp"]
+    assert regressions[0]["event_id"] == "e3"
+
+
+def test_exact_twelve_hour_backward_jump_is_not_a_rollover() -> None:
+    events = [
+        {"event_id": "e1", "timestamp": _ts(22, 0)},
+        {"event_id": "e2", "partial_time": time(10, 0)},
+    ]
+    normalized, regressions = normalize_timeline_timestamps(events)
+
+    # Exactly 12 hours backwards stays ambiguous: it is not promoted to rollover.
+    assert normalized[1]["timestamp"] == _ts(10, 0, day=1)
+    assert [r["reason"] for r in regressions] == ["non_monotonic_timestamp"]
+
+
+def test_backward_jump_beyond_twelve_hours_is_a_rollover() -> None:
+    events = [
+        {"event_id": "e1", "timestamp": _ts(22, 0)},
+        {"event_id": "e2", "partial_time": time(9, 59)},
+    ]
+    normalized, regressions = normalize_timeline_timestamps(events)
+
+    assert normalized[1]["timestamp"] == _ts(9, 59, day=2)
+    assert regressions == []
+
+
+def test_unanchored_partial_time_does_not_poison_later_inference() -> None:
+    events = [
+        {"event_id": "e1", "partial_time": time(23, 59)},
+        {"event_id": "e2", "timestamp": _ts(9, 0)},
+        {"event_id": "e3", "partial_time": time(10, 0)},
+    ]
+    normalized, regressions = normalize_timeline_timestamps(events)
+
+    assert normalized[0]["timestamp"] is None
+    assert normalized[1]["timestamp"] == _ts(9, 0, day=1)
+    # The unanchored 23:59 must not have become trusted state driving a rollover.
+    assert normalized[2]["timestamp"] == _ts(10, 0, day=1)
+    assert [r["reason"] for r in regressions] == ["ambiguous_partial_time_no_anchor"]
