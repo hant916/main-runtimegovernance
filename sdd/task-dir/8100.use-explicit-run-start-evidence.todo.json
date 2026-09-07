@@ -1,0 +1,151 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "post-run-evidence-review-repair",
+    "id": "8100.use-explicit-run-start-evidence",
+    "sequence": 8100,
+    "slug": "use-explicit-run-start-evidence",
+    "title": "Use explicit run-start evidence",
+    "type": "evidence_integrity",
+    "pack_kind": "convergence"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Review found that the missing-run-terminal signal uses not projection.evidence_refs as a proxy for whether run_started evidence exists. That proxy is semantically wrong: evidence_refs can be populated by many unrelated governance events, while a run_started event with an empty event_id can still set lifecycle/start semantics. Use the projection's explicit started_at field, which is already the run-start semantic projection, instead of inferring start evidence from the presence of arbitrary refs.",
+    "why_now": "Pack 8093 was meant to surface started-without-terminal runs without fabricating lifecycle facts. The current proxy can both false-positive and false-negative that condition. The smallest repair is to consume the explicit semantic field that already exists.",
+    "do_not_misread": [
+      "Do not add a second has_run_started flag if started_at already expresses the fact.",
+      "Do not change EvidenceRef generation to make the proxy work.",
+      "Do not infer run start from runtime_role, governance_decision, project_scope or any other unrelated event.",
+      "Do not change terminal lifecycle semantics."
+    ],
+    "red_lines": [
+      "Missing-terminal signaling requires Lifecycle.RUNNING and explicit run-start semantics from projection.started_at.",
+      "Arbitrary evidence_refs must not be treated as proof that a run started.",
+      "A run_started event with an empty event_id must still count as start evidence if the existing projection sets started_at from it.",
+      "Completed and failed runs remain unchanged."
+    ]
+  },
+  "machine_core": {
+    "depends_on": ["8093.surface-missing-run-terminal-evidence"],
+    "goal": "Replace the evidence_refs proxy in missing-run-terminal detection with the existing explicit run-start semantic projection so the signal fires only when start evidence actually exists.",
+    "invariants": [
+      "projection.started_at is the source of truth for observed run_started semantics in this rule.",
+      "projection.evidence_refs cardinality/content does not determine whether a run started.",
+      "Lifecycle.RUNNING without started_at does not emit missing_run_terminal_evidence.",
+      "Lifecycle.RUNNING with started_at emits missing_run_terminal_evidence even if run-start event_id is empty and no usable EvidenceRef exists.",
+      "Lifecycle.COMPLETED and Lifecycle.FAILED behavior is unchanged.",
+      "No new lifecycle field or parallel lifecycle representation is introduced."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "ExecutionProjection lifecycle/start fields derived from canonical run lifecycle evidence"},
+        "consumer": {"component": "signals._missing_run_terminal_evidence_rule", "production_path": true},
+        "observable_effect": {
+          "kind": "lifecycle_evidence_precision",
+          "assertion": "Missing-terminal signaling depends on explicit projected run-start evidence (started_at), not on whether unrelated evidence references happen to exist."
+        },
+        "proofs": [
+          {"layer": "false_positive", "gate": "hard", "assertion": "A RUNNING projection with unrelated evidence_refs but started_at=None does not emit missing_run_terminal_evidence."},
+          {"layer": "false_negative", "gate": "hard", "assertion": "A RUNNING projection with started_at set emits missing_run_terminal_evidence even when evidence_refs is empty or the source run_started event id is empty."},
+          {"layer": "terminal_regression", "gate": "hard", "assertion": "Completed and failed projections do not emit the missing-terminal signal."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "RUNNING without explicit start evidence remains insufficient to claim missing terminal evidence.",
+      "Started-without-terminal remains incomplete/unknown evidence, not execution failure.",
+      "Empty/missing event_id affects provenance quality but must not erase an already-observed run_started semantic fact."
+    ],
+    "complexity_budget": {
+      "max_new_files": 0,
+      "max_new_abstractions": 0,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": ["new lifecycle flag", "lifecycle service", "watchdog", "timeout inference", "EvidenceRef redesign", "producer-specific lifecycle logic"]
+    },
+    "files": {
+      "allow": ["src/ailuros/signals.py", "tests/test_missing_run_terminal_evidence.py"],
+      "create": [],
+      "forbid": ["src/ailuros/projection.py", "src/ailuros/core/execution.py", "src/ailuros/evidence_normalization.py", "schemas/**", "docs/**", "apps/**", ".everrun/**", "*.lock", "**/*.lock"]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Characterize both proxy failures",
+        "details": [
+          "Add a RUNNING projection with unrelated evidence_refs and started_at=None; assert no signal.",
+          "Add a RUNNING projection with started_at set and no meaningful evidence_refs; assert the signal is emitted."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Replace the proxy condition",
+        "details": [
+          "Change only the missing-terminal rule guard from evidence_refs presence to started_at presence while retaining Lifecycle.RUNNING requirement.",
+          "Do not modify how projection.started_at is derived unless tests prove the existing field is not in fact run_started-specific; if that contradiction is found, stop rather than expanding scope."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Lock terminal regressions",
+        "details": [
+          "Retain completed, failed, no-start and started-without-terminal behavior tests."
+        ]
+      }
+    ],
+    "acceptance": [
+      "RUNNING + started_at=None + unrelated refs does not emit missing_run_terminal_evidence.",
+      "RUNNING + started_at set emits missing_run_terminal_evidence regardless of arbitrary refs.",
+      "Completed and failed behavior remains unchanged.",
+      "No new lifecycle state, EvidenceRef semantics or producer-specific branches are introduced.",
+      "ruff, mypy, focused tests and the full pytest suite pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_missing_run_terminal_evidence.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true,
+    "tasks": [],
+    "red_lines": []
+  },
+  "judge": {
+    "must_check": [
+      "The missing-terminal rule uses projection.started_at rather than evidence_refs as proof of run-start evidence.",
+      "Unrelated EvidenceRefs cannot cause a false missing-terminal signal.",
+      "An observed run start is not lost solely because its event_id/provenance ref is empty.",
+      "Completed and failed lifecycle behavior remains unchanged.",
+      "No new lifecycle representation or EvidenceRef redesign is introduced.",
+      "Focused tests, full pytest, ruff and mypy pass."
+    ],
+    "reject_if": [
+      "The rule still uses evidence_refs presence as the run-start predicate.",
+      "runtime_role or another unrelated evidence type can prove run_started.",
+      "A new has_started flag or lifecycle subsystem is introduced without evidence that started_at is insufficient.",
+      "Completed/failed behavior regresses.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "Explicit run-start semantics for missing-terminal signal without EvidenceRef proxying.",
+    "missing_targets": [],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations"]
+}
