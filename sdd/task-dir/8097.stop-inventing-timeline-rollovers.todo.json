@@ -1,0 +1,166 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "post-run-evidence-review-repair",
+    "id": "8097.stop-inventing-timeline-rollovers",
+    "sequence": 8097,
+    "slug": "stop-inventing-timeline-rollovers",
+    "title": "Stop inventing timeline rollovers",
+    "type": "evidence_integrity",
+    "pack_kind": "convergence"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Review of the implemented 8094 timeline repair found a data-correctness defect: any partial-time regression is currently treated as a midnight rollover. A 3-second out-of-order event therefore gains a fabricated next-day date, and a later 00:10 event after 00:53 can be pushed to a third calendar day. Repair only this inference boundary. Ailuros may infer next-day rollover only for a large wall-clock wrap that is consistent with crossing midnight; ordinary backward jitter must remain on the carried date and surface non_monotonic_timestamp. An unanchored ambiguous partial-time event must not mutate trusted inference state.",
+    "why_now": "Ailuros is being used as a post-run evidence analyzer. Its value depends on preserving evidence chronology without manufacturing facts. Silent date fabrication violates the existing 'never invent' normalization contract and Evidence Over Assumptions.",
+    "do_not_misread": [
+      "Do not sort or reorder events to obtain monotonic timestamps.",
+      "Do not rewrite explicit full timestamps.",
+      "Do not add timezone inference, producer-specific rules, a timeline engine or a clock service.",
+      "Do not use every partial_tod < prev_tod comparison as rollover evidence."
+    ],
+    "red_lines": [
+      "A small backward movement such as 10:00:05 -> 10:00:03 must never increment the calendar date.",
+      "00:53 -> 00:10 after a legitimate midnight rollover must remain on the same derived date and surface non_monotonic_timestamp.",
+      "An ambiguous partial-time event with no date anchor must not update the state used to derive later timestamps.",
+      "Explicit timestamps and input order remain untouched."
+    ]
+  },
+  "machine_core": {
+    "depends_on": ["8094.repair-timeline-midnight-integrity"],
+    "goal": "Replace the over-broad partial-time rollover rule with a conservative deterministic boundary so Ailuros derives next-day dates only for a genuine wall-clock wrap and reports ordinary backward jitter instead of silently fabricating dates.",
+    "invariants": [
+      "Explicit datetime timestamps are preserved exactly.",
+      "Input event order is preserved exactly.",
+      "23:53 -> 00:53 remains a supported midnight rollover.",
+      "A partial-time backward jump of 12 hours or less is not a rollover; it remains on the carried date and is eligible for non_monotonic_timestamp reporting.",
+      "A backward jump greater than 12 hours is the only partial-time wall-clock wrap this MVP may treat as deterministic midnight rollover.",
+      "An exact 12-hour backward jump remains ambiguous/non-monotonic rather than being promoted to rollover.",
+      "Unanchored partial-time evidence never mutates trusted date/time inference state.",
+      "No producer/source label affects temporal inference."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "ordered normalized events containing explicit timestamps and/or partial_time"},
+        "consumer": {"component": "normalize_timeline_timestamps and downstream projection/timeline consumers", "production_path": true},
+        "observable_effect": {
+          "kind": "temporal_integrity",
+          "assertion": "Only a backward partial-time wall-clock jump greater than 12 hours increments the carried calendar date; smaller/equal backward movements retain the carried date and surface chronology regression instead of fabricating a later day."
+        },
+        "proofs": [
+          {"layer": "legitimate_rollover", "gate": "hard", "assertion": "2026-01-01 anchor + 23:53 -> 00:53 yields 2026-01-02 00:53."},
+          {"layer": "same_day_jitter", "gate": "hard", "assertion": "10:00:05 -> 10:00:03 does not increment date and produces non_monotonic_timestamp."},
+          {"layer": "post_midnight_disorder", "gate": "hard", "assertion": "23:53 -> 00:53 -> 00:10 yields dates Jan 1, Jan 2, Jan 2; the last event is non-monotonic and never Jan 3."},
+          {"layer": "ambiguous_anchor", "gate": "hard", "assertion": "A partial-time event before any explicit date is reported ambiguous and cannot influence inference after a later explicit anchor."},
+          {"layer": "explicit_timestamp", "gate": "hard", "assertion": "Explicit full timestamps remain unchanged even when non-monotonic."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "Ordinary backward partial-time movement is evidence disorder, not proof of a new calendar day.",
+      "Ambiguous no-anchor partial time remains ambiguous and does not become trusted state.",
+      "Temporal regression does not imply execution failure, root cause or producer defect."
+    ],
+    "complexity_budget": {
+      "max_new_files": 0,
+      "max_new_abstractions": 1,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": ["timeline engine", "clock service", "event sorter", "timezone inference framework", "producer-specific temporal parser"]
+    },
+    "files": {
+      "allow": ["src/ailuros/evidence_normalization.py", "tests/test_timeline_temporal_integrity.py"],
+      "create": [],
+      "forbid": ["src/ailuros/projection.py", "src/ailuros/signals.py", "src/ailuros/evidence_conformance.py", "src/ailuros/adapters/**", "schemas/**", "docs/**", "apps/**", ".everrun/**", "*.lock", "**/*.lock"]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Characterize the false rollover cases",
+        "details": [
+          "Add failing tests for 23:53 -> 00:53 -> 00:10 and for 10:00:05 -> 10:00:03.",
+          "Assert exact derived dates and regression reasons, not only list length."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Narrow the rollover predicate",
+        "details": [
+          "Replace the generic partial_tod < prev_tod rollover condition with the smallest local predicate that treats only a backward wall-clock jump greater than 12 hours as midnight rollover.",
+          "Do not introduce a configurable heuristic framework."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Stop ambiguous events from poisoning trusted state",
+        "details": [
+          "When carried_date is absent, keep timestamp=None and emit ambiguous_partial_time_no_anchor as today, but do not update prev_tod/prev_dt/carried state from that event."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Lock temporal invariants",
+        "details": [
+          "Retain existing legitimate rollover, explicit timestamp preservation and input-order tests.",
+          "Add exact-12-hour boundary coverage so it remains non-rollover."
+        ]
+      }
+    ],
+    "acceptance": [
+      "23:53 -> 00:53 still rolls to the next date.",
+      "10:00:05 -> 10:00:03 stays on the same date and emits non_monotonic_timestamp.",
+      "23:53 -> 00:53 -> 00:10 never fabricates a third day; the last event stays on the second day and emits non_monotonic_timestamp.",
+      "Unanchored partial-time evidence emits ambiguity but does not affect later anchored derivation.",
+      "Explicit timestamps and event order are unchanged.",
+      "ruff, mypy, focused tests and the full pytest suite pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_timeline_temporal_integrity.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true,
+    "tasks": [],
+    "red_lines": []
+  },
+  "judge": {
+    "must_check": [
+      "The implementation no longer treats every partial-time regression as midnight rollover.",
+      "The greater-than-12-hours rollover boundary is implemented exactly; an equal-or-smaller backward jump does not increment the date.",
+      "The two concrete review regressions produce non_monotonic_timestamp without date fabrication.",
+      "Ambiguous no-anchor partial-time evidence cannot mutate trusted inference state.",
+      "Explicit timestamps and event order remain unchanged.",
+      "No producer-specific or generalized temporal subsystem is introduced.",
+      "Focused tests, full pytest, ruff and mypy pass."
+    ],
+    "reject_if": [
+      "10:00:05 -> 10:00:03 is assigned to the next day.",
+      "23:53 -> 00:53 -> 00:10 assigns 00:10 to a third day.",
+      "An ambiguous no-anchor event changes later date inference.",
+      "Events are reordered or explicit timestamps rewritten.",
+      "The implementation adds a timeline engine, configurable heuristic framework, timezone inference or producer-specific branch.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "False rollover prevention, ambiguous-state isolation and legitimate midnight rollover preservation.",
+    "missing_targets": [],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations"]
+}
