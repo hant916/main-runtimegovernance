@@ -1,0 +1,171 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "post-run-evidence-review-repair",
+    "id": "8099.unify-governance-decision-disposition",
+    "sequence": 8099,
+    "slug": "unify-governance-decision-disposition",
+    "title": "Unify governance decision disposition",
+    "type": "governance_semantics",
+    "pack_kind": "convergence"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": ["todo", "done"],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Review found that Ailuros now has two parallel decision-classification implementations: signals._evidence_inconsistency_rule hard-codes allow vs {block, fail, blocked, deny}, while post-run conformance uses the projection approval vocabularies {approved, approve, granted} and {denied, deny, rejected, reject, declined}. The same structured governance meaning can therefore be classified differently depending on which Ailuros surface evaluates it. Converge these paths on one small deterministic decision-disposition primitive and one shared token vocabulary. Preserve structured-only semantics: no free-text parsing, no missing->contradiction promotion, no new policy engine.",
+    "why_now": "Pack 8096 was explicitly intended to repair validator/conformance semantic drift. Leaving signals and conformance with separate decision vocabularies recreates the same failure class one layer later. Governance surfaces must not disagree about the same structured decision token.",
+    "do_not_misread": [
+      "Do not redesign DecisionSummary, ApprovalRecord or the governance event ontology.",
+      "Do not parse prose, stderr or inferred intent.",
+      "Do not add fuzzy matching or model-based classification.",
+      "Do not broaden runtime enforcement behavior; this pack aligns interpretation only."
+    ],
+    "red_lines": [
+      "There must be one semantic classification primitive used by both signals-side inconsistency detection and conformance-side approval contradiction detection.",
+      "The shared vocabulary may contain only tokens already recognized by at least one of the two current implementations; do not invent new synonyms.",
+      "Unknown tokens remain unknown and never create a contradiction by themselves.",
+      "Equivalent structured evidence must yield equivalent approved/denied disposition across both paths."
+    ]
+  },
+  "machine_core": {
+    "depends_on": ["8096.repair-post-run-evidence-judgment-fidelity"],
+    "goal": "Eliminate duplicated governance decision semantics by centralizing approved/denied classification and making signals and conformance consume the same deterministic primitive.",
+    "invariants": [
+      "Approved-side shared tokens are exactly the union of currently recognized positive tokens: allow, approved, approve, granted.",
+      "Denied-side shared tokens are exactly the union of currently recognized negative tokens: block, fail, blocked, deny, denied, rejected, reject, declined.",
+      "Token normalization remains trim+lowercase for structured strings only.",
+      "Unknown/missing/non-string values remain unclassified.",
+      "Signals and conformance do not maintain separate approved/denied token sets after this pack.",
+      "No runtime enforcement outcome is changed merely because the classifier is shared."
+    ],
+    "contracts": [
+      {
+        "id": "CV1",
+        "kind": "convergence",
+        "producer": {"artifact": "structured governance decision/approval decision tokens already consumed by projection, signals and evidence conformance"},
+        "consumer": {"component": "signals inconsistency detection and evidence conformance inconsistency detection", "production_path": true},
+        "observable_effect": {
+          "kind": "semantic_convergence",
+          "assertion": "The same structured token maps to the same approved, denied or unknown disposition across Ailuros governance surfaces, using one shared classifier and one closed union of the previously recognized vocabularies."
+        },
+        "proofs": [
+          {"layer": "positive_union", "gate": "hard", "assertion": "allow, approved, approve and granted all classify approved wherever the shared classifier is used."},
+          {"layer": "negative_union", "gate": "hard", "assertion": "block, fail, blocked, deny, denied, rejected, reject and declined all classify denied wherever the shared classifier is used."},
+          {"layer": "cross_surface", "gate": "hard", "assertion": "At least one token previously recognized only by signals and one previously recognized only by conformance now produce the same disposition in both paths."},
+          {"layer": "unknown", "gate": "hard", "assertion": "An unrelated structured token remains unknown and does not create a contradiction."}
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "Unknown decision vocabulary remains unknown rather than guessed.",
+      "Missing structured fields remain missing rather than contradictory.",
+      "This semantic convergence does not authorize, deny or block runtime actions."
+    ],
+    "complexity_budget": {
+      "max_new_files": 1,
+      "max_new_abstractions": 1,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": ["policy engine", "decision ontology", "fuzzy classifier", "model-based classifier", "runtime enforcement rewrite", "adapter registry"]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/evidence_conformance.py",
+        "tests/test_governance_decision_semantics_consistency.py",
+        "tests/test_post_run_evidence_consistency.py",
+        "tests/test_*signal*.py",
+        "tests/test_*projection*.py"
+      ],
+      "create": ["tests/test_governance_decision_semantics_consistency.py"],
+      "forbid": ["src/ailuros/core/execution.py", "src/ailuros/models/**", "src/ailuros/policy/**", "schemas/**", "docs/**", "apps/**", ".everrun/**", "*.lock", "**/*.lock"]
+    },
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Characterize semantic drift",
+        "details": [
+          "Add tests proving at least one positive token and one negative token currently classify differently between signals and conformance paths.",
+          "Keep fixtures fully structured; no prose-based inputs."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Create one shared disposition primitive",
+        "details": [
+          "Place the smallest source-neutral helper in an existing neutral module; do not create a new semantic subsystem.",
+          "Return only approved, denied or unknown/unclassified using the exact union vocabulary in this pack."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Replace duplicated classification",
+        "details": [
+          "Make signals inconsistency detection and conformance approval contradiction detection call the shared primitive rather than maintaining local literal sets.",
+          "Reuse the same primitive from projection approval-state normalization where doing so removes duplication without changing public behavior."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Lock unknown and non-inference boundaries",
+        "details": [
+          "Verify unknown tokens remain unknown, booleans/non-strings do not become decisions, and missing fields do not become contradictions."
+        ]
+      }
+    ],
+    "acceptance": [
+      "Signals and evidence conformance no longer maintain separate decision token vocabularies.",
+      "The exact union token sets defined by this pack classify consistently across both surfaces.",
+      "Unknown tokens remain unknown and do not create false inconsistencies.",
+      "No free-text parsing, runtime enforcement or new policy abstraction is introduced.",
+      "ruff, mypy, focused tests and the full pytest suite pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_governance_decision_semantics_consistency.py -q",
+      "python -m pytest tests/test_post_run_evidence_consistency.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true,
+    "tasks": [],
+    "red_lines": []
+  },
+  "judge": {
+    "must_check": [
+      "One shared classifier/primitive is the source of approved/denied interpretation for both signals and conformance inconsistency paths.",
+      "The shared approved vocabulary is exactly allow, approved, approve, granted; the shared denied vocabulary is exactly block, fail, blocked, deny, denied, rejected, reject, declined.",
+      "Tokens previously unique to either path now classify identically across surfaces.",
+      "Unknown/missing/non-string values remain unclassified and do not create contradictions.",
+      "No runtime enforcement or free-text interpretation is added.",
+      "Focused tests, full pytest, ruff and mypy pass."
+    ],
+    "reject_if": [
+      "Signals and conformance still contain independently maintained approved/denied literal sets.",
+      "New synonyms beyond the union of existing vocabularies are introduced.",
+      "Unknown or missing evidence is promoted into contradiction.",
+      "Free text, stderr or inferred intent is parsed to classify decisions.",
+      "A policy engine or runtime enforcement behavior is introduced.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {"max_attempts": 2, "on_max_attempts": "stop_and_keep_todo"},
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "Cross-surface convergence of structured governance decision disposition.",
+    "missing_targets": ["tests/test_governance_decision_semantics_consistency.py may be created by this pack"],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": ["## Implementation Summary", "## Files modified", "## Validation", "## Evidence Matrix", "## Known limitations"]
+}
