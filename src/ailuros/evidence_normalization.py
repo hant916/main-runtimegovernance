@@ -51,6 +51,10 @@ def normalize_external_evidence_event(event: dict[str, Any]) -> dict[str, Any]:
     Malformed or partial wrappers are returned unchanged.  Normalization is an
     interpretation boundary, not a repair mechanism, so it must never invent
     evidence fields.
+
+    Metadata follows a single fallback rule: a dict on the inner wrapper wins
+    exactly as supplied, and otherwise valid envelope metadata is preserved
+    instead of being discarded.  The two are never merged.
     """
     if event.get("event_type") != "external_evidence":
         return event
@@ -68,7 +72,14 @@ def normalize_external_evidence_event(event: dict[str, Any]) -> dict[str, Any]:
     normalized["event_type"] = event_type
     normalized["payload"] = payload
     metadata = wrapper.get("metadata")
-    normalized["metadata"] = metadata if isinstance(metadata, dict) else {}
+    if not isinstance(metadata, dict):
+        # The inner wrapper carries no metadata dict: fall back to metadata the
+        # envelope already supplied rather than erasing it.  Provenance such as
+        # ``metadata.artifact`` must survive normalization for the existing
+        # EvidenceRef path; the two dicts are never merged.
+        outer_metadata = event.get("metadata")
+        metadata = outer_metadata if isinstance(outer_metadata, dict) else {}
+    normalized["metadata"] = metadata
     scope_ref = wrapper.get("scope_ref")
     if isinstance(scope_ref, str) and scope_ref:
         normalized["scope_ref"] = scope_ref
