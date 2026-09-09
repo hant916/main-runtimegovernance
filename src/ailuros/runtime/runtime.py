@@ -19,6 +19,7 @@ from ailuros.models import (
 )
 from ailuros.path import ExpectedPath, PathValidationResult, PathValidator
 from ailuros.policy import DecisionResolver, PolicyEngine, PolicyLoader, ToolCallContext
+from ailuros.policy.matcher import ActorSubstitutionContext
 from ailuros.runtime.clock import now_utc
 from ailuros.runtime.ids import new_decision_id, new_event_id, new_run_id
 from ailuros.runtime.tool_wrapper import ToolExecutionResult, WrappedTool
@@ -216,6 +217,92 @@ class AilurosRuntime:
                     "reason": decision.reason,
                 },
             )
+        return decision
+
+    def before_actor_substitution(
+        self,
+        run_id: str,
+        role: str,
+        from_identity: str,
+        to_identity: str,
+        reason: str,
+        authority_level: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> GovernanceDecision:
+        self._require_run(run_id)
+        meta = metadata or {}
+        facts = {
+            "role": role,
+            "from_identity": from_identity,
+            "to_identity": to_identity,
+            "reason": reason,
+            "authority_level": authority_level,
+            "metadata": meta,
+        }
+        self.record_event(
+            run_id,
+            RuntimeEventType.ACTOR_SUBSTITUTION_REQUESTED,
+            facts,
+        )
+        context = ActorSubstitutionContext(
+            environment=self.environment,
+            role=role,
+            from_identity=from_identity,
+            to_identity=to_identity,
+            reason=reason,
+            authority_level=authority_level,
+            metadata=meta,
+        )
+        evaluation = self.policy_engine.evaluate_actor_substitution(context)
+        input_hash = hashlib.sha256(
+            json.dumps(context.model_dump(mode="json"), sort_keys=True).encode()
+        ).hexdigest()
+        decision_metadata = {"governance_kind": "actor_substitution", **facts}
+        if evaluation.matched_policy_count == 0:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.REQUIRE_REVIEW,
+                allowed=False,
+                reason="No matching actor-substitution policy.",
+                severity=Severity.LOW,
+                input_hash=input_hash,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        else:
+            resolved = self.decision_resolver.resolve(run_id, evaluation.matched_policies)
+            if resolved.decision in (
+                GovernanceDecisionType.WARN,
+                GovernanceDecisionType.SANITIZE,
+            ):
+                decision = resolved.model_copy(
+                    update={
+                        "decision_id": new_decision_id(),
+                        "decision": GovernanceDecisionType.REQUIRE_REVIEW,
+                        "allowed": False,
+                        "reason": (
+                            f"{resolved.decision.value} is non-authorizing for actor "
+                            "substitution; converged to require_review."
+                        ),
+                        "input_hash": input_hash,
+                        "metadata": decision_metadata,
+                    }
+                )
+            else:
+                decision = resolved.model_copy(
+                    update={
+                        "decision_id": new_decision_id(),
+                        "input_hash": input_hash,
+                        "metadata": decision_metadata,
+                    }
+                )
+        self.storage.save_governance_decision(decision)
+        self.record_event(
+            run_id,
+            RuntimeEventType.GOVERNANCE_DECISION,
+            decision.model_dump(mode="json"),
+        )
         return decision
 
     def after_tool_call(

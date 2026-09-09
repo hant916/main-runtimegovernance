@@ -33,6 +33,7 @@ class RuntimeEventType(StrEnum):
     PAYLOAD_REDACTED = "payload_redacted"
     EVIDENCE = "evidence"
     EXTERNAL_EVIDENCE = "external_evidence"
+    ACTOR_SUBSTITUTION_REQUESTED = "actor_substitution_requested"
 
 
 class RuntimeEvent(BaseModel):

@@ -20,6 +20,18 @@ class ToolCallContext(BaseModel):
     prior_events: list[dict[str, Any]] = []
 
 
+class ActorSubstitutionContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    environment: Environment
+    role: str
+    from_identity: str
+    to_identity: str
+    reason: str
+    authority_level: str
+    metadata: dict[str, Any] = {}
+
+
 @dataclass(frozen=True)
 class MatchDetails:
     matched: bool
@@ -27,10 +39,14 @@ class MatchDetails:
 
 
 class PolicyMatcher:
-    def matches(self, policy: Policy, context: ToolCallContext) -> bool:
+    def matches(
+        self, policy: Policy, context: ToolCallContext | ActorSubstitutionContext
+    ) -> bool:
         return self.match_details(policy, context).matched
 
-    def match_details(self, policy: Policy, context: ToolCallContext) -> MatchDetails:
+    def match_details(
+        self, policy: Policy, context: ToolCallContext | ActorSubstitutionContext
+    ) -> MatchDetails:
         failed = []
         context_data = context.model_dump(mode="json")
         for source in (policy.scope, policy.match):
