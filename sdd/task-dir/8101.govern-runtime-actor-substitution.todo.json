@@ -1,0 +1,313 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "project": "ailuros",
+    "batch": "runtime-governance-core",
+    "id": "8101.govern-runtime-actor-substitution",
+    "sequence": 8101,
+    "slug": "govern-runtime-actor-substitution",
+    "title": "Govern runtime actor substitution before authority transfer",
+    "type": "runtime_governance",
+    "pack_kind": "implementation"
+  },
+  "scheduling": {
+    "status_source_of_truth": "filename_suffix",
+    "allowed_suffixes": [
+      "todo",
+      "done"
+    ],
+    "on_success": "rename_todo_to_done",
+    "on_failure": "keep_todo"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Production dogfood run run-20260906-030631 showed a planner substitution from codex/default to opencode/deepseek/deepseek-v4-pro after fresh_unavailable, and the substitute planner then participated in the terminal accept decision. Add one narrow pre-action Actor Substitution Governance capability: a runtime proposes a role-preserving actor substitution, Ailuros evaluates existing policy against the resolved role/from/to identity/reason/authority facts, records the request and governance decision, and returns ALLOW, REQUIRE_REVIEW or BLOCK before the substitute actor is started. Reuse the existing GovernanceDecision and policy primitives. Ailuros must not discover, rank, start or retry fallback actors.",
+    "why_now": "This run provides concrete production evidence for a pre-action governance moment: the original and proposed actor identities, role, fallback reason and decision impact were known before the substitute planner started, and a governance decision at that point could have changed execution. This satisfies the runtime-governance graduation rule without requiring speculative framework abstractions.",
+    "do_not_misread": [
+      "Do not implement fallback discovery, provider retry, model routing or replacement selection.",
+      "Do not create an Actor platform model, IAM subsystem, RBAC/ABAC system or trust-scoring engine.",
+      "Do not add model/provider reputation, capability scoring or reliability ranking.",
+      "Do not integrate EverRun in this pack; this pack establishes the Ailuros governance seam that EverRun can consume in a separate repo-scoped pack.",
+      "Do not generalize this work into mutation governance, delegation governance or a universal action ontology.",
+      "Actor identities are opaque runtime-supplied stable strings. Ailuros must not parse provider/model naming conventions to infer authority."
+    ],
+    "red_lines": [
+      "Only an explicit ALLOW decision may authorize actor substitution.",
+      "No matching actor-substitution policy must not default to ALLOW; it must produce REQUIRE_REVIEW.",
+      "BLOCK and REQUIRE_REVIEW must return allowed=false.",
+      "WARN or SANITIZE must never authorize actor substitution; if encountered for this governance kind they must converge to REQUIRE_REVIEW rather than execute.",
+      "Ailuros records and decides; the external runtime retains ownership of whether and how the substitute actor is started."
+    ]
+  },
+  "machine_core": {
+    "depends_on": [
+      "8090.runtime-decision-enforcement",
+      "8092.freeze-runtime-governance-scalpel-boundary"
+    ],
+    "goal": "Add one deterministic pre-action governance seam that decides whether a proposed runtime actor substitution is authorized before authority transfers to the substitute actor.",
+    "invariants": [
+      "The actor-substitution request is recorded before its governance decision.",
+      "Only GovernanceDecisionType.ALLOW yields allowed=true.",
+      "An actor substitution with no matching policy yields REQUIRE_REVIEW and allowed=false.",
+      "An explicit BLOCK policy yields BLOCK and allowed=false.",
+      "An explicit REQUIRE_REVIEW policy yields REQUIRE_REVIEW and allowed=false.",
+      "WARN and SANITIZE do not authorize actor substitution and converge to REQUIRE_REVIEW for this path.",
+      "Existing tool-call policy and runtime enforcement semantics remain unchanged.",
+      "The existing GovernanceDecision model and GovernanceDecisionType vocabulary are reused unchanged.",
+      "The existing DecisionResolver global no-policy behavior is not changed.",
+      "Actor identity remains an opaque string supplied by the integrating runtime.",
+      "Ailuros does not select, start, retry or orchestrate replacement actors."
+    ],
+    "contracts": [
+      {
+        "id": "ACTOR-SUBSTITUTION-GOVERNANCE",
+        "kind": "runtime_gate",
+        "producer": {
+          "artifact": "runtime-proposed actor substitution with role, current identity, proposed identity, fallback/substitution reason and authority level"
+        },
+        "consumer": {
+          "component": "external runtime before starting the proposed substitute actor",
+          "production_path": true
+        },
+        "observable_effect": {
+          "kind": "runtime_decision",
+          "assertion": "A proposed actor substitution receives an explicit auditable governance decision before authority transfers; only ALLOW authorizes continuation, while unknown/unmatched policy requires review and explicit deny blocks."
+        },
+        "proofs": [
+          {
+            "layer": "pre_action",
+            "gate": "hard",
+            "assertion": "ACTOR_SUBSTITUTION_REQUESTED evidence precedes GOVERNANCE_DECISION evidence."
+          },
+          {
+            "layer": "preauthorized",
+            "gate": "hard",
+            "assertion": "A policy explicitly matching the proposed role/from/to identity/reason/authority combination can produce ALLOW."
+          },
+          {
+            "layer": "unknown",
+            "gate": "hard",
+            "assertion": "No matching actor-substitution policy produces REQUIRE_REVIEW, never implicit ALLOW."
+          },
+          {
+            "layer": "deny",
+            "gate": "hard",
+            "assertion": "An explicit BLOCK policy produces BLOCK and allowed=false."
+          },
+          {
+            "layer": "non_authorizing_decisions",
+            "gate": "hard",
+            "assertion": "WARN and SANITIZE cannot accidentally grant substitution authority."
+          },
+          {
+            "layer": "regression",
+            "gate": "hard",
+            "assertion": "Existing governed tool-call ALLOW/BLOCK/REQUIRE_REVIEW behavior is unchanged."
+          }
+        ]
+      }
+    ],
+    "failure_semantics": [
+      "Missing authorization evidence is unknown and requires review; it is not silently allowed and is not automatically treated as malicious.",
+      "Explicit policy denial is BLOCK, not runtime/provider failure.",
+      "REQUIRE_REVIEW means the substitute actor has not been authorized to start; it is not execution success.",
+      "Unsupported non-terminal decision semantics such as WARN or SANITIZE must fail closed to REQUIRE_REVIEW for actor substitution without changing their semantics elsewhere.",
+      "Provider/model availability and fallback root cause remain runtime/reliability concerns rather than Ailuros governance conclusions."
+    ],
+    "complexity_budget": {
+      "max_new_files": 1,
+      "max_new_abstractions": 1,
+      "prefer_modify_over_create": true,
+      "prefer_adapt_over_rewrite": true,
+      "forbidden_complexity": [
+        "IAM system",
+        "RBAC",
+        "ABAC",
+        "actor registry",
+        "identity platform",
+        "trust score",
+        "model capability score",
+        "provider reputation",
+        "fallback router",
+        "fallback optimizer",
+        "workflow engine",
+        "orchestrator",
+        "generic policy framework rewrite",
+        "universal actor ontology"
+      ]
+    },
+    "files": {
+      "allow": [
+        "src/ailuros/models/event.py",
+        "src/ailuros/policy/matcher.py",
+        "src/ailuros/policy/engine.py",
+        "src/ailuros/runtime/runtime.py",
+        "tests/test_actor_substitution_governance.py"
+      ],
+      "create": [
+        "tests/test_actor_substitution_governance.py"
+      ],
+      "forbid": [
+        "src/ailuros/models/decision.py",
+        "src/ailuros/policy/decision_resolver.py",
+        "src/ailuros/models/policy.py",
+        "src/ailuros/storage/**",
+        "src/ailuros/server/**",
+        "src/ailuros/adapters/**",
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "schemas/**",
+        "fixtures/**",
+        "examples/**",
+        "apps/**",
+        "docs/**",
+        ".everrun/**",
+        "*.sqlite",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "red_lines": [
+      "Do not modify GovernanceDecisionType or create an actor-specific decision enum.",
+      "Do not modify DecisionResolver's existing default behavior for tool calls or other governance paths.",
+      "Do not reuse TOOL_CALL_REQUESTED or TOOL_CALL_BLOCKED to represent actor substitution.",
+      "Do not add provider-specific, model-specific or EverRun-specific branching to Ailuros core.",
+      "Do not infer actor authority from actor names, providers, models or fallback reason.",
+      "Do not perform the substitution inside AilurosRuntime."
+    ],
+    "steps": [
+      {
+        "id": "T1",
+        "title": "Characterize actor substitution as a narrow policy context",
+        "details": [
+          "Add a minimal ActorSubstitutionContext alongside the existing ToolCallContext rather than creating a general Actor domain model.",
+          "Required structured fields are environment, role, from_identity, to_identity, reason and authority_level; optional metadata may remain a plain dictionary.",
+          "Treat from_identity and to_identity as opaque stable strings. Do not split or interpret provider/model/agent components.",
+          "Generalize PolicyMatcher only enough to accept ToolCallContext or ActorSubstitutionContext. Do not introduce a universal GovernanceContext abstraction."
+        ]
+      },
+      {
+        "id": "T2",
+        "title": "Reuse the existing policy engine for substitution evaluation",
+        "details": [
+          "Add PolicyEngine.evaluate_actor_substitution(context) using the same active-policy matching mechanics already used for tool calls.",
+          "Existing policy match/scope operators must be sufficient to match role, from_identity, to_identity, reason, authority_level and environment.",
+          "Do not change the Policy schema or invent actor-specific policy files/schema.",
+          "Existing tool policies containing tool_name naturally remain unmatched against ActorSubstitutionContext."
+        ]
+      },
+      {
+        "id": "T3",
+        "title": "Add the pre-action runtime governance seam",
+        "details": [
+          "Add AilurosRuntime.before_actor_substitution(run_id, role, from_identity, to_identity, reason, authority_level, metadata=None) -> GovernanceDecision.",
+          "Record ACTOR_SUBSTITUTION_REQUESTED before evaluating policy.",
+          "Evaluate actor-substitution policies and reuse DecisionResolver when at least one policy matches.",
+          "When zero policies match, construct a REQUIRE_REVIEW GovernanceDecision locally for this path; do not change DecisionResolver's global default-ALLOW semantics.",
+          "If resolution produces WARN or SANITIZE, return REQUIRE_REVIEW with allowed=false while preserving matched policy IDs and an explicit reason that the decision is non-authorizing for actor substitution.",
+          "Attach governance_kind=actor_substitution and the structured substitution facts to GovernanceDecision.metadata.",
+          "Compute input_hash from a deterministic serialization of the structured actor-substitution context.",
+          "Persist the decision and record the existing GOVERNANCE_DECISION event after the request event.",
+          "Return the decision only. Do not execute, callback into, start or otherwise control the replacement actor."
+        ]
+      },
+      {
+        "id": "T4",
+        "title": "Prove preauthorized, unknown and denied branches",
+        "details": [
+          "Use the production dogfood shape in tests: planner, codex/default -> opencode/deepseek/deepseek-v4-pro, reason fresh_unavailable, with a terminal-decision authority level.",
+          "An exact preauthorization policy must return ALLOW and allowed=true.",
+          "The same proposed substitution without matching authorization must return REQUIRE_REVIEW and allowed=false.",
+          "An explicit block policy must return BLOCK and allowed=false.",
+          "Parameterized WARN/SANITIZE policies must not authorize substitution.",
+          "Verify ACTOR_SUBSTITUTION_REQUESTED precedes GOVERNANCE_DECISION and the decision contains the exact structured effective identities."
+        ]
+      },
+      {
+        "id": "T5",
+        "title": "Lock existing runtime governance regressions",
+        "details": [
+          "Run existing runtime decision enforcement tests proving ALLOW tool calls execute once while BLOCK/REQUIRE_REVIEW execute zero times.",
+          "Do not change tool-call default-allow behavior.",
+          "Do not change replay, audit or post-run evidence semantics."
+        ]
+      }
+    ],
+    "acceptance": [
+      "Ailuros exposes one narrow before_actor_substitution pre-action decision seam.",
+      "The API requires only role, opaque from/to identities, substitution reason, authority level and optional metadata.",
+      "A matching ALLOW policy authorizes the substitution.",
+      "No matching policy yields REQUIRE_REVIEW rather than implicit ALLOW.",
+      "Explicit BLOCK yields BLOCK.",
+      "WARN and SANITIZE cannot authorize actor substitution.",
+      "ACTOR_SUBSTITUTION_REQUESTED is recorded before GOVERNANCE_DECISION.",
+      "The resulting decision contains deterministic structured substitution evidence and input_hash.",
+      "GovernanceDecision, GovernanceDecisionType, Policy and DecisionResolver public semantics remain unchanged.",
+      "Existing governed tool behavior remains unchanged.",
+      "No fallback selection/execution, IAM, actor registry, model scoring or generic governance framework is introduced.",
+      "ruff, mypy, focused tests and full pytest pass."
+    ],
+    "validate": [
+      "python -m pytest tests/test_actor_substitution_governance.py -q",
+      "python -m pytest tests/test_runtime_decision_enforcement.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "evidence_matrix_required": true,
+    "tasks": []
+  },
+  "judge": {
+    "must_check": [
+      "The implementation provides a real pre-action actor-substitution decision API rather than only post-run detection.",
+      "ACTOR_SUBSTITUTION_REQUESTED evidence is persisted before the governance decision.",
+      "Only explicit ALLOW authorizes substitution.",
+      "No matching substitution policy produces REQUIRE_REVIEW and allowed=false.",
+      "Explicit BLOCK produces BLOCK and allowed=false.",
+      "WARN and SANITIZE cannot fall through as authorization.",
+      "Existing GovernanceDecisionType, Policy schema and DecisionResolver global semantics are reused rather than redesigned.",
+      "Actor identities remain opaque runtime-supplied strings; Ailuros does not parse or score provider/model identity.",
+      "Ailuros does not select, start, retry or orchestrate the substitute actor.",
+      "Existing tool-call runtime enforcement tests still pass unchanged.",
+      "No forbidden files change and all validation commands pass."
+    ],
+    "reject_if": [
+      "No-policy actor substitution defaults to ALLOW.",
+      "WARN or SANITIZE can cause a substitute actor to be considered authorized.",
+      "The implementation adds a new actor-specific decision enum or changes GovernanceDecisionType.",
+      "DecisionResolver's existing no-policy default is globally changed to make this feature work.",
+      "The Policy schema is expanded into an IAM/RBAC/ABAC or actor-permission system.",
+      "Provider/model names are parsed to infer authority, capability, trust or risk.",
+      "A model/provider trust score, ranking or fallback-selection mechanism is added.",
+      "Ailuros starts, retries, selects or otherwise orchestrates replacement actors.",
+      "Tool-specific event types are reused misleadingly for actor substitution.",
+      "The implementation generalizes into mutation/delegation/action governance without production evidence.",
+      "Existing tool-call ALLOW/BLOCK/REQUIRE_REVIEW behavior regresses.",
+      "Validation fails or forbidden files change."
+    ]
+  },
+  "execution_policy": {
+    "max_attempts": 2,
+    "on_max_attempts": "stop_and_keep_todo"
+  },
+  "validation_notes": {
+    "validation_profile": "focused_plus_full",
+    "commands_are_profile_based": false,
+    "targeted_contract_coverage": "Pre-action authorization of runtime actor substitution using existing Ailuros policy and governance-decision primitives.",
+    "missing_targets": [
+      "tests/test_actor_substitution_governance.py may be created by this pack"
+    ],
+    "completion_needed": false,
+    "completion_reason": null
+  },
+  "evidence_matrix_requested_from_coder": true,
+  "expected_coder_final_response": [
+    "## Implementation Summary",
+    "## Files modified",
+    "## Validation",
+    "## Evidence Matrix",
+    "## Known limitations",
+    "## Suggested next pack"
+  ]
+}
