@@ -19,7 +19,7 @@ from ailuros.models import (
 )
 from ailuros.path import ExpectedPath, PathValidationResult, PathValidator
 from ailuros.policy import DecisionResolver, PolicyEngine, PolicyLoader, ToolCallContext
-from ailuros.policy.matcher import ActorSubstitutionContext
+from ailuros.policy.matcher import ActorSubstitutionContext, matched_allow_binds_cause
 from ailuros.runtime.clock import now_utc
 from ailuros.runtime.ids import new_decision_id, new_event_id, new_run_id
 from ailuros.runtime.tool_wrapper import ToolExecutionResult, WrappedTool
@@ -228,6 +228,7 @@ class AilurosRuntime:
         reason: str,
         authority_level: str,
         metadata: dict[str, Any] | None = None,
+        cause_classification: str = "unknown",
     ) -> GovernanceDecision:
         self._require_run(run_id)
         meta = metadata or {}
@@ -237,6 +238,7 @@ class AilurosRuntime:
             "to_identity": to_identity,
             "reason": reason,
             "authority_level": authority_level,
+            "cause_classification": cause_classification,
             "metadata": meta,
         }
         self.record_event(
@@ -252,6 +254,7 @@ class AilurosRuntime:
             reason=reason,
             authority_level=authority_level,
             metadata=meta,
+            cause_classification=cause_classification,
         )
         evaluation = self.policy_engine.evaluate_actor_substitution(context)
         input_hash = hashlib.sha256(
@@ -284,6 +287,23 @@ class AilurosRuntime:
                         "reason": (
                             f"{resolved.decision.value} is non-authorizing for actor "
                             "substitution; converged to require_review."
+                        ),
+                        "input_hash": input_hash,
+                        "metadata": decision_metadata,
+                    }
+                )
+            elif (
+                resolved.decision is GovernanceDecisionType.ALLOW
+                and not matched_allow_binds_cause(evaluation.matched_policies)
+            ):
+                decision = resolved.model_copy(
+                    update={
+                        "decision_id": new_decision_id(),
+                        "decision": GovernanceDecisionType.REQUIRE_REVIEW,
+                        "allowed": False,
+                        "reason": (
+                            "Matched ALLOW policy does not explicitly constrain "
+                            "cause_classification; converged to require_review."
                         ),
                         "input_hash": input_hash,
                         "metadata": decision_metadata,

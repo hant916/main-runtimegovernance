@@ -5,9 +5,13 @@ FROM_IDENTITY = "codex/default"
 TO_IDENTITY = "opencode/deepseek/deepseek-v4-pro"
 REASON = "fresh_unavailable"
 AUTHORITY_LEVEL = "terminal_decision"
+CAUSE = "fallback_unavailable"
 
 
-def _policy_json(policy_id: str, decision: str) -> str:
+def _policy_json(policy_id: str, decision: str, cause: str | None = None) -> str:
+    cause_part = ""
+    if cause is not None:
+        cause_part = f', "cause_classification": "{cause}"'
     return f'''{{
       "policy_id": "{policy_id}",
       "version": "1",
@@ -18,14 +22,16 @@ def _policy_json(policy_id: str, decision: str) -> str:
         "from_identity": "{FROM_IDENTITY}",
         "to_identity": "{TO_IDENTITY}",
         "reason": "{REASON}",
-        "authority_level": "{AUTHORITY_LEVEL}"
+        "authority_level": "{AUTHORITY_LEVEL}"{cause_part}
       }}
     }}'''
 
 
-def _runtime_with_policy(tmp_path, policy_id: str, decision: str) -> AilurosRuntime:
+def _runtime_with_policy(
+    tmp_path, policy_id: str, decision: str, cause: str | None = None
+) -> AilurosRuntime:
     policy = tmp_path / f"{policy_id}.json"
-    policy.write_text(_policy_json(policy_id, decision))
+    policy.write_text(_policy_json(policy_id, decision, cause))
     return AilurosRuntime(storage_path=tmp_path / "runtime.sqlite", policies=[policy])
 
 
@@ -33,7 +39,10 @@ def _event_types(runtime: AilurosRuntime, run_id: str) -> list[RuntimeEventType]
     return [event.event_type for event in runtime.list_events(run_id)]
 
 
-def _substitute(runtime: AilurosRuntime, run_id: str):
+def _substitute(runtime: AilurosRuntime, run_id: str, cause_classification: str | None = None):
+    kwargs = {}
+    if cause_classification is not None:
+        kwargs["cause_classification"] = cause_classification
     return runtime.before_actor_substitution(
         run_id,
         role=ROLE,
@@ -41,11 +50,12 @@ def _substitute(runtime: AilurosRuntime, run_id: str):
         to_identity=TO_IDENTITY,
         reason=REASON,
         authority_level=AUTHORITY_LEVEL,
+        **kwargs,
     )
 
 
 def test_exact_preauthorization_policy_allows_substitution(tmp_path):
-    runtime = _runtime_with_policy(tmp_path, "allow.substitution", "allow")
+    runtime = _runtime_with_policy(tmp_path, "allow.substitution", "allow", cause="unknown")
     run = runtime.start_run("substitution")
 
     decision = _substitute(runtime, run.run_id)
@@ -94,8 +104,38 @@ def test_sanitize_policy_does_not_authorize_substitution(tmp_path):
     assert decision.allowed is False
 
 
+def test_legacy_allow_policy_without_cause_requires_review(tmp_path):
+    runtime = _runtime_with_policy(tmp_path, "allow.legacy", "allow")
+    run = runtime.start_run("substitution")
+
+    decision = _substitute(runtime, run.run_id)
+
+    assert decision.decision is GovernanceDecisionType.REQUIRE_REVIEW
+    assert decision.allowed is False
+
+
+def test_explicit_cause_match_allows_substitution(tmp_path):
+    runtime = _runtime_with_policy(tmp_path, "allow.cause", "allow", cause=CAUSE)
+    run = runtime.start_run("substitution")
+
+    decision = _substitute(runtime, run.run_id, cause_classification=CAUSE)
+
+    assert decision.decision is GovernanceDecisionType.ALLOW
+    assert decision.allowed is True
+
+
+def test_mismatched_cause_requires_review(tmp_path):
+    runtime = _runtime_with_policy(tmp_path, "allow.cause", "allow", cause="fallback")
+    run = runtime.start_run("substitution")
+
+    decision = _substitute(runtime, run.run_id, cause_classification="unknown")
+
+    assert decision.decision is GovernanceDecisionType.REQUIRE_REVIEW
+    assert decision.allowed is False
+
+
 def test_requested_event_precedes_governance_decision_with_structured_identities(tmp_path):
-    runtime = _runtime_with_policy(tmp_path, "allow.substitution", "allow")
+    runtime = _runtime_with_policy(tmp_path, "allow.substitution", "allow", cause="unknown")
     run = runtime.start_run("substitution")
 
     decision = _substitute(runtime, run.run_id)
@@ -116,11 +156,13 @@ def test_requested_event_precedes_governance_decision_with_structured_identities
     assert requested.payload["to_identity"] == TO_IDENTITY
     assert requested.payload["reason"] == REASON
     assert requested.payload["authority_level"] == AUTHORITY_LEVEL
+    assert requested.payload["cause_classification"] == "unknown"
 
     assert decision.metadata["governance_kind"] == "actor_substitution"
     assert decision.metadata["role"] == ROLE
     assert decision.metadata["from_identity"] == FROM_IDENTITY
     assert decision.metadata["to_identity"] == TO_IDENTITY
+    assert decision.metadata["cause_classification"] == "unknown"
     assert decision.input_hash is not None
 
 

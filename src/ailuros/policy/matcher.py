@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from ailuros.models import Environment, Policy, PolicyOperator
+from ailuros.models.decision import GovernanceDecisionType
 from ailuros.policy.operators import OperatorResult, evaluate_operator
 from ailuros.utils import get_by_path
 
@@ -30,6 +31,7 @@ class ActorSubstitutionContext(BaseModel):
     reason: str
     authority_level: str
     metadata: dict[str, Any] = {}
+    cause_classification: str = "unknown"
 
 
 @dataclass(frozen=True)
@@ -73,3 +75,11 @@ class PolicyMatcher:
                     return result
             return OperatorResult(True)
         return evaluate_operator(PolicyOperator.EQ, actual, condition)
+
+
+def matched_allow_binds_cause(policies: list[Policy]) -> bool:
+    return any(
+        "cause_classification" in policy.scope or "cause_classification" in policy.match
+        for policy in policies
+        if policy.decision is GovernanceDecisionType.ALLOW
+    )
