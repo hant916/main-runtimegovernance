@@ -1,0 +1,145 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "id": "8102.govern-validation-evidence-fidelity",
+    "title": "Govern validation evidence fidelity",
+    "slug": "govern-validation-evidence-fidelity",
+    "type": "checker"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Latest dogfood exposed a governance gap: a validation result can be green while the state that was validated is not proven to be the same state later used for acceptance. Add one narrow pre-acceptance gate that decides whether validation evidence is fit to support acceptance. The runtime supplies opaque validated_state_ref and acceptance_target_ref values plus an explicit state_equivalence classification and evidence references. Ailuros records the request and returns ALLOW only for explicitly confirmed equivalence with supporting evidence, BLOCK only when explicit evidence says equivalence is violated, and REQUIRE_REVIEW for unknown, missing or insufficient evidence. Ailuros must not inspect Git, infer equivalence from ref equality, rerun validation, or take ownership of checkout/commit/deploy.",
+    "goal": "Prevent green validation evidence from authorizing acceptance when equivalence between validated state and acceptance target state is not explicitly evidenced.",
+    "non_goals": [
+      "Do not build a dirty-worktree detector, Git integration, checkout validator, commit validator or deployment verifier.",
+      "Do not make Ailuros rerun tests or validation commands.",
+      "Do not create a generic state graph, artifact registry, attestation framework or provenance platform.",
+      "Do not change existing ValidationResult structural-validation semantics."
+    ],
+    "red_lines": [
+      "State-reference equality must never be treated as proof of state equivalence.",
+      "Zero changed files, dirty workspace, clean workspace or Git status must never be encoded as universal governance truth.",
+      "Unknown or insufficient evidence must not silently become ALLOW or BLOCK.",
+      "BLOCK applies only to using the supplied validation result as acceptance evidence; it does not terminate or orchestrate the external runtime."
+    ],
+    "do_not_misread": [
+      "This is validation-evidence-use governance, not validation execution.",
+      "validated_state_ref and acceptance_target_ref are opaque runtime-supplied identifiers.",
+      "state_equivalence is an explicit runtime/adapter supplied fact; Ailuros does not compute it from repository state.",
+      "The gate protects acceptance evidence fidelity without taking ownership of EverRun-specific Git semantics."
+    ]
+  },
+  "machine_core": {
+    "goal": "Add AilurosRuntime.before_validation_evidence_use(...) as a deterministic auditable gate for whether one validation result may support acceptance of a target state.",
+    "files": {
+      "allow": [
+        "src/ailuros/models/event.py",
+        "src/ailuros/runtime/runtime.py",
+        "tests/test_validation_evidence_fidelity_governance.py"
+      ],
+      "create": [
+        "tests/test_validation_evidence_fidelity_governance.py"
+      ],
+      "forbid": [
+        "src/ailuros/core/validation.py",
+        "src/ailuros/policy/**",
+        "src/ailuros/adapters/**",
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/storage/**",
+        "src/ailuros/server/**",
+        "schemas/**",
+        "fixtures/**",
+        "examples/**",
+        "apps/**",
+        "docs/**",
+        ".everrun/**",
+        "pyproject.toml",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "validate": [
+      "python -m pytest tests/test_validation_evidence_fidelity_governance.py -q",
+      "python -m pytest tests/test_runtime_decision_enforcement.py tests/test_actor_substitution_governance.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "acceptance": [
+      "AilurosRuntime exposes before_validation_evidence_use(run_id, validation_id, validated_state_ref, acceptance_target_ref, state_equivalence, evidence_refs=None, metadata=None) returning GovernanceDecision.",
+      "The request is recorded before the resulting GOVERNANCE_DECISION evidence.",
+      "The request and decision metadata preserve validation_id, validated_state_ref, acceptance_target_ref, state_equivalence and evidence_refs without parsing state refs.",
+      "state_equivalence='confirmed' with at least one evidence reference returns ALLOW and allowed=true.",
+      "state_equivalence='violated' with at least one evidence reference returns BLOCK and allowed=false.",
+      "state_equivalence='unknown', an unrecognized classification, or missing/empty evidence_refs returns REQUIRE_REVIEW and allowed=false.",
+      "The implementation does not compare state refs to infer equivalence.",
+      "The implementation does not inspect Git/worktree state or run validation commands.",
+      "Existing tool-call and actor-substitution governance behavior remains unchanged.",
+      "All focused and full validation commands pass."
+    ],
+    "red_lines": [
+      "Do not modify DecisionResolver, Policy, PolicyEngine, GovernanceDecisionType or core.ValidationResult.",
+      "Do not add Git/subprocess/worktree inspection to AilurosRuntime for this capability.",
+      "Do not derive equivalence from validated_state_ref == acceptance_target_ref.",
+      "Do not generalize this into a universal artifact/state/provenance subsystem.",
+      "Do not terminate or repair the external runtime from this gate."
+    ],
+    "failure_semantics": [
+      "Confirmed equivalence without supporting evidence is insufficient and must REQUIRE_REVIEW.",
+      "Explicitly violated equivalence with supporting evidence BLOCKS use of that validation evidence for acceptance.",
+      "Unknown, unrecognized or incomplete equivalence evidence must REQUIRE_REVIEW rather than guessing.",
+      "A governance BLOCK here means 'do not use this validation result as acceptance evidence'; it does not mean the entire run is failed or malicious.",
+      "Repository cleanliness and Git diff shape are producer-specific evidence concerns, not Ailuros core conclusions."
+    ],
+    "invariants": [
+      "Only explicit confirmed equivalence plus evidence may authorize validation evidence use.",
+      "Unknown is distinct from violation.",
+      "State references remain opaque.",
+      "Governance evidence is recorded before any external runtime acts on the decision.",
+      "Existing runtime-governance paths retain their current semantics."
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "A real pre-acceptance API exists and returns GovernanceDecision before validation evidence is consumed for acceptance.",
+      "Confirmed plus non-empty evidence_refs yields ALLOW; violated plus non-empty evidence_refs yields BLOCK; unknown or insufficient evidence yields REQUIRE_REVIEW.",
+      "The implementation records the validation-evidence-use request before GOVERNANCE_DECISION.",
+      "State refs are treated as opaque strings and are never compared to infer equivalence.",
+      "No Git, subprocess, worktree-cleanliness or changed-files heuristic is introduced.",
+      "BLOCK semantics are scoped to rejecting validation evidence use, not controlling the external runtime lifecycle.",
+      "core.ValidationResult and policy/decision resolver semantics remain unchanged.",
+      "Existing tool-call and actor-substitution tests pass unchanged.",
+      "No forbidden files changed and every validation command passed."
+    ],
+    "reject_if": [
+      "validated_state_ref == acceptance_target_ref is used as equivalence proof.",
+      "Dirty/clean workspace, zero-diff or changed-file counts are encoded as universal Ailuros governance rules.",
+      "Ailuros executes Git commands, validation commands, checkout, commit, deploy or repair actions.",
+      "Unknown, unrecognized or missing evidence defaults to ALLOW or BLOCK instead of REQUIRE_REVIEW.",
+      "Confirmed equivalence with no evidence_refs is allowed.",
+      "The implementation changes core.ValidationResult, DecisionResolver, Policy schema, PolicyEngine or GovernanceDecisionType.",
+      "The implementation expands into a generic state graph, provenance platform, artifact registry or attestation framework.",
+      "Existing runtime governance regresses.",
+      "Validation fails or forbidden files change."
+    ],
+    "required": true
+  },
+  "runtime_governance": {
+    "max_coder_executions_per_pack": 3,
+    "accept_checkpoint": {
+      "enabled": true
+    },
+    "validation_debt_classification": {
+      "enabled": false
+    },
+    "simple_retry": {
+      "ruff_f401_only": true
+    }
+  },
+  "execution_policy": {
+    "max_attempts": 3
+  }
+}

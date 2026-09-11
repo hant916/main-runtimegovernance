@@ -1,0 +1,154 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "id": "8103.govern-actor-substitution-cause",
+    "title": "Govern actor substitution cause classification",
+    "slug": "govern-actor-substitution-cause",
+    "type": "checker"
+  },
+  "human_pressure": {
+    "one_screen_brief": "8101 added a pre-action actor-substitution gate, but current positive authorization can still match only role/from/to/reason/authority facts. Latest dogfood shows that the runtime's classified cause of a fallback matters to whether a substitute actor should inherit authority. Extend the existing 8101 seam with one opaque runtime-supplied cause_classification fact. Ailuros must not map provider/backend error strings into causes. Positive ALLOW becomes sufficient only when at least one matched ALLOW policy explicitly constrains cause_classification; legacy broad ALLOW policies that omit it must converge to REQUIRE_REVIEW. Existing BLOCK, REQUIRE_REVIEW, WARN/SANITIZE fail-closed behavior and tool-call governance must remain unchanged.",
+    "goal": "Require explicit policy authorization of the runtime-supplied substitution cause before a replacement actor can receive an ALLOW decision.",
+    "non_goals": [
+      "Do not build provider/backend error classification inside Ailuros.",
+      "Do not add a fallback router, retry manager, actor registry, trust score or model/provider reputation system.",
+      "Do not create a cause taxonomy enum or universal failure ontology from the current dogfood sample.",
+      "Do not redesign the Policy schema, DecisionResolver or GovernanceDecisionType.",
+      "Do not integrate EverRun-specific backend strings into Ailuros core."
+    ],
+    "red_lines": [
+      "Ailuros must never derive cause_classification from reason, provider name, model name, exception text or backend error text.",
+      "Only a matched ALLOW policy that explicitly binds cause_classification may authorize substitution.",
+      "A legacy matched ALLOW policy omitting cause_classification must no longer be sufficient for ALLOW on this path.",
+      "Unknown classification may be authorized only if policy explicitly matches unknown.",
+      "Ailuros still does not select, start, retry or orchestrate replacement actors."
+    ],
+    "do_not_misread": [
+      "cause_classification is an opaque policy fact supplied by the integrating runtime/adapter.",
+      "The existing free-form reason remains preserved and opaque; it is not replaced by cause_classification.",
+      "This intentionally tightens only the positive ALLOW branch of actor substitution.",
+      "Append the optional cause_classification parameter after the existing metadata parameter to preserve positional caller compatibility."
+    ]
+  },
+  "machine_core": {
+    "goal": "Extend ActorSubstitutionContext and AilurosRuntime.before_actor_substitution with optional cause_classification='unknown', and require explicit cause binding in matched ALLOW policy evidence before returning ALLOW.",
+    "files": {
+      "allow": [
+        "src/ailuros/policy/matcher.py",
+        "src/ailuros/runtime/runtime.py",
+        "tests/test_actor_substitution_governance.py"
+      ],
+      "create": [],
+      "forbid": [
+        "src/ailuros/models/event.py",
+        "src/ailuros/models/decision.py",
+        "src/ailuros/models/policy.py",
+        "src/ailuros/policy/decision_resolver.py",
+        "src/ailuros/policy/engine.py",
+        "src/ailuros/storage/**",
+        "src/ailuros/server/**",
+        "src/ailuros/adapters/**",
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "schemas/**",
+        "fixtures/**",
+        "examples/**",
+        "apps/**",
+        "docs/**",
+        ".everrun/**",
+        "pyproject.toml",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "validate": [
+      "python -m pytest tests/test_actor_substitution_governance.py -q",
+      "python -m pytest tests/test_runtime_decision_enforcement.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "acceptance": [
+      "ActorSubstitutionContext contains cause_classification as an opaque string with default 'unknown'.",
+      "before_actor_substitution preserves existing arguments and appends cause_classification after metadata with default 'unknown'.",
+      "ACTOR_SUBSTITUTION_REQUESTED payload and GovernanceDecision metadata include the exact runtime-supplied cause_classification.",
+      "reason remains preserved as an independent opaque string.",
+      "A matched ALLOW policy that explicitly constrains cause_classification can return ALLOW and allowed=true.",
+      "A matched ALLOW policy that omits cause_classification converges to REQUIRE_REVIEW and allowed=false.",
+      "A mismatched cause classification produces no positive authorization and results in REQUIRE_REVIEW.",
+      "An explicit policy matching cause_classification='unknown' may authorize an unknown classification.",
+      "Existing BLOCK remains BLOCK; REQUIRE_REVIEW remains REQUIRE_REVIEW; WARN and SANITIZE remain non-authorizing and converge to REQUIRE_REVIEW.",
+      "Existing tool-call policy behavior remains unchanged.",
+      "No provider/backend-specific classifier or cause taxonomy is introduced.",
+      "All focused and full validation commands pass."
+    ],
+    "red_lines": [
+      "Do not change GovernanceDecisionType, DecisionResolver, Policy schema or PolicyEngine.",
+      "Do not infer cause_classification from reason or any actor/provider/model identifier.",
+      "Do not add provider-specific or EverRun-specific branching.",
+      "Do not create a new before_actor_substitution_v2 API.",
+      "Do not authorize a substitution merely because a legacy ALLOW policy matched role/from/to/reason/authority.",
+      "Do not execute or orchestrate fallback actors inside Ailuros."
+    ],
+    "failure_semantics": [
+      "Missing cause_classification becomes the explicit value 'unknown'; it is not guessed from reason.",
+      "Positive authorization without an explicit matched policy constraint on cause_classification is insufficient and must REQUIRE_REVIEW.",
+      "A policy may explicitly authorize 'unknown'; this is a conscious policy decision rather than a default.",
+      "Explicit BLOCK still blocks regardless of positive authorization tightening.",
+      "WARN and SANITIZE remain non-authorizing for actor substitution.",
+      "Provider/model availability and backend error interpretation remain external runtime concerns."
+    ],
+    "invariants": [
+      "Actor identities and cause classification remain opaque runtime-supplied strings.",
+      "Only explicit ALLOW with explicit cause binding yields allowed=true.",
+      "No-policy actor substitution remains REQUIRE_REVIEW as established by 8101.",
+      "The global DecisionResolver no-policy behavior remains unchanged.",
+      "Existing tool-call runtime enforcement remains unchanged.",
+      "Ailuros does not own fallback selection or execution."
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "The change extends the existing actor-substitution seam rather than creating a parallel API or framework.",
+      "cause_classification is present in ActorSubstitutionContext, request evidence and decision metadata.",
+      "No code maps reason/provider/model/error strings into cause_classification.",
+      "A matched ALLOW policy must explicitly constrain cause_classification before ALLOW is returned.",
+      "A legacy ALLOW policy without cause_classification is downgraded to REQUIRE_REVIEW.",
+      "An explicit policy matching cause_classification='unknown' can intentionally authorize unknown.",
+      "BLOCK, REQUIRE_REVIEW, WARN/SANITIZE and no-policy fail-closed actor-substitution behavior remain correct.",
+      "DecisionResolver, Policy schema, PolicyEngine and GovernanceDecisionType are unchanged.",
+      "Tool-call runtime governance still passes unchanged.",
+      "No forbidden files changed and every validation command passed."
+    ],
+    "reject_if": [
+      "Ailuros derives cause_classification from reason, exception text, provider, model or backend-specific strings.",
+      "A legacy ALLOW policy omitting cause_classification can still authorize actor substitution.",
+      "Missing classification silently inherits authorization from reason or actor identity.",
+      "A new cause enum/taxonomy, fallback router, actor registry, trust score or provider reputation mechanism is introduced.",
+      "DecisionResolver global semantics, Policy schema, PolicyEngine or GovernanceDecisionType are changed.",
+      "A new actor-substitution API is introduced instead of extending the existing one.",
+      "Ailuros selects, starts, retries or orchestrates the substitute actor.",
+      "Existing BLOCK/REQUIRE_REVIEW/WARN/SANITIZE or tool-call semantics regress.",
+      "Validation fails or forbidden files change."
+    ],
+    "required": true
+  },
+  "runtime_governance": {
+    "max_coder_executions_per_pack": 3,
+    "accept_checkpoint": {
+      "enabled": true
+    },
+    "validation_debt_classification": {
+      "enabled": false
+    },
+    "simple_retry": {
+      "ruff_f401_only": true
+    }
+  },
+  "execution_policy": {
+    "max_attempts": 3
+  }
+}
