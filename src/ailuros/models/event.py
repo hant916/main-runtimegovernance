@@ -34,6 +34,7 @@ class RuntimeEventType(StrEnum):
     EVIDENCE = "evidence"
     EXTERNAL_EVIDENCE = "external_evidence"
     ACTOR_SUBSTITUTION_REQUESTED = "actor_substitution_requested"
+    VALIDATION_EVIDENCE_USE_REQUESTED = "validation_evidence_use_requested"
 
 
 class RuntimeEvent(BaseModel):

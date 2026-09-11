@@ -305,6 +305,80 @@ class AilurosRuntime:
         )
         return decision
 
+    def before_validation_evidence_use(
+        self,
+        run_id: str,
+        validation_id: str,
+        validated_state_ref: str,
+        acceptance_target_ref: str,
+        state_equivalence: str,
+        evidence_refs: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> GovernanceDecision:
+        self._require_run(run_id)
+        meta = metadata or {}
+        evidence = list(evidence_refs or [])
+        request = {
+            "validation_id": validation_id,
+            "validated_state_ref": validated_state_ref,
+            "acceptance_target_ref": acceptance_target_ref,
+            "state_equivalence": state_equivalence,
+            "evidence_refs": evidence,
+            "metadata": meta,
+        }
+        self.record_event(
+            run_id,
+            RuntimeEventType.VALIDATION_EVIDENCE_USE_REQUESTED,
+            request,
+        )
+        decision_metadata = {"governance_kind": "validation_evidence_use", **request}
+        if state_equivalence == "confirmed" and evidence:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.ALLOW,
+                allowed=True,
+                reason="Validation evidence equivalence explicitly confirmed with evidence.",
+                severity=Severity.LOW,
+                evidence_refs=evidence,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        elif state_equivalence == "violated" and evidence:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.BLOCK,
+                allowed=False,
+                reason=(
+                    "Validation evidence equivalence explicitly violated; this validation "
+                    "result is not usable as acceptance evidence."
+                ),
+                severity=Severity.CRITICAL,
+                evidence_refs=evidence,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        else:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.REQUIRE_REVIEW,
+                allowed=False,
+                reason="Validation evidence equivalence is unknown or insufficient for acceptance.",
+                severity=Severity.MEDIUM,
+                evidence_refs=evidence,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        self.storage.save_governance_decision(decision)
+        self.record_event(
+            run_id,
+            RuntimeEventType.GOVERNANCE_DECISION,
+            decision.model_dump(mode="json"),
+        )
+        return decision
+
     def after_tool_call(
         self,
         run_id: str,
