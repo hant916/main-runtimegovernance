@@ -24,7 +24,8 @@ def test_runtime_event_type_contains_canonical_events() -> None:
     assert "run_started" in values
     assert "payload_redacted" in values
     assert "state_handoff_requested" in values
-    assert len(values) == 29
+    assert "action_outcome_use_requested" in values
+    assert len(values) == 30
 
 
 def test_models_serialize_to_json() -> None:

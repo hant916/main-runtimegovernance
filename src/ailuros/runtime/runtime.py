@@ -480,6 +480,91 @@ class AilurosRuntime:
         )
         return decision
 
+    def before_action_outcome_use(
+        self,
+        run_id: str,
+        action_ref: str,
+        outcome_ref: str,
+        consistency: str,
+        evidence_refs: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> GovernanceDecision:
+        self._require_run(run_id)
+        meta = metadata or {}
+        evidence = list(evidence_refs or [])
+        request = {
+            "action_ref": action_ref,
+            "outcome_ref": outcome_ref,
+            "consistency": consistency,
+            "evidence_refs": evidence,
+            "metadata": meta,
+        }
+        self.record_event(
+            run_id,
+            RuntimeEventType.ACTION_OUTCOME_USE_REQUESTED,
+            request,
+        )
+        decision_metadata = {"governance_kind": "action_outcome_use", **request}
+        input_hash = hashlib.sha256(
+            json.dumps(
+                {
+                    "action_ref": action_ref,
+                    "outcome_ref": outcome_ref,
+                    "consistency": consistency,
+                },
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        if consistency == "confirmed" and evidence:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.ALLOW,
+                allowed=True,
+                reason="Action outcome channel consistency explicitly confirmed with evidence.",
+                severity=Severity.LOW,
+                evidence_refs=evidence,
+                input_hash=input_hash,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        elif consistency == "violated" and evidence:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.BLOCK,
+                allowed=False,
+                reason=(
+                    "Action outcome channel consistency explicitly violated; this "
+                    "outcome is not usable as trusted evidence."
+                ),
+                severity=Severity.CRITICAL,
+                evidence_refs=evidence,
+                input_hash=input_hash,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        else:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.REQUIRE_REVIEW,
+                allowed=False,
+                reason="Action outcome channel consistency is unknown or insufficient.",
+                severity=Severity.MEDIUM,
+                evidence_refs=evidence,
+                input_hash=input_hash,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        self.storage.save_governance_decision(decision)
+        self.record_event(
+            run_id,
+            RuntimeEventType.GOVERNANCE_DECISION,
+            decision.model_dump(mode="json"),
+        )
+        return decision
+
     def after_tool_call(
         self,
         run_id: str,
