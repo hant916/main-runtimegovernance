@@ -1,0 +1,147 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "id": "8105.govern-action-outcome-evidence-consistency",
+    "title": "Govern action outcome evidence consistency before use",
+    "slug": "govern-action-outcome-evidence-consistency",
+    "type": "checker"
+  },
+  "human_pressure": {
+    "one_screen_brief": "Latest EverRun dogfood exposed contradictory outcome channels for the same coder action: one channel reported exit_code=0/process_state=succeeded while another digest reported exit_code=1. Ailuros already detects some post-run evidence inconsistencies, but the runtime needs a narrow pre-use gate so contradictory action-outcome evidence cannot be consumed downstream as trusted success. The integrating runtime/adapter supplies opaque action_ref and outcome_ref values, an explicit consistency classification, and evidence references. Ailuros records the request and returns ALLOW only for explicitly confirmed consistency with evidence, BLOCK only when consistency is explicitly violated with evidence, and REQUIRE_REVIEW for unknown, unrecognized, or unsupported consistency. Ailuros must not parse producer logs, compare exit codes, choose a winning channel, or build an evidence reconciliation engine.",
+    "goal": "Prevent downstream runtime decisions from treating an action outcome as trustworthy when the producer has not explicitly evidenced that its outcome channels are consistent.",
+    "non_goals": [
+      "Do not parse EverRun role.run_summary, coder-error.digest, process_state, exit_code, stdout/stderr, or backend-specific artifacts in Ailuros core.",
+      "Do not build a generic evidence graph, reconciliation engine, consensus algorithm, majority-vote mechanism, or source-trust scoring system.",
+      "Do not decide which contradictory channel is true.",
+      "Do not retry, restart, fail, repair, or otherwise orchestrate the external action/runtime."
+    ],
+    "red_lines": [
+      "action_ref and outcome_ref are opaque runtime-supplied identifiers.",
+      "Ailuros must never compute consistency by comparing producer-specific fields or by preferring one channel/source/provider over another.",
+      "Unknown, unrecognized, or insufficient evidence must not silently become ALLOW or BLOCK.",
+      "BLOCK applies only to using the supplied action outcome as trusted downstream evidence; it does not assert which competing claim is correct."
+    ],
+    "do_not_misread": [
+      "This is an action-outcome evidence-use gate, not a post-run inconsistency detector and not an evidence parser.",
+      "The producer/runtime or adapter owns detection/classification of channel consistency.",
+      "This pack must not modify the existing post-run EVIDENCE_INCONSISTENCY signal path in signals.py.",
+      "The design intentionally mirrors 8102's evidence-use pattern but governs action outcomes rather than validation-to-acceptance fidelity."
+    ]
+  },
+  "machine_core": {
+    "goal": "Add AilurosRuntime.before_action_outcome_use(run_id, action_ref, outcome_ref, consistency, evidence_refs=None, metadata=None) as a deterministic auditable gate before downstream consumption of an action outcome.",
+    "files": {
+      "allow": [
+        "src/ailuros/models/event.py",
+        "src/ailuros/runtime/runtime.py",
+        "tests/test_models.py",
+        "tests/test_action_outcome_evidence_consistency_governance.py"
+      ],
+      "create": [
+        "tests/test_action_outcome_evidence_consistency_governance.py"
+      ],
+      "forbid": [
+        "src/ailuros/core/**",
+        "src/ailuros/policy/**",
+        "src/ailuros/adapters/**",
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/storage/**",
+        "src/ailuros/server/**",
+        "schemas/**",
+        "fixtures/**",
+        "examples/**",
+        "apps/**",
+        "docs/**",
+        ".everrun/**",
+        "pyproject.toml",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "validate": [
+      "python -m pytest tests/test_action_outcome_evidence_consistency_governance.py tests/test_models.py -q",
+      "python -m pytest tests/test_state_handoff_governance.py tests/test_validation_evidence_fidelity_governance.py tests/test_actor_substitution_governance.py tests/test_runtime_decision_enforcement.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "acceptance": [
+      "RuntimeEventType contains ACTION_OUTCOME_USE_REQUESTED with wire value 'action_outcome_use_requested', and tests/test_models.py is updated inside declared scope so the canonical event-count assertion remains correct.",
+      "AilurosRuntime exposes before_action_outcome_use(run_id, action_ref, outcome_ref, consistency, evidence_refs=None, metadata=None) returning GovernanceDecision.",
+      "The ACTION_OUTCOME_USE_REQUESTED event is recorded before the resulting GOVERNANCE_DECISION.",
+      "The request and decision metadata preserve action_ref, outcome_ref, consistency, evidence_refs, and metadata without parsing producer-specific evidence.",
+      "consistency='confirmed' with at least one evidence reference returns ALLOW and allowed=true.",
+      "consistency='violated' with at least one evidence reference returns BLOCK and allowed=false.",
+      "consistency='unknown', an unrecognized value, or missing/empty evidence_refs returns REQUIRE_REVIEW and allowed=false.",
+      "The decision carries the supplied evidence_refs and a deterministic input_hash derived from the outcome-use request facts.",
+      "The implementation does not compare exit codes/process states, inspect logs/artifacts, choose a winning channel, or modify post-run signals.",
+      "Existing state-handoff, validation-evidence, actor-substitution, and tool-call governance behavior remains unchanged.",
+      "All focused and full validation commands pass."
+    ],
+    "red_lines": [
+      "Do not modify DecisionResolver, Policy, PolicyEngine, GovernanceDecisionType, core.ExecutionProjection, or existing post-run inconsistency semantics.",
+      "Do not parse or compare exit_code, process_state, stdout/stderr, role summaries, digest files, provider names, or backend-specific artifacts.",
+      "Do not add source ranking, majority voting, trust scoring, consensus, or evidence reconciliation logic.",
+      "Do not create a new generic evidence model or graph.",
+      "Do not retry, restart, fail, repair, or orchestrate the external action from this gate."
+    ],
+    "failure_semantics": [
+      "Confirmed consistency without supporting evidence is insufficient and must REQUIRE_REVIEW.",
+      "Explicitly violated consistency with supporting evidence BLOCKS use of the supplied action outcome as trusted downstream evidence.",
+      "Unknown, unrecognized, or incomplete consistency evidence must REQUIRE_REVIEW rather than guessing.",
+      "A BLOCK means 'do not consume this outcome as authoritative'; it does not identify the true channel or necessarily fail the underlying action.",
+      "Producer-specific contradiction detection remains outside Ailuros core and must be supplied as explicit classification plus evidence."
+    ],
+    "invariants": [
+      "Only explicit confirmed consistency plus evidence may authorize action-outcome use.",
+      "Violation is distinct from unknown.",
+      "Action and outcome references remain opaque.",
+      "Governance evidence is recorded before downstream consumption of the outcome.",
+      "Ailuros decides whether outcome evidence is usable; it does not reconcile channels or orchestrate recovery.",
+      "Existing post-run EVIDENCE_INCONSISTENCY behavior remains unchanged."
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "The change adds one narrow pre-use action-outcome gate and does not create an evidence reconciliation subsystem.",
+      "ACTION_OUTCOME_USE_REQUESTED is emitted before GOVERNANCE_DECISION and tests/test_models.py is explicitly in scope for the canonical event-count update.",
+      "Confirmed plus non-empty evidence_refs yields ALLOW; violated plus non-empty evidence_refs yields BLOCK; unknown/unrecognized/insufficient evidence yields REQUIRE_REVIEW.",
+      "action_ref and outcome_ref are preserved as opaque values and producer-specific channels are never parsed or compared.",
+      "No exit-code/process-state/log/backend/provider inference, source ranking, majority vote, trust score, or consensus logic is introduced.",
+      "The decision carries evidence_refs and deterministic input_hash.",
+      "BLOCK semantics are scoped to rejecting use of the outcome as authoritative evidence, not declaring which channel is correct or controlling runtime recovery.",
+      "8104 state-handoff governance, 8102 validation-evidence governance, 8103 actor-substitution governance, tool-call governance, and existing post-run inconsistency behavior remain green.",
+      "No forbidden files changed and every validation command passed."
+    ],
+    "reject_if": [
+      "Ailuros derives consistency by comparing exit_code, process_state, stdout/stderr, role summaries, digest files, backend/provider data, or other producer-specific fields.",
+      "Ailuros chooses a winning evidence channel, ranks sources, votes, scores trust, reconciles claims, or builds a generic evidence graph.",
+      "Confirmed consistency with no evidence_refs is allowed.",
+      "Unknown, unrecognized, or missing evidence defaults to ALLOW or BLOCK instead of REQUIRE_REVIEW.",
+      "The implementation changes existing post-run EVIDENCE_INCONSISTENCY semantics, DecisionResolver, Policy schema, PolicyEngine, GovernanceDecisionType, or core.ExecutionProjection.",
+      "Ailuros retries, restarts, fails, repairs, or otherwise orchestrates the external action/runtime.",
+      "Existing state-handoff, validation-evidence, actor-substitution, tool-call, or post-run inconsistency behavior regresses.",
+      "Validation fails or forbidden files change."
+    ],
+    "required": true
+  },
+  "runtime_governance": {
+    "max_coder_executions_per_pack": 3,
+    "accept_checkpoint": {
+      "enabled": true
+    },
+    "validation_debt_classification": {
+      "enabled": false
+    },
+    "simple_retry": {
+      "ruff_f401_only": true
+    }
+  },
+  "execution_policy": {
+    "max_attempts": 3
+  }
+}
