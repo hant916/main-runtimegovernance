@@ -143,5 +143,12 @@
   },
   "execution_policy": {
     "max_attempts": 3
+  },
+  "execution_history": {
+    "attempt_reserved": false,
+    "attempts": 2,
+    "last_attempt_at": "2026-09-12T22:50:01Z",
+    "last_result": "unresolved",
+    "last_summary": "iteration=1 validation=passed changed_files=0 diff_chars=5285 risks=(none)"
   }
 }

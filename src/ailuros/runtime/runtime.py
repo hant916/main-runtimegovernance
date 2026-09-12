@@ -399,6 +399,87 @@ class AilurosRuntime:
         )
         return decision
 
+    def before_state_handoff(
+        self,
+        run_id: str,
+        source_execution_ref: str,
+        target_execution_ref: str,
+        state_ref: str,
+        state_assurance: str,
+        evidence_refs: list[str] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> GovernanceDecision:
+        self._require_run(run_id)
+        meta = metadata or {}
+        evidence = list(evidence_refs or [])
+        request = {
+            "source_execution_ref": source_execution_ref,
+            "target_execution_ref": target_execution_ref,
+            "state_ref": state_ref,
+            "state_assurance": state_assurance,
+            "evidence_refs": evidence,
+            "metadata": meta,
+        }
+        self.record_event(run_id, RuntimeEventType.STATE_HANDOFF_REQUESTED, request)
+        decision_metadata = {"governance_kind": "state_handoff", **request}
+        input_hash = hashlib.sha256(
+            json.dumps(
+                {
+                    "source_execution_ref": source_execution_ref,
+                    "target_execution_ref": target_execution_ref,
+                    "state_ref": state_ref,
+                    "state_assurance": state_assurance,
+                },
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        if state_assurance == "accepted" and evidence:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.ALLOW,
+                allowed=True,
+                reason="Execution-state handoff assurance explicitly accepted with evidence.",
+                severity=Severity.LOW,
+                evidence_refs=evidence,
+                input_hash=input_hash,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        elif state_assurance == "rejected" and evidence:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.BLOCK,
+                allowed=False,
+                reason="Execution-state handoff assurance explicitly rejected.",
+                severity=Severity.CRITICAL,
+                evidence_refs=evidence,
+                input_hash=input_hash,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        else:
+            decision = GovernanceDecision(
+                decision_id=new_decision_id(),
+                run_id=run_id,
+                decision=GovernanceDecisionType.REQUIRE_REVIEW,
+                allowed=False,
+                reason="Execution-state handoff assurance is unknown or insufficient.",
+                severity=Severity.MEDIUM,
+                evidence_refs=evidence,
+                input_hash=input_hash,
+                metadata=decision_metadata,
+                created_at=now_utc(),
+            )
+        self.storage.save_governance_decision(decision)
+        self.record_event(
+            run_id,
+            RuntimeEventType.GOVERNANCE_DECISION,
+            decision.model_dump(mode="json"),
+        )
+        return decision
+
     def after_tool_call(
         self,
         run_id: str,
