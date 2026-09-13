@@ -1,0 +1,151 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "id": "8106.govern-validation-scope-authority",
+    "title": "Govern validation scope authority before acceptance",
+    "slug": "govern-validation-scope-authority",
+    "type": "checker"
+  },
+  "human_pressure": {
+    "one_screen_brief": "EverRun dogfood produced accepted runs where validation was green but the shared execution state contained changes outside the pack-authorized scope. Ailuros already has 8102's validation-state-equivalence gate; do not duplicate it. Add one separate, framework-neutral pre-use gate for validation scope authority. The integrating runtime/adapter supplies opaque validation_scope_ref, authorized_scope_ref and observed_change_scope_ref values plus an explicit scope_alignment classification and evidence references. Ailuros records the request and allows the validation result to act as authoritative acceptance evidence only when scope alignment is explicitly confirmed with evidence; explicit contamination blocks that evidence use; unknown or insufficient evidence requires review. Ailuros must not inspect Git, infer test-to-source coverage, or reinterpret a passed validation result as failed.",
+    "goal": "Separate validation success from validation authority so a green result cannot authorize acceptance when its execution/change scope is explicitly evidenced as contaminated relative to the governed scope.",
+    "non_goals": [
+      "Do not replace or widen 8102's validation-state-equivalence gate.",
+      "Do not inspect Git status, diffs, pack files, test discovery, coverage data or validation commands inside Ailuros core.",
+      "Do not infer which source files a test command covers.",
+      "Do not change core.ValidationResult or turn a passed validation fact into a failed validation fact.",
+      "Do not build a generic provenance, lineage, attestation or scope graph subsystem."
+    ],
+    "red_lines": [
+      "Opaque scope-reference equality must never be treated as proof of scope alignment.",
+      "Dirty/clean workspace state and changed-file counts must not become universal Ailuros rules.",
+      "Explicit contamination affects authority to consume validation evidence for acceptance; it does not rewrite the validation result itself.",
+      "Unknown or unsupported scope alignment must not silently become ALLOW or BLOCK."
+    ],
+    "do_not_misread": [
+      "This is validation-evidence authority, not validation execution and not repository hygiene.",
+      "The producer/runtime or adapter owns producer-specific derivation of scope_alignment.",
+      "Ailuros consumes explicit scope facts and decides whether the validation evidence may authorize acceptance.",
+      "8102 state equivalence and this scope-authority gate are independent conditions; neither silently implies the other."
+    ]
+  },
+  "machine_core": {
+    "goal": "Add AilurosRuntime.before_validation_scope_use(...) as a deterministic auditable gate that keeps validation result status separate from whether that result has sufficient scope authority to support acceptance.",
+    "files": {
+      "allow": [
+        "src/ailuros/models/event.py",
+        "src/ailuros/runtime/runtime.py",
+        "tests/test_models.py",
+        "tests/test_validation_scope_authority_governance.py"
+      ],
+      "create": [
+        "tests/test_validation_scope_authority_governance.py"
+      ],
+      "forbid": [
+        "src/ailuros/core/**",
+        "src/ailuros/policy/**",
+        "src/ailuros/adapters/**",
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/run_failure_correlation.py",
+        "src/ailuros/storage/**",
+        "src/ailuros/server/**",
+        "schemas/**",
+        "fixtures/**",
+        "examples/**",
+        "apps/**",
+        "docs/**",
+        ".everrun/**",
+        "pyproject.toml",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "validate": [
+      "python -m pytest tests/test_validation_scope_authority_governance.py tests/test_validation_evidence_fidelity_governance.py tests/test_models.py -q",
+      "python -m pytest tests/test_action_outcome_evidence_consistency_governance.py tests/test_state_handoff_governance.py tests/test_actor_substitution_governance.py tests/test_runtime_decision_enforcement.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "acceptance": [
+      "RuntimeEventType contains VALIDATION_SCOPE_USE_REQUESTED with wire value 'validation_scope_use_requested', and tests/test_models.py is updated inside declared scope for the canonical event-count assertion if required.",
+      "AilurosRuntime exposes before_validation_scope_use(run_id, validation_id, validation_scope_ref, authorized_scope_ref, observed_change_scope_ref, scope_alignment, evidence_refs=None, metadata=None) returning GovernanceDecision.",
+      "The VALIDATION_SCOPE_USE_REQUESTED event is recorded before the resulting GOVERNANCE_DECISION.",
+      "Request and decision metadata preserve validation_id, all three opaque scope refs, scope_alignment, evidence_refs and caller metadata without parsing the refs.",
+      "scope_alignment='confirmed' with at least one evidence reference returns ALLOW and allowed=true.",
+      "scope_alignment='contaminated' with at least one evidence reference returns BLOCK and allowed=false, scoped only to using that validation evidence as authoritative acceptance evidence.",
+      "scope_alignment='unknown', an unrecognized classification, or missing/empty evidence_refs returns REQUIRE_REVIEW and allowed=false.",
+      "The decision carries the supplied evidence_refs and a deterministic input_hash derived from the scope-use request facts.",
+      "The implementation never compares scope refs to infer alignment and never inspects Git, validation commands, test coverage or changed-file counts.",
+      "Existing 8102 validation-state-equivalence behavior and 8105 action-outcome consistency behavior remain unchanged.",
+      "All focused and full validation commands pass."
+    ],
+    "red_lines": [
+      "Do not modify DecisionResolver, Policy, PolicyEngine, GovernanceDecisionType or core.ValidationResult.",
+      "Do not add Git/subprocess/worktree/test-coverage inspection to AilurosRuntime.",
+      "Do not derive scope_alignment from equality or inequality of opaque scope refs.",
+      "Do not fold this capability into 8102 by breaking or silently strengthening the existing before_validation_evidence_use API.",
+      "Do not generalize into a universal evidence authority graph, provenance platform or artifact registry.",
+      "Do not terminate, retry, repair or otherwise orchestrate the external runtime."
+    ],
+    "failure_semantics": [
+      "Confirmed alignment without supporting evidence is insufficient and must REQUIRE_REVIEW.",
+      "Explicit contamination with supporting evidence BLOCKS only authoritative use of the validation result for acceptance.",
+      "Unknown, unrecognized or incomplete scope evidence must REQUIRE_REVIEW rather than guess.",
+      "A BLOCK here never changes the producer's validation result from passed to failed.",
+      "Producer-specific derivation such as Git/worktree set comparison remains outside Ailuros core."
+    ],
+    "invariants": [
+      "Validation success and validation authority remain separate facts.",
+      "Only explicit confirmed scope alignment plus evidence may authorize validation evidence use under this gate.",
+      "Contamination is distinct from unknown.",
+      "Scope references remain opaque.",
+      "Governance evidence is recorded before downstream acceptance consumes the validation evidence.",
+      "Existing runtime-governance APIs retain their current semantics."
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "The change adds one narrow validation-scope authority gate and does not duplicate 8102's state-equivalence logic.",
+      "VALIDATION_SCOPE_USE_REQUESTED is emitted before GOVERNANCE_DECISION and the canonical event-count test is updated only if needed.",
+      "Confirmed plus non-empty evidence_refs yields ALLOW; contaminated plus non-empty evidence_refs yields BLOCK; unknown/unrecognized/insufficient evidence yields REQUIRE_REVIEW.",
+      "All scope refs are preserved as opaque values and are never compared to infer alignment.",
+      "A passed validation result is not rewritten as failed; only its authority to support acceptance is governed.",
+      "No Git/worktree/test-coverage/changed-file heuristic or producer-specific parser is introduced.",
+      "The decision carries evidence_refs and deterministic input_hash.",
+      "8102 validation-state-equivalence, 8105 action-outcome consistency, state-handoff, actor-substitution and tool-call governance remain green.",
+      "No forbidden files changed and every validation command passed."
+    ],
+    "reject_if": [
+      "The implementation derives scope alignment from scope-ref equality/inequality, Git status, diff shape, changed-file counts, test names or coverage inference.",
+      "The implementation changes core.ValidationResult or represents contaminated scope as validation execution failure.",
+      "The implementation weakens, removes or silently changes 8102 before_validation_evidence_use semantics.",
+      "Unknown, unrecognized or missing evidence defaults to ALLOW or BLOCK instead of REQUIRE_REVIEW.",
+      "Confirmed scope alignment with no evidence_refs is allowed.",
+      "The implementation changes DecisionResolver, Policy schema, PolicyEngine or GovernanceDecisionType.",
+      "The implementation expands into a generic provenance, lineage, artifact registry, attestation or evidence-graph subsystem.",
+      "Ailuros retries, repairs or orchestrates the external runtime.",
+      "Existing runtime governance regresses, validation fails, or forbidden files change."
+    ],
+    "required": true
+  },
+  "runtime_governance": {
+    "max_coder_executions_per_pack": 3,
+    "accept_checkpoint": {
+      "enabled": true
+    },
+    "validation_debt_classification": {
+      "enabled": false
+    },
+    "simple_retry": {
+      "ruff_f401_only": true
+    }
+  },
+  "execution_policy": {
+    "max_attempts": 3
+  }
+}
