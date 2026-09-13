@@ -1,0 +1,158 @@
+{
+  "schema_version": "impl-pack.v3.convergence",
+  "identity": {
+    "id": "8107.gate-repeated-cross-run-retry-admission",
+    "title": "Gate repeated cross-run retry admission",
+    "slug": "gate-repeated-cross-run-retry-admission",
+    "type": "runtime_governance"
+  },
+  "human_pressure": {
+    "one_screen_brief": "EverRun dogfood produced six near-immediate runs for the same unresolved pack with the same terminal failure shape and no meaningful state progress. 8086 already correlates bounded structured failure signatures, but it is advisory and explicitly does not control the next run. Add one narrow pre-admission gate for automated re-entry. The caller supplies the requested/prior work refs, the canonical repeated failure signature reference and recurrence count derived from bounded structured correlation, an explicit state_continuity classification, and evidence refs. Two or more equivalent prior failures for the same work with explicitly unchanged relevant state and no recovery evidence or acknowledgement must pause automatic re-entry via REQUIRE_REVIEW. Explicit acknowledgement or evidenced recovery may allow the retry. Ailuros must not scan history, persist cross-run memory, choose a backend, repair the runtime, or infer recurrence from prose.",
+    "goal": "Stop deterministic no-progress retry storms at the admission boundary while preserving intentional or evidenced recovery retries and keeping orchestration in the external runtime.",
+    "non_goals": [
+      "Do not replace 8086 failure correlation or create a second signature algorithm.",
+      "Do not add a database, durable retry ledger, background monitor, history crawler or repository scanner.",
+      "Do not automatically retry, restart, repair, reorder backends or choose the next execution path.",
+      "Do not treat one isolated failure as sufficient to block the first retry.",
+      "Do not infer recovery from elapsed time, vendor status, network guesses or free-form messages."
+    ],
+    "red_lines": [
+      "Recurrence must come from bounded structured evidence equivalent to 8086, never prose similarity or embeddings.",
+      "Same-work and unchanged-state facts must be explicit caller/runtime facts with evidence; Ailuros must not inspect Git or external systems to derive them.",
+      "The intervention is pause/escalate via REQUIRE_REVIEW, not permanent denial.",
+      "An explicit acknowledgement or evidenced recovery must preserve business flow and allow a deliberate retry.",
+      "ALLOW from this gate means only that duplicate-retry admission is not blocked; it is not proof the execution will succeed or is globally safe."
+    ],
+    "do_not_misread": [
+      "8086 answers 'is this failure pattern recurrent?'; this pack answers 'may the runtime automatically re-enter the same work now?'.",
+      "The external runtime remains responsible for starting, retrying, stopping and selecting executors.",
+      "Ailuros consumes bounded recurrence and state-continuity facts; it does not discover history itself.",
+      "The gate targets cross-run no-progress loops, not ordinary in-run max_attempts."
+    ]
+  },
+  "machine_core": {
+    "goal": "Add AilurosRuntime.before_retry_admission(...) as an auditable pre-run/re-entry gate that converts proven repeated no-progress recurrence into REQUIRE_REVIEW unless recovery evidence or explicit acknowledgement authorizes another retry.",
+    "files": {
+      "allow": [
+        "src/ailuros/models/event.py",
+        "src/ailuros/runtime/runtime.py",
+        "tests/test_models.py",
+        "tests/test_retry_admission_governance.py"
+      ],
+      "create": [
+        "tests/test_retry_admission_governance.py"
+      ],
+      "forbid": [
+        "src/ailuros/run_failure_correlation.py",
+        "src/ailuros/run_diagnosis.py",
+        "src/ailuros/execution_report.py",
+        "src/ailuros/core/**",
+        "src/ailuros/policy/**",
+        "src/ailuros/adapters/**",
+        "src/ailuros/evidence_normalization.py",
+        "src/ailuros/projection.py",
+        "src/ailuros/signals.py",
+        "src/ailuros/storage/**",
+        "src/ailuros/server/**",
+        "schemas/**",
+        "fixtures/**",
+        "examples/**",
+        "apps/**",
+        "docs/**",
+        ".everrun/**",
+        "pyproject.toml",
+        "*.lock",
+        "**/*.lock"
+      ]
+    },
+    "validate": [
+      "python -m pytest tests/test_retry_admission_governance.py tests/test_run_failure_correlation.py tests/test_models.py -q",
+      "python -m pytest tests/test_validation_scope_authority_governance.py tests/test_validation_evidence_fidelity_governance.py tests/test_action_outcome_evidence_consistency_governance.py tests/test_runtime_decision_enforcement.py -q",
+      "python -m ruff check .",
+      "python -m mypy src",
+      "python -m pytest tests -q",
+      "git diff --check"
+    ],
+    "acceptance": [
+      "RuntimeEventType contains RETRY_ADMISSION_REQUESTED with wire value 'retry_admission_requested', and tests/test_models.py is updated inside declared scope for the canonical event-count assertion if required.",
+      "AilurosRuntime exposes before_retry_admission(run_id, prior_work_ref, requested_work_ref, failure_signature_ref, recurrence_count, state_continuity, evidence_refs=None, recovery_evidence_refs=None, acknowledgement_ref=None, metadata=None) returning GovernanceDecision.",
+      "RETRY_ADMISSION_REQUESTED is recorded before the resulting GOVERNANCE_DECISION and preserves all supplied facts without scanning history.",
+      "When prior_work_ref == requested_work_ref, recurrence_count >= 2, state_continuity='unchanged', supporting evidence_refs are present, and neither recovery_evidence_refs nor acknowledgement_ref is present, the gate returns REQUIRE_REVIEW and allowed=false.",
+      "The repeated no-progress decision reason/metadata makes clear that automatic re-entry is paused and explicit acknowledgement or recovery evidence is required; it does not claim a new root cause.",
+      "An explicit acknowledgement_ref permits ALLOW for the duplicate-admission gate and is preserved in decision metadata.",
+      "Non-empty recovery_evidence_refs permit ALLOW for the duplicate-admission gate and are preserved as evidence.",
+      "A different requested_work_ref or recurrence_count < 2 does not trigger the repeated-retry pause; with sufficient evidence it returns ALLOW because this gate has not proven a retry storm.",
+      "state_continuity='changed' with supporting evidence returns ALLOW for this duplicate-retry gate; state_continuity='unknown' or missing/empty required evidence returns REQUIRE_REVIEW.",
+      "The decision carries deterministic input_hash and the evidence references used for the admission decision.",
+      "The implementation does not read repository history, Git, databases, external status, or free-form failure prose and does not modify 8086 correlation logic.",
+      "Existing governance behavior remains unchanged and all focused/full validation commands pass."
+    ],
+    "red_lines": [
+      "Do not modify or duplicate failure_signature/correlate_run_failures from 8086.",
+      "Do not add persistence, durable retry counters, history scanning, background polling or cross-project memory.",
+      "Do not derive recurrence from text similarity, timestamps, vendor messages or embeddings.",
+      "Do not inspect Git/worktree/network/provider state to derive state_continuity or recovery.",
+      "Do not automatically retry, stop, restart, repair, reorder or choose execution backends.",
+      "Do not return BLOCK merely because recurrence is present; repeated no-progress automation must pause via REQUIRE_REVIEW unless a narrower existing hard violation independently applies."
+    ],
+    "failure_semantics": [
+      "One prior failure or recurrence_count < 2 is not enough to prove a retry storm under this gate.",
+      "Repeated equivalent failure plus explicitly unchanged state and evidence pauses automatic re-entry with REQUIRE_REVIEW.",
+      "Unknown state continuity or insufficient evidence requires review rather than a guessed ALLOW/BLOCK.",
+      "Explicit acknowledgement allows an intentional retry without erasing the recurrence evidence.",
+      "Recovery evidence allows a retry because the prior no-progress condition is no longer assumed unchanged.",
+      "This gate never fabricates the cause of failure and never returns ACCEPT for the underlying work."
+    ],
+    "invariants": [
+      "Cross-run admission uses only bounded caller-supplied facts and creates no durable memory.",
+      "Repeated failure evidence and no-progress state evidence are both required before automatic re-entry is paused.",
+      "Human/explicit acknowledgement is a deliberate override, not a mutation of historical evidence.",
+      "The external runtime owns execution and retry orchestration.",
+      "8086 remains the canonical structured correlation mechanism.",
+      "Existing acceptance, validation, scope and action-outcome gates are not bypassed."
+    ],
+    "evidence_matrix_required": true
+  },
+  "judge": {
+    "must_check": [
+      "The pack adds a real pre-admission GovernanceDecision API, not another post-run report or advisory-only field.",
+      "The gate uses bounded caller-supplied recurrence/state facts and performs no history discovery or persistence.",
+      "Two or more equivalent prior failures for the same work plus explicitly unchanged state and evidence pause automatic re-entry via REQUIRE_REVIEW.",
+      "The first/isolated failure is not automatically paused solely by this capability.",
+      "Explicit acknowledgement or recovery evidence can allow a deliberate retry while preserving the recorded recurrence facts.",
+      "Unknown state continuity or insufficient evidence does not silently ALLOW or BLOCK.",
+      "8086 failure correlation code/signature semantics remain untouched and no second recurrence algorithm is introduced.",
+      "No Git/network/provider/free-form-log inference, backend selection, retry execution or runtime repair is introduced.",
+      "ALLOW is scoped to this admission gate and does not imply execution success, acceptance or global safety.",
+      "No forbidden files changed and every validation command passed."
+    ],
+    "reject_if": [
+      "The implementation adds a DB/table/file ledger, durable retry counter, background monitor, history crawler or repo-wide run scan.",
+      "The implementation duplicates or changes 8086's structured failure signature/correlation semantics.",
+      "Free-form text similarity, embeddings, vendor prose or timestamps determine recurrence.",
+      "A single isolated failure is enough to pause all retries.",
+      "Repeated no-progress evidence is converted into permanent BLOCK instead of REQUIRE_REVIEW/explicit confirmation.",
+      "Acknowledgement or recovery evidence cannot clear this specific duplicate-admission pause.",
+      "Unknown or insufficient evidence silently becomes ALLOW or BLOCK.",
+      "Ailuros automatically retries, restarts, repairs, selects/reorders backends or otherwise takes over orchestration.",
+      "Existing validation, action-outcome, state-handoff, actor-substitution or tool-call governance regresses.",
+      "Validation fails or forbidden files change."
+    ],
+    "required": true
+  },
+  "runtime_governance": {
+    "max_coder_executions_per_pack": 3,
+    "accept_checkpoint": {
+      "enabled": true
+    },
+    "validation_debt_classification": {
+      "enabled": false
+    },
+    "simple_retry": {
+      "ruff_f401_only": true
+    }
+  },
+  "execution_policy": {
+    "max_attempts": 3
+  }
+}
